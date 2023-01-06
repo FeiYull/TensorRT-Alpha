@@ -15,10 +15,10 @@ Compatible platforms: windows、linux
 - cudnn8.4
 - tensorrt8.4.2.4
 - opencv3.x
-- miniconda
 
 python dependent environment(optional）：
 ```bash
+# install miniconda first
 conda create -n tensorrt-alpha python==3.8 -y
 conda activate tensorrt-alpha
 git clone https://github.com/FeiYull/tensorrt-alpha
@@ -26,7 +26,7 @@ cd tensorrt-alpha
 pip install -r requirements.txt  
 ```
 ## Run
-set your TensorRT_ROOT path:
+Take ubuntu18 as an example, set your TensorRT_ROOT path:
 ```bash
 cd tensorrt-alpha/cmake
 vim common.cmake
@@ -73,21 +73,21 @@ some precision alignment renderings comparison:<br>
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    <center>yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题--></center>
+    yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题-->
     <br>		<!--换行-->
     <br>		<!--换行-->
     <img src=".github/yolov5s-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    <center>yolov5s : Offical( left ) vs Ours( right )	<!--标题--></center>
+    yolov5s : Offical( left ) vs Ours( right )	<!--标题-->
     <br>		<!--换行-->
     <br>		<!--换行-->
     <img src=".github/libfacedet-Offical(left)vsOurs(right-topk-4000).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    <center>libfacedetction : Offical( left ) vs Ours( right topK:4000)	<!--标题--></center>
+    libfacedetction : Offical( left ) vs Ours( right topK:4000)	<!--标题-->
     <br>		<!--换行-->
     <br>		<!--换行-->
     </center>

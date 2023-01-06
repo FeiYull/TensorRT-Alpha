@@ -15,10 +15,10 @@ graph LR
 - cudnn8.4
 - tensorrt8.4.2.4
 - opencv3.x
-- miniconda
 
 python环境（可选）：
 ```bash
+# 需要安装 miniconda
 conda create -n tensorrt-alpha python==3.8 -y
 conda activate tensorrt-alpha
 git clone https://github.com/FeiYull/tensorrt-alpha
@@ -26,7 +26,7 @@ cd tensorrt-alpha
 pip install -r requirements.txt  # 安装
 ```
 ## 运行
-设置 TensorRT_ROOT 路径:
+以ubuntu18为例子，设置 TensorRT_ROOT 路径:
 ```bash
 cd tensorrt-alpha/cmake
 vim common.cmake
@@ -64,7 +64,7 @@ vim common.cmake
 
 </div> 
 
-some precision alignment renderings comparison:<br>
+部分TensorRT-Alpha与原始python算法框架精度对齐展示:<br>
 <div align='center'>			<!--块级封装-->
     <center>	<!--将图片和文字居中-->
     <img src="yolov7-tiny-Offical(left)vsOurs(right).jpg"
