@@ -64,6 +64,10 @@ gif:<br>
 <center><img decoding="async" src=".github/u2net.gif" width="20%"> </center> <br>
 
 
+<center class="half">
+    <img src=".github/NBA.gif" width="200"/><img src=".github/u2net.gif" width="200"/><img src=".github/NBA.gif" width="200"/>
+</center>
+
 some precision alignment renderings comparison:<br>
 <div>			<!--块级封装-->
     <center>	<!--将图片和文字居中-->
