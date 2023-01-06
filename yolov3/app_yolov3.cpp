@@ -15,7 +15,7 @@ YOLOV3::~YOLOV3()
 {
 }
 
-void setParameters(/*Ӧ��1280 or 640ģʽѡ��*/utils::InitParameter& initParameters)
+void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
 	initParameters.num_class = 80; // for coco
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
 	utils::InitParameter param;
 	setParameters(param);
 	// path
-	std::string model_path = "../../data/yolov3/alpha_yolov3-tiny";
+	std::string model_path = "../../data/yolov3/alpha_yolov3-tiny.trt";
 	std::string video_path = "../../data/people.mp4";
 	std::string image_path = "../../data/6406403.jpg";
 	// camera' id
