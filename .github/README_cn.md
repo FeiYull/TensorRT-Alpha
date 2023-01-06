@@ -65,7 +65,7 @@ vim common.cmake
 </div> 
 
 some precision alignment renderings comparison:<br>
-<div>			<!--块级封装-->
+<div align='center'>			<!--块级封装-->
     <center>	<!--将图片和文字居中-->
     <img src="yolov7-tiny-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
