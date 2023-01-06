@@ -38,7 +38,7 @@ cd build
 cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/yolov4/build by default
-./app_yolov4  --model=../../data/yolov4/alpha_yolov4_-1_3_608_608_dynamic.trt --size=608  --batch_size=1  --img=../../data/6406401.jpg  --show --savePath
+./app_yolov4  --model=../../data/yolov4/alpha_yolov4_-1_3_608_608_dynamic.trt --size=608  --batch_size=1  --img=../../data/6406402.jpg  --show --savePath
 
 +-----------+
 |5. appendix|
