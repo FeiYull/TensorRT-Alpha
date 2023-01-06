@@ -64,7 +64,15 @@ gif:<br>
 <center><img decoding="async" src=".github/u2net.gif" width="20%"> </center> <br>
 
 
-![](.github/NBA.gif)  |  ![](.github/u2net.gif)
+<div align='center'>
+  <img src='.github/u2net.gif' height="90px" width="90px">
+  <img src='.github/u2net.gif' height="90px" width="90px">
+  <br>
+  <img src='.github/u2net.gif' height="90px" width="90px">
+  <img src='.github/u2net.gif' height="90px" width="90px">
+
+</div>  
+
 
 some precision alignment renderings comparison:<br>
 <div>			<!--块级封装-->
