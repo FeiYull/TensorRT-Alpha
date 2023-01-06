@@ -71,21 +71,21 @@ some precision alignment renderings comparison:<br>
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    <center>yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题--></center>
+    yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题-->
     <br>		<!--换行-->
     <br>		<!--换行-->
     <img src="yolov5s-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    <center>yolov5s : Offical( left ) vs Ours( right )	<!--标题--></center>
+    yolov5s : Offical( left ) vs Ours( right )	<!--标题-->
     <br>		<!--换行-->
     <br>		<!--换行-->
     <img src="libfacedet-Offical(left)vsOurs(right-topk-4000).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    <center>libfacedetction : Offical( left ) vs Ours( right topK:4000)	<!--标题--></center>
+    libfacedetction : Offical( left ) vs Ours( right topK:4000)	<!--标题-->
     <br>		<!--换行-->
     <br>		<!--换行-->
     </center>
