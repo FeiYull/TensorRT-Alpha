@@ -1,44 +1,44 @@
 # TensorRT-Alpha
- English | [简体中文](.github/README_cn.md)
-## Introduce
-This repository  provides accelerated deployment cases of deep learning CV   popular models, and cuda accelerated methods for pre-processing and post-processing of mainstream models. Most of the model transformation process is torch->onnx->tensorrt. There are two ways to obtain onnx files:
-- According to the network disk provided by this  repository, download ONNX directly
-- Follow the instructions provided in this repository to manually export ONNX from the relevant source code framework.
+  [English](../README.md) | 简体中文
+## 介绍
+本仓库提供深度学习CV领域模型加速部署案例，主流模型前处理、后处理提供cuda加速方法。大部分模型转换流程为：torch->onnx->tensorrt。获取onnx文件以下有两种方式：
+- 本仓库提供的网盘直接下载onnx；
+- 按照本仓库提供的指令，手动从相关源代码框架导出onnx。
 
 ```mermaid
 graph LR
     pytorch/tensorflow -->onnx-->tensorrt
 ```
-## Installation
-Compatible platforms: windows、linux
+## 安装
+适用平台：windows、linux
 - cuda11.6
 - cudnn8.4
 - tensorrt8.4.2.4
 - opencv3.x
 - miniconda
 
-python dependent environment(optional）：
+python环境（可选）：
 ```bash
 conda create -n tensorrt-alpha python==3.8 -y
 conda activate tensorrt-alpha
 git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha
-pip install -r requirements.txt  
+pip install -r requirements.txt  # 安装
 ```
-## Run
-set your TensorRT_ROOT path:
+## 运行
+设置 TensorRT_ROOT 路径:
 ```bash
 cd tensorrt-alpha/cmake
 vim common.cmake
-# set var TensorRT_ROOT to your path in line 20, eg:
+# 在第20行设置tensorrt的安装路径, 例如:
 # set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
 ```
-start to build project:
-For example:[yolov5](yolov5/readme.txt)
+开始构建工程:
+例如：[yolov5](../yolov5/readme.txt)
 
-## Onnx
-At present, more than 30  models have been implemented, and some onnx files of them are organized as follows:
-| model |weiyun |google driver |
+## 模型
+目前已实现30多个主流模型，部分整理好的onnx文件如下列表：
+|模型 |微云 |google网盘 |
 | --- | --- | --- |
 |yolov3    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|      
 |yolov4    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|
@@ -50,38 +50,37 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |u2net     | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |libfacedet  | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |facemesh   | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|more...(🚀: I will be back soon!)    |      |          |
+|more...(🚀: 剩余模型(含transformer)正在整理!)    |      |          |
 
-
-## DstImage
+## 效果
 gif:<br>
 <center>
-<img decoding="async" src=".github/facemesh.jpg" width="19%">
-<img decoding="async" src=".github/poeple640640.gif" width="42%">
+<img decoding="async" src="facemesh.jpg" width="19%">
+<img decoding="async" src="poeple640640.gif" width="42%">
 <br></center>
 
-<center><img decoding="async" src=".github/NBA.gif" width="32.5%"> <img decoding="async" src=".github/nuScenes.gif" width="30%"></center> <br>
-<center><img decoding="async" src=".github/u2net.gif" width="20%"> </center> <br>
+<center><img decoding="async" src="NBA.gif" width="32.5%"> <img decoding="async" src="nuScenes.gif" width="30%"></center> <br>
+<center><img decoding="async" src="u2net.gif" width="20%"> </center> <br>
 
 
 some precision alignment renderings comparison:<br>
 <div>			<!--块级封装-->
     <center>	<!--将图片和文字居中-->
-    <img src=".github/yolov7-tiny-Offical(left)vsOurs(right).jpg"
+    <img src="yolov7-tiny-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
     <center>yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
-    <img src=".github/yolov5s-Offical(left)vsOurs(right).jpg"
+    <img src="yolov5s-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
     <center>yolov5s : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
-    <img src=".github/libfacedet-Offical(left)vsOurs(right-topk-4000).jpg"
+    <img src="libfacedet-Offical(left)vsOurs(right-topk-4000).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
@@ -91,8 +90,7 @@ some precision alignment renderings comparison:<br>
     </center>
 </div>
 
-
-## Reference
+## 参考
 [0].https://github.com/NVIDIA/TensorRT<br>
 [1].https://github.com/onnx/onnx-tensor<br>
 [2].https://github.com/NVIDIA-AI-IOT/torch2trt<br>

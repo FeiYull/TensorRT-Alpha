@@ -30,3 +30,35 @@
 *.exe
 *.out
 *.app
+
+
+# VS 2019
+*x64/
+*.idea
+*CUDA_Demo.sln
+*vs
+*.vcxproj
+*.vcxproj.user
+*.user
+*.onnx
+*.trt
+*.vcxproj.filters
+*.sln
+
+#vscode
+*.vscode
+
+# linux
+*build
+
+*.ppm
+*.tgz
+*.prototxt
+*.caffemodel
+*.code-workspace
+
+*__pycache__
+
+# deep learning's file
+*onnx
+*trt
