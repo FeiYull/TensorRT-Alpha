@@ -54,24 +54,14 @@ At present, more than 30  models have been implemented, and some onnx files of t
 
 
 ## DstImage
-gif:<br>
-<center>
-<img decoding="async" src=".github/facemesh.jpg" width="19%">
-<img decoding="async" src=".github/poeple640640.gif" width="42%">
-<br></center>
-
-<center><img decoding="async" src=".github/NBA.gif" width="32.5%"> <img decoding="async" src=".github/nuScenes.gif" width="30%"></center> <br>
-<center><img decoding="async" src=".github/u2net.gif" width="20%"> </center> <br>
-
-
 <div align='center'>
-  <img src='.github/facemesh.jpg' width="200px">
-  <img src='.github/poeple640640.gif' height="90px" width="90px">
+  <img src='.github/facemesh.jpg' width="180px">
+  <img src='.github/poeple640640.gif' width="400px">
   <br>
-  <img src='.github/NBA.gif' height="90px" width="90px">
-  <img src='.github/nuScenes.gif' height="90px" width="90px">
+  <img src='.github/NBA.gif' height="200px" width="280px">
+  <img src='.github/nuScenes.gif' height="200px" width="300px">
   <br>
-  <img src='.github/u2net.gif' height="90px" width="90px">
+  <img src='.github/u2net.gif' height="200px" width="200px">
 
 </div>  
 

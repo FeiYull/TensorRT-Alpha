@@ -53,15 +53,16 @@ vim common.cmake
 |more...(🚀: 剩余模型(含transformer)正在整理!)    |      |          |
 
 ## 效果
-gif:<br>
-<center>
-<img decoding="async" src="facemesh.jpg" width="19%">
-<img decoding="async" src="poeple640640.gif" width="42%">
-<br></center>
+<div align='center'>
+  <img src='facemesh.jpg' width="180px">
+  <img src='poeple640640.gif' width="400px">
+  <br>
+  <img src='NBA.gif' height="200px" width="280px">
+  <img src='nuScenes.gif' height="200px" width="300px">
+  <br>
+  <img src='u2net.gif' height="200px" width="200px">
 
-<center><img decoding="async" src="NBA.gif" width="32.5%"> <img decoding="async" src="nuScenes.gif" width="30%"></center> <br>
-<center><img decoding="async" src="u2net.gif" width="20%"> </center> <br>
-
+</div> 
 
 some precision alignment renderings comparison:<br>
 <div>			<!--块级封装-->
