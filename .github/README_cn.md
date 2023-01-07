@@ -1,5 +1,9 @@
 # TensorRT-Alpha
+<div align="center">
+
   [English](../README.md) | 简体中文
+  <br>
+  </div>
 ## 介绍
 本仓库提供深度学习CV领域模型加速部署案例，主流模型前处理、后处理提供cuda加速方法。大部分模型转换流程为：torch->onnx->tensorrt。获取onnx文件以下有两种方式：
 - 本仓库提供的网盘直接下载onnx；
@@ -65,7 +69,7 @@ vim common.cmake
   <img src='nuScenes.gif' height="200px" width="300px">
   <br>
   <img src='u2net.gif' height="200px" width="200px">
-
+  <img src='libfacedet.gif' height="200px" width="360px">
 </div> 
 
 some precision alignment renderings comparison:<br>
