@@ -15,10 +15,10 @@ Compatible platforms: windows、linux
 - cudnn8.4
 - tensorrt8.4.2.4
 - opencv3.x
+- miniconda
 
 python dependent environment(optional）：
 ```bash
-# install miniconda first
 conda create -n tensorrt-alpha python==3.8 -y
 conda activate tensorrt-alpha
 git clone https://github.com/FeiYull/tensorrt-alpha
@@ -26,7 +26,9 @@ cd tensorrt-alpha
 pip install -r requirements.txt  
 ```
 ## Run
-Take ubuntu18 as an example, set your TensorRT_ROOT path:
+
+### linux
+set your TensorRT_ROOT path:
 ```bash
 cd tensorrt-alpha/cmake
 vim common.cmake
@@ -35,6 +37,9 @@ vim common.cmake
 ```
 start to build project:
 For example:[yolov5](yolov5/readme.txt)
+
+### windows
+waiting for update
 
 ## Onnx
 At present, more than 30  models have been implemented, and some onnx files of them are organized as follows:
@@ -62,6 +67,7 @@ At present, more than 30  models have been implemented, and some onnx files of t
   <img src='.github/nuScenes.gif' height="200px" width="300px">
   <br>
   <img src='.github/u2net.gif' height="200px" width="200px">
+  <img src='.github/libfacedet.gif' height="200px" width="360px">
 
 </div>  
 
@@ -73,21 +79,21 @@ some precision alignment renderings comparison:<br>
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题-->
+    <center>yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
     <img src=".github/yolov5s-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    yolov5s : Offical( left ) vs Ours( right )	<!--标题-->
+    <center>yolov5s : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
     <img src=".github/libfacedet-Offical(left)vsOurs(right-topk-4000).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    libfacedetction : Offical( left ) vs Ours( right topK:4000)	<!--标题-->
+    <center>libfacedetction : Offical( left ) vs Ours( right topK:4000)	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
     </center>
@@ -96,7 +102,7 @@ some precision alignment renderings comparison:<br>
 
 ## Reference
 [0].https://github.com/NVIDIA/TensorRT<br>
-[1].https://github.com/onnx/onnx-tensor<br>
+[1].https://github.com/onnx/onnx-tensorrt<br>
 [2].https://github.com/NVIDIA-AI-IOT/torch2trt<br>
 [3].https://github.com/shouxieai/tensorRT_Pro<br>
 [4].https://github.com/opencv/opencv_zoo<br>

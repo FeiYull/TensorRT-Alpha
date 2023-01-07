@@ -18,6 +18,7 @@ python alpha_export.py cfg/yolov4.cfg yolov4.weights --batch_size=-1 --onnx_file
 +---------------------+
 |2.edit and save onnx |
 +---------------------+
+# note: If you have obtained onnx by downloading, this step can be ignored
 ignore
 
 +----------------+

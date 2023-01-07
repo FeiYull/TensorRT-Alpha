@@ -37,6 +37,7 @@ python export_onnx.py   --weights  yolov6n.pt
 +---------------------+
 |2.edit and save onnx |
 +---------------------+
+# note: If you have obtained onnx by downloading, this step can be ignored
 ignore
 
 +----------------+

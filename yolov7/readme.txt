@@ -17,6 +17,7 @@ python export.py --weights yolov7-w6.pt  --dynamic  --grid --img-size 1280
 +---------------------+
 |2.edit and save onnx |
 +---------------------+
+# note: If you have obtained onnx by downloading, this step can be ignored
 ignore
 
 +----------------+
