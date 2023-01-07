@@ -46,6 +46,7 @@ ignore
 +----------------+
 # put your onnx file in this path:tensorrt-alpha/data/yolov3
 cd tensorrt-alpha/data/yolov3
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 # 640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3.onnx        --saveEngine=alpha_yolov3.trt      --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3-spp.onnx    --saveEngine=alpha_yolov3-spp.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
