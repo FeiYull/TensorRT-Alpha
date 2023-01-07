@@ -4,6 +4,7 @@
   [English](../README.md) | 简体中文
   <br>
   </div>
+
 ## 介绍
 本仓库提供深度学习CV领域模型加速部署案例，主流模型前处理、后处理提供cuda加速方法。大部分模型转换流程为：torch->onnx->tensorrt。获取onnx文件以下有两种方式：
 
@@ -20,10 +21,10 @@ graph LR
 - cudnn8.4
 - tensorrt8.4.2.4
 - opencv3.x
-- miniconda
 
 python环境（可选）：
 ```bash
+# 需要安装miniconda
 conda create -n tensorrt-alpha python==3.8 -y
 conda activate tensorrt-alpha
 git clone https://github.com/FeiYull/tensorrt-alpha
@@ -47,7 +48,9 @@ vim common.cmake
 
 ## 模型
 目前已实现30多个主流模型，部分整理好的onnx文件如下列表：
-|模型 |微云 |google网盘 |
+<div align='center'>
+
+| model |weiyun |google driver |
  :-: | :-: | :-: |
 |yolov3    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|      
 |yolov4    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|
@@ -59,7 +62,8 @@ vim common.cmake
 |u2net     | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |libfacedet  | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |facemesh   | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|more...(🚀: 剩余模型(含transformer)正在整理!)    |      |          |
+|more...(🚀: I will be back soon!)    |      |          |
+</div>  
 
 ## 效果
 <div align='center'>

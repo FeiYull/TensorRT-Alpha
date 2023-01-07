@@ -20,10 +20,10 @@ Compatible platforms: windows、linux
 - cudnn8.4
 - tensorrt8.4.2.4
 - opencv3.x
-- miniconda
 
 python dependent environment(optional）：
 ```bash
+# install miniconda first
 conda create -n tensorrt-alpha python==3.8 -y
 conda activate tensorrt-alpha
 git clone https://github.com/FeiYull/tensorrt-alpha
@@ -48,6 +48,9 @@ waiting for update
 
 ## Onnx
 At present, more than 30  models have been implemented, and some onnx files of them are organized as follows:
+
+<div align='center'>
+
 | model |weiyun |google driver |
  :-: | :-: | :-: |
 |yolov3    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|      
@@ -61,6 +64,8 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |libfacedet  | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |facemesh   | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |more...(🚀: I will be back soon!)    |      |          |
+
+</div>  
 
 
 ## DstImage
