@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 	setParameters(param);
 	// path
 	std::string model_path = "../../data/yolov7/yolov7-tiny.trt";
-	std::string video_path = "../../data/people640640.mp4";
+	std::string video_path = "../../data/people.mp4";
 	std::string image_path = "../../data/6406403.jpg";
 	int camera_id = 0; // camera' id
 
