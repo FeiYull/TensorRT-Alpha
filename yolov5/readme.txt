@@ -1,7 +1,7 @@
 +------------+
 |1. get onnx |
 +------------+
-download directly at [weiyun]   https://share.weiyun.com/3T3mZKBm  or [google driver]  https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv
+download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv)
 
 or export onnx:
 
@@ -23,7 +23,6 @@ python yolov5.py --mode=p6 --net_name=yolov5s6  --model_path=../data/yolov5/yolo
 +----------------+
 # put your onnx file in this path:tensorrt-alpha/data/yolov5
 cd tensorrt-alpha/data/yolov5
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 # 640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov5s.onnx   --saveEngine=alpha_yolov5s.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 # 1280
@@ -39,8 +38,17 @@ cd build
 cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/yolov5/build by default
-./app_yolov5  --model=../../data/yolov5/alpha_yolov5s.trt   --size=640  --batch_size=1 --img=../../data/6406401.jpg  --show --savePath
-./app_yolov5  --model=../../data/yolov5/alpha_yolov5m6.trt  --size=1280 --batch_size=1 --img=../../data/6406401.jpg  --show --savePath
+
+# 640
+# infer an image
+./app_yolov5  --model=../../data/yolov5/alpha_yolov5s.trt   --size=640  --batch_size=1 --img=../../data/6406401.jpg   --show --savePath
+# infer video
+./app_yolov5  --model=../../data/yolov5/alpha_yolov5s.trt   --size=640  --batch_size=8 --video=../../data/people.mp4  --show --savePath
+# infer web camera
+./app_yolov5  --model=../../data/yolov5/alpha_yolov5s.trt   --size=640  --batch_size=4 --cam_id=0                     --show --savePath
+
+# 1280
+./app_yolov5  --model=../../data/yolov5/alpha_yolov5m6.trt  --size=1280 --batch_size=1 --img=../../data/6406401.jpg   --show --savePath
 
 +-----------+
 |5. appendix|
