@@ -39,6 +39,7 @@ python export.py  --weights  yolov3-spp.pt  --dynamic
 +---------------------+
 |2.edit and save onnx |
 +---------------------+
+# note: If you have obtained onnx by downloading, this step can be ignored
 ignore
 
 +----------------+

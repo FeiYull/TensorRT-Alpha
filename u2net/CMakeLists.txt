@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_BUILD_TYPE "Debug")
 #set(CMAKE_BUILD_TYPE "Release")
 
-PROJECT(yolox VERSION 1.0.0 LANGUAGES C CXX CUDA)
+PROJECT(u2net VERSION 1.0.0 LANGUAGES C CXX CUDA)
 message(*********************************************************)
 message(STATUS CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR})
 message(*********************************************************)
@@ -22,7 +22,7 @@ file(GLOB CPPS
   ${CMAKE_CURRENT_SOURCE_DIR}/../utils/*.cpp
   ${TensorRT_ROOT}/samples/common/logger.cpp 
   )
-list(REMOVE_ITEM CPPS app_yolox.cpp)
+list(REMOVE_ITEM CPPS u2net.cpp)
 message(*********************************************************)
 message(STATUS CPPS = ${CPPS})
 message(*********************************************************)
@@ -51,8 +51,8 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 50 61 72 75)
 target_compile_options(${PROJECT_NAME} PUBLIC 
    $<$<COMPILE_LANGUAGE:CUDA>:--default-stream per-thread -lineinfo; --use_fast_math --disable-warnings>)
   
-add_executable(app_yolox app_yolox.cpp)
+add_executable(app_u2net app_u2net.cpp)
 
 # NVCC
 # target_link_libraries(detect ${PROJECT_NAME} ${ALL_LIBS} ${OpenCV_LIBRARIES} libgflags_nothreads.a)
-target_link_libraries(app_yolox ${PROJECT_NAME} ${ALL_LIBS} ${OpenCV_LIBRARIES} )
+target_link_libraries(app_u2net ${PROJECT_NAME} ${ALL_LIBS} ${OpenCV_LIBRARIES} )

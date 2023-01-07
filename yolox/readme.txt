@@ -39,6 +39,7 @@ python tools/export_onnx.py --output-name=yolox_tiny.onnx --exp_file=exps/defaul
 +---------------------+
 |2.edit and save onnx |
 +---------------------+
+# note: If you have obtained onnx by downloading, this step can be ignored
 ignore
 
 +----------------+

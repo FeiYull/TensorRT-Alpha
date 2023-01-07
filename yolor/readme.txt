@@ -29,6 +29,7 @@ python alpha_export.py --net=yolor_csp_x_star
 +---------------------+
 |2.edit and save onnx |
 +---------------------+
+# note: If you have obtained onnx by downloading, this step can be ignored
 ignore
 
 +----------------+
