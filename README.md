@@ -1,5 +1,10 @@
 # TensorRT-Alpha
- English | [简体中文](.github/README_cn.md)
+<div align="center">
+
+  English | [简体中文](.github/README_cn.md)
+  <br>
+  </div>
+
 ## Introduce
 This repository  provides accelerated deployment cases of deep learning CV   popular models, and cuda accelerated methods for pre-processing and post-processing of mainstream models. Most of the model transformation process is torch->onnx->tensorrt. There are two ways to obtain onnx files:
 - According to the network disk provided by this  repository, download ONNX directly
