@@ -55,11 +55,6 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 	//int index = atomicAdd(dst + dy * dstArea, 1);
 	//assert(dy == 1);
 
-	/*if (dy == 1)
-	{
-		float* add1 = dst + dy * dstArea;
-	}*/
-
 	int index = atomicAdd(dst + dy * dstArea, 1);
 
 	//int index = atomicAdd(&(dst + dy * dstWidth)[0], 1);
