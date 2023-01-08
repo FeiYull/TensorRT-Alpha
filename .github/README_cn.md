@@ -15,6 +15,13 @@
 graph LR
     pytorch/tensorflow -->onnx-->tensorrt
 ```
+
+## Update
+- 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
+- 2023.01.04  🍅 更新 yolov7, yolox, yolor
+- 2023.01.05  🎉 更新 u2net, libfacedetction
+- 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
+
 ## 安装
 适用平台：windows、linux
 - cuda11.6
@@ -65,12 +72,6 @@ vim common.cmake
 |facemesh   | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
-
-## Update
-- 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
-- 2023.01.04  🍅 更新 yolov7, yolox, yolor
-- 2023.01.05  🎉 更新 u2net, libfacedetction
-- 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
 
 ## 可视化
 <div align='center'>

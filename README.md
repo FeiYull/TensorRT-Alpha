@@ -14,6 +14,13 @@ This repository  provides accelerated deployment cases of deep learning CV   pop
 graph LR
     pytorch/tensorflow -->onnx-->tensorrt
 ```
+
+## Update
+- 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6
+- 2023.01.04  🍅 update yolov7, yolox, yolor
+- 2023.01.05  🎉 update u2net, libfacedetction
+- 2023.01.08  🚀 The whole network is the first to support yolov8
+
 ## Installation
 Compatible platforms: windows、linux
 - cuda11.6
@@ -66,12 +73,6 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |facemesh   | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
-
-## Update
-- 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6
-- 2023.01.04  🍅 update yolov7, yolox, yolor
-- 2023.01.05  🎉 update u2net, libfacedetction
-- 2023.01.08  🚀 The whole network is the first to support yolov8
 
 ## Visualization
 <div align='center'>
