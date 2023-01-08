@@ -46,8 +46,17 @@ cd build
 cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/yolov7/build by default
+
+## 640
+# infer image
 ./app_yolov7  --model=../../data/yolov7/yolov7-tiny.trt --size=640  --batch_size=1  --img=../../data/6406401.jpg  --show --savePath
 ./app_yolov7  --model=../../data/yolov7/yolov7-w6.trt   --size=1280 --batch_size=1  --img=../../data/6406401.jpg  --show --savePath
+
+# infer video
+./app_yolov7  --model=../../data/yolov7/yolov7-tiny.trt     --size=640 --batch_size=8  --img=../../data/people.mp4  --show --savePath=../
+
+# infer camera
+./app_yolov7  --model=../../data/yolov7/yolov7-tiny.trt     --size=640 --batch_size=4  --cam_id=0  --show
 
 +-----------+
 |5. appendix|
