@@ -58,13 +58,13 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |yolov5    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |yolov6    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |yolov7    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|yolov8    | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |yolox     | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |yolor     | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |u2net     | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |libfacedet  | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |facemesh   | [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |more...(🚀: I will be back soon!)    |      |          |
-
 </div>  
 
 
@@ -84,6 +84,14 @@ At present, more than 30  models have been implemented, and some onnx files of t
 
 some precision alignment renderings comparison:<br>
 <div align='center'>			<!--块级封装-->
+     <center>	<!--将图片和文字居中-->
+    <img src=".github/yolov8n-Offical(left)vsOurs(right).jpg"
+         alt="无法显示图片时显示的文字"
+         style="zoom:100%"/>
+    <br>		<!--换行-->
+    <center>yolov8n : Offical( left ) vs Ours( right )	<!--标题--></center>
+    <br>		<!--换行-->
+    <br>		<!--换行-->
     <center>	<!--将图片和文字居中-->
     <img src=".github/yolov7-tiny-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
