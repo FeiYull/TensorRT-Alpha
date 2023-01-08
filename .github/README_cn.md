@@ -66,6 +66,12 @@ vim common.cmake
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 
+## Update
+- 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
+- 2023.01.04  🍅 更新 yolov7, yolox, yolor
+- 2023.01.05  🎉 更新 u2net, libfacedetction
+- 2023.01.08  🚀 全网最快支持基于CUDA +TensorRT的yolov8框架
+
 ## 效果
 <div align='center'>
   <img src='facemesh.jpg' width="180px">
