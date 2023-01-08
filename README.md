@@ -67,6 +67,11 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 
+## Update
+- 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6
+- 2023.01.04  🍅 update yolov7, yolox, yolor
+- 2023.01.05  🎉 update u2net, libfacedetction
+- 2023.01.08  🚀 The whole network is the first to support yolov8
 
 ## DstImage
 <div align='center'>
