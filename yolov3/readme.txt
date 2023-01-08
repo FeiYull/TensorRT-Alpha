@@ -67,7 +67,17 @@ cd build
 cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/yolov3/build by default
+
+## 640
+# infer image
 ./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640  --batch_size=1  --img=../../data/6406403.jpg  --show --savePath
+
+# infer video
+./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=8  --img=../../data/people.mp4  --show --savePath=../
+
+# infer camera
+./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=4  --cam_id=0  --show
+
 # note:yolov3-tiny has obvious missed detection on the image 6406401.jpg, don't worry, the effect is consistent with the official
 
 +-----------+

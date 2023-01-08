@@ -41,8 +41,16 @@ cd build
 cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/libfacedetction/build by default
+
+# dynamic w h c
+# infer image
 ./app_libfacedetction  --model=../../data/libfacedetction/alpha_yunet_yunet_final_dynamic_simplify.trt  --batch_size=4  --img=../../data/6406401.jpg  --show --savePath
+
+# infer video
 ./app_libfacedetction  --model=../../data/libfacedetction/alpha_yunet_yunet_final_dynamic_simplify.trt  --batch_size=4  --video=../../data/people.mp4  --show
+
+# infer camera
+./app_libfacedetction  --model=../../data/libfacedetction/alpha_yunet_yunet_final_dynamic_simplify.trt  --batch_size=1  --cam_id=0  --show
 
 
 +-----------+

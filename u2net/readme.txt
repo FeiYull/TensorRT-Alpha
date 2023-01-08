@@ -38,7 +38,17 @@ cd build
 cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/u2net/build by default
+
+## 320
+# infer image
 ./app_u2net  --model=../../data/u2net/u2net.trt --size=320  --batch_size=1  --img=../../data/sailboat3.jpg  --show --savePath
+
+# infer video
+./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=8  --img=../../data/people.mp4  --show --savePath=../
+
+# infer camera
+./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=4  --cam_id=0  --show
+
 
 +-----------+
 |5. appendix|
