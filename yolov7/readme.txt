@@ -27,11 +27,11 @@ ignore
 cd tensorrt-alpha/data/yolov7
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 # 640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov7-tiny.onnx  --saveEngine=yolov7-tiny.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov7.onnx   	--saveEngine=yolov7.trt       --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov7x.onnx   	--saveEngine=yolov7x.trt      --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+../../../TensorRT-8.4.2.4/bin/trtexec    --onnx=yolov7-tiny.onnx  --saveEngine=yolov7-tiny.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+../../../TensorRT-8.4.2.4/bin/trtexec    --onnx=yolov7.onnx   	--saveEngine=yolov7.trt       --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+../../../TensorRT-8.4.2.4/bin/trtexec    --onnx=yolov7x.onnx   	--saveEngine=yolov7x.trt      --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 # 1280
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov7-w6.onnx    --saveEngine=yolov7-w6.trt    --buildOnly --minShapes=images:1x3x1280x1280 --optShapes=images:4x3x1280x1280 --maxShapes=images:8x3x1280x1280
+../../../TensorRT-8.4.2.4/bin/trtexec    --onnx=yolov7-w6.onnx    --saveEngine=yolov7-w6.trt    --buildOnly --minShapes=images:1x3x1280x1280 --optShapes=images:4x3x1280x1280 --maxShapes=images:8x3x1280x1280
 
 # note:if report an error（Error Code 1: Cuda Runtime (an illegal memory access was encountered "bool context = m_context->executeV2((void**)bindings)" returns false） 
 when running the model(yolov7-w6), just lower the batch_size.
