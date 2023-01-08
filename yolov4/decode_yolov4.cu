@@ -10,9 +10,6 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 	{
 		return;
 	}
-	//printf("dy = %d, my_index[dy] = %d \n", dy, my_index[dy]);
-	//printf("index = %d \n", my_index[dy]);
-	//printf("dy = %d,  dx = %d \n", dy, dx);
 	float* pitem = src + dy * srcArea + dx * srcWidth;
 	//float objectness = pitem[4]; //  Pr(Object)
 	//if (objectness < conf_thresh)
@@ -44,14 +41,7 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 	// atomicAdd: return old_count
 	//int index = atomicAdd(dst + dy * dstArea, 1);
 	//assert(dy == 1);
-
-	/*if (dy == 1)
-	{
-		float* add1 = dst + dy * dstArea;
-	}*/
-	
 	int index = atomicAdd(dst + dy * dstArea, 1);
-	
 	//int index = atomicAdd(&(dst + dy * dstWidth)[0], 1);
 	if (index >= topK)
 	{
@@ -81,7 +71,6 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 	*pout_item++ = right;
 	*pout_item++ = bottom;
 
-	// 
 	/**pout_item++ = *pitem++;
 	*pout_item++ = *pitem++;
 	*pout_item++ = *pitem++;
@@ -111,18 +100,6 @@ static __device__ float box_iou(
 	return c_area / (a_area + b_area - c_area);
 }
 
-/*
-* @brief:
-* @in: param
-* @in: src
-* @in: srcWidth:  eg:85
-* @in: srcHeight: eg:22500
-* @in: srcArea: = srcWidth * srcHeight, eg: 22500 * 85
-* @out:dst
-* @in: dstWidth: 7
-* @in: dstHeight:topK condidate objects, eg:1000
-* @note:yolov4ֱ:xyxy,yolov3567:xywh
-*/
 void yolov4::decodeDevice(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea, float* dst, int dstWidth, int dstHeight)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
@@ -133,7 +110,5 @@ void yolov4::decodeDevice(utils::InitParameter param, float* src, int srcWidth, 
 	decode_yolov4_device_kernel << < grid_size, block_size, 0, nullptr >> >(param.batch_size, param.num_class, param.topK, param.conf_thresh,
 																	 src, srcWidth, srcHeight, srcArea, 
 																	 dst, dstWidth, dstHeight, dstArea);
-	/*int my_index_host[4];
-	cudaMemcpy(my_index_host, my_index, 4 * sizeof(int), cudaMemcpyDeviceToHost);*/
 }
 

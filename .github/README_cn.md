@@ -70,19 +70,19 @@ vim common.cmake
 - 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
 - 2023.01.04  🍅 更新 yolov7, yolox, yolor
 - 2023.01.05  🎉 更新 u2net, libfacedetction
-- 2023.01.08  🚀 全网最快支持基于CUDA +TensorRT的yolov8框架
+- 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
 
-## 效果
+## 可视化
 <div align='center'>
-  <img src='facemesh.jpg' width="180px">
-  <img src='poeple640640.gif' width="400px">
+  <img src='facemesh.jpg' width="145px">
+  <img src='poeple640640.gif' width="320px">
+  <img src='NBA.gif' height="190px" width="230px">
   <br>
-  <img src='NBA.gif' height="200px" width="280px">
-  <img src='nuScenes.gif' height="200px" width="300px">
+  <img src='nuScenes.gif'  width="257px">
+  <img src='u2net.gif'  width="190px">
+  <img src='libfacedet.gif'  width="250px">
   <br>
-  <img src='u2net.gif' height="200px" width="200px">
-  <img src='libfacedet.gif' height="200px" width="360px">
-</div> 
+</div>  
 
 some precision alignment renderings comparison:<br>
 <div align='center'>			<!--块级封装-->

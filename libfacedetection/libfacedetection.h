@@ -64,7 +64,6 @@ protected:
 
 };
 
-
 void decodeLibFaceDetDevice(float* minSizes, float* feat_hw, float* priorBoxes, float* variances,
     int srcImgWidth, int srcImgHeight,
     float confThreshold, int batchSize, int srcHeight,
