@@ -56,7 +56,7 @@ int main(int argc, char** argv)
 	// path
 	std::string model_path = "../../data/yolov8/yolov8n.trt";
 	std::string video_path = "../../data/people.mp4";
-	std::string image_path = "../../data/6406407.jpg";
+	std::string image_path = "../../data/bus.jpg";
 	// camera' id
 	int camera_id = 0;
 
