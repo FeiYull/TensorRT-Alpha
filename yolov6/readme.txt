@@ -64,7 +64,7 @@ make -j10
 ./app_yolov6  --model=../../data/yolov6/yolov6n.trt --size=640  --batch_size=1  --img=../../data/6406401.jpg  --show --savePath
 
 # infer video
-./app_yolov6  --model=../../data/yolov6/yolov6n.trt     --size=640 --batch_size=8  --img=../../data/people.mp4  --show --savePath=../
+./app_yolov6  --model=../../data/yolov6/yolov6n.trt     --size=640 --batch_size=8  --video=../../data/people.mp4  --show --savePath=../
 
 # infer camera
 ./app_yolov6  --model=../../data/yolov6/yolov6n.trt     --size=640 --batch_size=4  --cam_id=0  --show

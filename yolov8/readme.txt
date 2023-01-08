@@ -47,10 +47,10 @@ make -j10
 ./app_yolov8  --model=../../data/yolov8/yolov8s.trt --size=640 --batch_size=8  --video=../../data/people.mp4  --show --savePath
 
 # infer video
-./app_yolov8  --model=../../data/yolov8/yolov8s.trt     --size=640 --batch_size=8  --img=../../data/people.mp4  --show --savePath=../
+./app_yolov8  --model=../../data/yolov8/yolov8n.trt     --size=640 --batch_size=8  --video=../../data/people.mp4  --show --savePath=../
 
 # infer camera
-./app_yolov8  --model=../../data/yolov8/yolov8s.trt     --size=640 --batch_size=2  --cam_id=0  --show
+./app_yolov8  --model=../../data/yolov8/yolov8n.trt     --size=640 --batch_size=2  --cam_id=0  --show
 
 +-----------+
 |5. appendix|
