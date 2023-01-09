@@ -16,7 +16,7 @@ graph LR
     pytorch/tensorflow -->onnx-->tensorrt
 ```
 
-## Update
+## 更新
 - 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
 - 2023.01.04  🍅 更新 yolov7, yolox, yolor
 - 2023.01.05  🎉 更新 u2net, libfacedetction
