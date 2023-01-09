@@ -30,9 +30,8 @@ namespace u2net
         //private:
     protected:
         utils::InitParameter m_param;
-        nvinfer1::Dims m_output_dims;  // (1, 25200, 85, 0, 0...)
-        int m_output_area; // 1 * 25200 * 85
-        //int m_total_objects; // 25200
+        nvinfer1::Dims m_output_dims;  
+        int m_output_area;
         std::vector<std::vector<utils::Box>> m_objectss;
 
         
