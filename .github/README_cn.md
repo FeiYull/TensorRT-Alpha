@@ -85,7 +85,7 @@ vim common.cmake
   <br>
 </div>  
 
-some precision alignment renderings comparison:<br>
+严格的精度对齐，官方效果 vs TensorRT-Alpha:<br>
 <div align='center'>			<!--块级封装-->
      <center>	<!--将图片和文字居中-->
     <img src="yolov8n-Offical(left)vsOurs(right).jpg"
