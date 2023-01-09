@@ -248,7 +248,7 @@ void LibFaceDet::preprocess(const std::vector<cv::Mat>& imgsBatch)
         pi += 3 * m_param.src_h * m_param.src_w;
     }
 
-    // 2. whc2cwh
+    // 2. hWc2chW
     hwc2chwDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_chw_device, m_param.src_w, m_param.src_h);
 #if 0
