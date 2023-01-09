@@ -22,7 +22,7 @@ file(GLOB CPPS
   ${CMAKE_CURRENT_SOURCE_DIR}/../utils/*.cpp
   ${TensorRT_ROOT}/samples/common/logger.cpp 
   )
-list(REMOVE_ITEM CPPS app_yolov7.cpp)
+list(REMOVE_ITEM CPPS app_yolov8.cpp)
 message(*********************************************************)
 message(STATUS CPPS = ${CPPS})
 message(*********************************************************)
