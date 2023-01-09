@@ -289,7 +289,7 @@ bool yolo::YOLO::infer()
 
 void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-#if 1 // valid
+#if 0 // valid
     {
         float* phost = new float[m_param.batch_size * m_output_area];
         float* pdevice = m_output_src_device;
@@ -305,7 +305,7 @@ void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
     // decode
     decodeDevice(m_param, m_output_src_device, 5 + m_param.num_class, m_total_objects, m_output_area,
         m_output_objects_device, m_output_objects_width, m_param.topK);
-#if 1 // valid
+#if 0 // valid
     {
         float* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
         float* pdevice = m_output_objects_device;
