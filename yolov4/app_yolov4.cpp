@@ -16,11 +16,11 @@ void setParameters(utils::InitParameter& initParameters)
 
 	initParameters.input_output_names = { "input",  "output" };
 
-	// initParameters.conf_thresh = 0.4f;
-	// initParameters.iou_thresh = 0.6f;
+	initParameters.conf_thresh = 0.4f;
+	initParameters.iou_thresh = 0.6f;
 
-	initParameters.conf_thresh = 0.1f;
-	initParameters.iou_thresh = 0.2f;
+	// initParameters.conf_thresh = 0.1f;
+	// initParameters.iou_thresh = 0.2f;
 	initParameters.save_path = "";
 }
 
