@@ -55,6 +55,8 @@ make -j10
 +-----------+
 |5. appendix|
 +-----------+
+yolov8 offical Tutorial: https://colab.research.google.com/github/glenn-jocher/glenn-jocher.github.io/blob/main/tutorial.ipynb#scrollTo=CYIjW4igCjqD
+
 offical model weights:
 https://github.com/ultralytics/assets/releases
 https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
