@@ -151,7 +151,7 @@ void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
     }
 #endif // 0
 
-    // 5. whc2cwh
+    // 5. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
 #if 0

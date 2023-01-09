@@ -287,7 +287,7 @@ void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
         delete[] phost;
     }
 #endif // 0
-    // 4. whc2cwh
+    // 4. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_norm_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
 #if 0
