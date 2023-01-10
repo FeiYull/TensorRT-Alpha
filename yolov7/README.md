@@ -1,10 +1,7 @@
-+------------+
-|1. get onnx |
-+------------+
-download directly at [weiyun]   https://share.weiyun.com/3T3mZKBm    or  [google driver]    https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv
+## 1. get onnx 
 
-or export onnx:
-
+download directly at [weiyun]:[weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing) or export onnx:
+```bash
 git clone https://github.com/WongKinYiu/yolov7
 git checkout  072f76c72c641c7a1ee482e39f604f6f8ef7ee92
 # 640
@@ -13,16 +10,15 @@ python export.py --weights yolov7.pt  --dynamic  --grid
 python export.py --weights yolov7x.pt  --dynamic  --grid
 # 1280
 python export.py --weights yolov7-w6.pt  --dynamic  --grid --img-size 1280
-
-+---------------------+
-|2.edit and save onnx |
-+---------------------+
+```
+## 2.edit and save onnx 
+```bash
 # note: If you have obtained onnx by downloading, this step can be ignored
 ignore
+```
 
-+----------------+
-| 3.compile onnx |
-+----------------+
+## 3.compile onnx
+```bash
 # put your onnx file in this path:tensorrt-alpha/data/yolov7
 cd tensorrt-alpha/data/yolov7
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
@@ -35,10 +31,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 
 # note:if report an error（Error Code 1: Cuda Runtime (an illegal memory access was encountered "bool context = m_context->executeV2((void**)bindings)" returns false） 
 when running the model(yolov7-w6), just lower the batch_size.
-
-+------+
-|4.run |
-+------+
+```
+## 4.run
+```bash
 git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/yolov7
 mkdir build
@@ -57,8 +52,6 @@ make -j10
 
 # infer camera
 ./app_yolov7  --model=../../data/yolov7/yolov7-tiny.trt     --size=640 --batch_size=4  --cam_id=0  --show
-
-+-----------+
-|5. appendix|
-+-----------+
+```
+## 5. appendix
 ignore

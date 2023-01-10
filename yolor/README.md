@@ -1,17 +1,15 @@
-[注意]：
-0、请使用本仓库提供的导出脚本“alpha_export.py：
-1、使用torch1.7+onnx1.8.0时候，导出onnx的时候会报错：
+## 说明
+- 0、请使用本仓库提供的导出脚本“alpha_export.py：
+- 1、使用torch1.7+onnx1.8.0时候，导出onnx的时候会报错：
 “RuntimeError: Exporting the operator silu to ONNX opset version 11 is not supported. Please open a bug to request ONNX export support for the missing operator.”
-2、将环境改为：torch1.9+onnx1.11.0，上述不支持的op问题就解决了导出onnx问题。
+- 2、将环境改为：torch1.9+onnx1.11.0，上述不支持的op问题就解决了导出onnx问题。
 
 
-+------------+
-|1. get onnx |
-+------------+
+## 1. get onnx 
 download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv)
 
 or export onnx:
-
+```bash
 git clone https://github.com/WongKinYiu/yolor
 git checkout  462858e8737f56388f812cfe381a69c4ffca0cc7
 
@@ -25,16 +23,14 @@ python alpha_export.py --net=yolor_csp
 python alpha_export.py --net=yolor_csp_star
 python alpha_export.py --net=yolor_csp_x
 python alpha_export.py --net=yolor_csp_x_star
-
-+---------------------+
-|2.edit and save onnx |
-+---------------------+
+```
+## 2.edit and save onnx 
+```bash
 # note: If you have obtained onnx by downloading, this step can be ignored
 ignore
-
-+----------------+
-| 3.compile onnx |
-+----------------+
+```
+## 3.compile onnx
+```bash
 # put your onnx file in this path:tensorrt-alpha/data/yolor
 cd tensorrt-alpha/data/yolor
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
@@ -47,11 +43,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 ../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_star.onnx     --saveEngine=yolor_csp_star.trt     --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_x.onnx        --saveEngine=yolor_csp_x.trt        --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_x_star.onnx   --saveEngine=yolor_csp_x_star.trt   --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-
-
-+------+
-|4.run |
-+------+
+```
+## 4.run
+```bash
 git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/yolor
 mkdir build
@@ -73,8 +67,6 @@ make -j10
 
 ## 1280
 ./app_yolor  --model=../../data/yolor/yolor_p6.trt  --size=1280 --batch_size=1  --img=../../data/6406401.jpg  --show --savePath
-
-+-----------+
-|5. appendix|
-+-----------+
+```
+## 5. appendix
 ignore
