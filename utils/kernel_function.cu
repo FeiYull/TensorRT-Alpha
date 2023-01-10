@@ -984,17 +984,7 @@ void nms_sort_kernel(int topK, int batch_size, float iou_thresh,
 		
 	}
 }
-/*
-* @brief:
-* @in: param
-* @in: src
-* @in: srcWidth:  eg:85
-* @in: srcHeight: eg:22500
-* @in: srcArea: = srcWidth * srcHeight, eg: 22500 * 85
-* @out:dst
-* @in: dstWidth: 7
-* @in: dstHeight:topK condidate objects, eg:1000
-*/
+
 void decodeDevice(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea, float* dst, int dstWidth, int dstHeight)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
@@ -1016,7 +1006,7 @@ void nmsDeviceV1(utils::InitParameter param, float* src, int srcWidth, int srcHe
 	nms_fast_kernel << < grid_size, block_size, 0, nullptr >> > (param.topK, param.batch_size, param.iou_thresh,
 		src, srcWidth, srcHeight, srcArea);
 }
-
+// nms with sort
 void nmsDeviceV2(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea, 
 	int* idx, float* conf)
 {
