@@ -48,7 +48,7 @@ vim common.cmake
 # set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
 ```
 start to build project:
-For example:[yolov5](yolov5/readme.txt)
+For example:[yolov7](yolov7/readme.txt)
 
 ### windows
 waiting for update
