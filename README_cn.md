@@ -1,7 +1,7 @@
 # TensorRT-Alpha
 <div align="center">
 
-  [English](../README.md) | 简体中文
+  [English](README.md) | 简体中文
   <br>
   </div>
 
