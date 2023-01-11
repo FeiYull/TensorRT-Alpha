@@ -18,6 +18,7 @@ python yolov5.py --mode=p6 --net_name=yolov5s6  --model_path=../data/yolov5/yolo
 ## 3.compile onnx
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/yolov5
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 cd tensorrt-alpha/data/yolov5
 # 640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov5s.onnx   --saveEngine=alpha_yolov5s.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
