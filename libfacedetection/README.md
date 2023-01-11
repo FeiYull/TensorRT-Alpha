@@ -6,7 +6,7 @@ or export onnx:
 git clone https://github.com/ShiqiYu/libfacedetection.train
 git checkout  a3bc97c7e85bb206c9feca97fbd541ce82cfa3a9
 
-note：The official repository gives the following three models:
+# note：The official repository gives the following three models:
 yunet_yunet_final_320_320_simplify.onnx
 yunet_yunet_final_640_640_simplify.onnx
 yunet_yunet_final_dynamic_simplify.onnx
@@ -16,7 +16,9 @@ choose the third model here.
 ```bash
 # note: If you have obtained onnx by downloading, this step can be ignored
 conda activate tensorrt-alpha
-python alpha_edit.py --onnx=../data/libfacedetction/yunet_yunet_final_dynamic_simplify.onnx
+# put your onnx file in this path:tensorrt-alpha/data/libfacedetection
+cd  tensorrt-alpha/data/libfacedetction
+python alpha_edit.py --onnx=yunet_yunet_final_dynamic_simplify.onnx
 ```
 ## 3.compile onnx 
 ```bash
@@ -35,7 +37,7 @@ cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/libfacedetction/build by default
 
-# dynamic w h c
+# dynamic [b w h] 
 # infer image
 ./app_libfacedetction  --model=../../data/libfacedetction/alpha_yunet_yunet_final_dynamic_simplify.trt  --batch_size=4  --img=../../data/6406401.jpg  --show --savePath
 

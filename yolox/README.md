@@ -31,7 +31,7 @@ ignore
 
 ## 3.compile onnx
 ```bash
-# put your onnx file in this path:tensorrt-alpha/data/yolov7
+# put your onnx file in this path:tensorrt-alpha/data/yolox
 cd tensorrt-alpha/data/yolov7
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 

@@ -12,7 +12,7 @@ or export onnx:
 ```bash
 git clone https://github.com/WongKinYiu/yolor
 git checkout  462858e8737f56388f812cfe381a69c4ffca0cc7
-
+# PLease use the "alpha_export.py" file provided by TensorRT-Alpha to export onnx
 cd yolor-main
 cp  alpha_export.py yolor-main
 
