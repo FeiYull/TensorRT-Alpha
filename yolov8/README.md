@@ -49,5 +49,4 @@ make -j10
 ./app_yolov8  --model=../../data/yolov8/yolov8n.trt     --size=640 --batch_size=2  --cam_id=0  --show
 ```
 ## 5. appendix
-yolov8 offical Tutorial: https://colab.research.google.com/github/glenn-jocher/glenn-jocher.github.io/blob/main/tutorial.ipynb#scrollTo=CYIjW4igCjqD<br>
 yolov8 offical repo:https://github.com/ultralytics/ultralytics<br>
