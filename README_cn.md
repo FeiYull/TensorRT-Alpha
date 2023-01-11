@@ -7,7 +7,7 @@
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
   [![](https://img.shields.io/badge/pytorch-1.9.0-blue.svg?style=flat&logo=pytorch)](https://pytorch.org/)
 
-  English | [简体中文](README_cn.md)
+  [English](README.md) | 简体中文
   <br>
   </div>
 
