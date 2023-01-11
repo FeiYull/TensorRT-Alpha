@@ -5,13 +5,14 @@
   [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
+  [![](https://img.shields.io/badge/pytorch-1.9.0-blue.svg?style=flat&logo=pytorch)](https://pytorch.org/)
 
   English | [简体中文](README_cn.md)
   <br>
   </div>
 
 ## 介绍
-本仓库提供深度学习CV领域模型加速部署案例，主流模型前处理、后处理提供cuda加速方法。大部分模型转换流程为：torch->onnx->tensorrt。获取onnx文件以下有两种方式：
+本仓库提供深度学习CV领域模型加速部署案例，主流模型前处理、后处理提供cuda c加速方法。大部分模型转换流程为：torch->onnx->tensorrt。获取onnx文件以下有两种方式：
 
 - 本仓库提供的网盘直接下载onnx；
 - 按照本仓库提供的指令，手动从相关源代码框架导出onnx。
