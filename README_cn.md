@@ -1,7 +1,12 @@
 # TensorRT-Alpha
 <div align="center">
 
-  [English](README.md) | 简体中文
+  [![Cuda](https://img.shields.io/badge/CUDA-v11.3-%2376B900?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit-archive)
+  [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
+  [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
+  [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
+
+  English | [简体中文](README_cn.md)
   <br>
   </div>
 
