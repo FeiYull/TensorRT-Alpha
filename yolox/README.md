@@ -68,7 +68,5 @@ make -j10
 # 416
 ./app_yolox  --model=../../data/yolox/yolox_nano.trt  --size=416 --batch_size=2  --img=../../data/6406401.jpg  --show --savePath
 ```
-+-----------+
-|5. appendix|
-+-----------+
+## 5. appendix
 ignore

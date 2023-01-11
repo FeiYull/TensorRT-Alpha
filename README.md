@@ -22,11 +22,21 @@ graph LR
 - 2023.01.08  🚀 The whole network is the first to support yolov8
 
 ## Installation
-Compatible platforms: windows、linux
-- cuda11.6
-- cudnn8.4
+platforms: windows and linux. The following environments have been tested：<br>
+### ubuntu18.04
+- cuda11.3
+- cudnn8.2.0
+- gcc7.5.0
 - tensorrt8.4.2.4
-- opencv3.x
+- opencv3.x、4.x
+- cmake3.10.2
+
+### windows10
+- cuda11.3
+- cudnn8.2.0
+- visual studio 2017 and 2019
+- tensorrt8.4.2.4
+- opencv3.x、4.x
 
 python dependent environment(optional）：
 ```bash
@@ -37,20 +47,20 @@ git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha
 pip install -r requirements.txt  
 ```
-## Run
-
-### linux
+## Quick Start
+### ubuntu18.04
 set your TensorRT_ROOT path:
 ```bash
+git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/cmake
 vim common.cmake
 # set var TensorRT_ROOT to your path in line 20, eg:
 # set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
 ```
 start to build project:
-For example:[yolov7](yolov7/readme.txt)
+For example:[yolov7](yolov7/README.md)
 
-### windows
+### windows10
 waiting for update
 
 ## Onnx
