@@ -23,11 +23,21 @@ graph LR
 - 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
 
 ## 安装
-适用平台：windows、linux
-- cuda11.6
-- cudnn8.4
+适用平台: windows and linux. 以下环境已经被测试过：<br>
+### ubuntu18.04
+- cuda11.3
+- cudnn8.2.0
+- gcc7.5.0
 - tensorrt8.4.2.4
-- opencv3.x
+- opencv3.x、4.x
+- cmake3.10.2
+
+### windows10
+- cuda11.3
+- cudnn8.2.0
+- visual studio 2017 and 2019
+- tensorrt8.4.2.4
+- opencv3.x、4.x
 
 python环境（可选）：
 ```bash
@@ -38,20 +48,20 @@ git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha
 pip install -r requirements.txt  # 安装
 ```
-## 运行
-### linux
-设置 TensorRT_ROOT 路径:
+## 快速开始
+### ubuntu18.04
+设置TensorRT根目录（安装目录）路径:
 ```bash
+git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/cmake
 vim common.cmake
-# 在第20行设置tensorrt的安装路径, 例如:
+# 把common.cmake文件第20行中的TensorRT_ROOT修改成您的TensorRT安装目录, 例如改成如下:
 # set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
 ```
-开始构建工程:
-例如：[yolov7](../yolov7/readme.txt)
+开始编译、运行工程，例如:[yolov7](yolov7/README.md)
 
-### windows
-等待更新
+### windows10
+waiting for update
 
 ## 模型
 目前已实现30多个主流模型，部分整理好的onnx文件如下列表：

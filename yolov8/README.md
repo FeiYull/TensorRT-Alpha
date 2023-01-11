@@ -1,6 +1,7 @@
 ## 1. get onnx 
 download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv) or export onnx:
 ```bash
+# The official version of yolov8 has just been released, and TensorRT-Alpha will be updated synchronously as soon as possible!
 pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ultralytics==0.0.59
 yolo mode=export model=yolov8n.pt format=onnx dynamic=True     #simplify=True
 yolo mode=export model=yolov8s.pt  format=onnx dynamic=True    #simplify=True
@@ -49,11 +50,4 @@ make -j10
 ```
 ## 5. appendix
 yolov8 offical Tutorial: https://colab.research.google.com/github/glenn-jocher/glenn-jocher.github.io/blob/main/tutorial.ipynb#scrollTo=CYIjW4igCjqD<br>
-
-offical model weights:<br>
-https://github.com/ultralytics/assets/releases<br>
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt<br>
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8s.pt<br>
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8m.pt<br>
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8l.pt<br>
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x.pt<br>
+yolov8 offical repo:https://github.com/ultralytics/ultralytics<br>
