@@ -12,8 +12,8 @@ python export.py --weights=yolov5s6.pt  --dynamic # 1280
 git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/yolov5
 conda activate tensorrt-alpha
-python yolov5.py --mode=p5 --net_name=yolov5s  --model_path=../data/yolov5/yolov5s.onnx # 640
-python yolov5.py --mode=p6 --net_name=yolov5s6  --model_path=../data/yolov5/yolov5s6.onnx # 1280
+python alpha_edit.py --mode=p5 --net_name=yolov5s  --model_path=../data/yolov5/yolov5s.onnx # 640
+python alpha_edit.py --mode=p6 --net_name=yolov5s6  --model_path=../data/yolov5/yolov5s6.onnx # 1280
 ```
 ## 3.compile onnx
 ```bash

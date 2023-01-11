@@ -4,8 +4,9 @@ or export onnx:
 ```bash
 git clone https://github.com/ultralytics/yolov3
 git checkout  dd838e25863169d0de4f10631a609350658efb69
-cd yolov3
-# note: When using the official export.py to export onnx, you need to comment the following two lines(line 23, 24)：
+```
+```bash
+# note: When using the official export.py to export onnx, you need to comment the following two lines：
 #---------------------------------------------------------------------------------------------------------
 if simplify:
             try:
@@ -27,6 +28,9 @@ if simplify:
         LOGGER.info(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
         LOGGER.info(f"{prefix} run --dynamic ONNX model inference with: 'python detect.py --weights {f}'")
 #---------------------------------------------------------------------------------------------------------
+```
+```bash
+cd yolov3
 python export.py  --weights  yolov3-tiny.pt --dynamic --simplify
 python export.py  --weights  yolov3.pt      --dynamic --simplify
 python export.py  --weights  yolov3-spp.pt  --dynamic

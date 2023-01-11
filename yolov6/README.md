@@ -3,6 +3,8 @@ download directly at:[weiyun](https://share.weiyun.com/3T3mZKBm) or [google driv
 ```bash
 git clone https://github.com/meituan/YOLOv6
 git checkout  0.2.0
+```
+```bash
 # In order to support dynamic axes, the official onnx export script export_onnx.py 
 # needs to be modified, and the following modifications are made
 #*****************************************************************************************************************
@@ -27,6 +29,8 @@ torch.onnx.export(model, img, f, verbose=False, opset_version=12,
 
                               )
 #*****************************************************************************************************************
+```
+```bash
 python export_onnx.py   --weights  yolov6n.pt
 ```
 ## 2.edit and save onnx

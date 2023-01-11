@@ -26,7 +26,7 @@ graph LR
 - 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6
 - 2023.01.04  🍅 update yolov7, yolox, yolor
 - 2023.01.05  🎉 update u2net, libfacedetction
-- 2023.01.08  🚀 The whole network is the first to support yolov8
+- 2023.01.08  🚀 The whole network is the first to support yolov8 
 
 ## Installation
 platforms: windows and linux. The following environments have been tested：<br>
