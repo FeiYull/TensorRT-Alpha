@@ -6,13 +6,14 @@
   [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
+  [![](https://img.shields.io/badge/pytorch-1.9.0-blue.svg?style=flat&logo=pytorch)](https://pytorch.org/)
 
   English | [简体中文](README_cn.md)
   <br>
   </div>
 
 ## Introduce
-This repository  provides accelerated deployment cases of deep learning CV   popular models, and cuda accelerated methods for pre-processing and post-processing of mainstream models. Most of the model transformation process is torch->onnx->tensorrt. There are two ways to obtain onnx files:
+This repository  provides accelerated deployment cases of deep learning CV   popular models, and cuda c accelerated methods for pre-processing and post-processing of mainstream models. Most of the model transformation process is torch->onnx->tensorrt. There are two ways to obtain onnx files:
 - According to the network disk provided by this  repository, download ONNX directly
 - Follow the instructions provided in this repository to manually export ONNX from the relevant source code framework.
 
