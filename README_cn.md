@@ -1,7 +1,7 @@
 # TensorRT-Alpha
 <div align="center">
 
-  [![Cuda](https://img.shields.io/badge/CUDA-v11.3-%2376B900?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit-archive)
+  [![Cuda](https://img.shields.io/badge/CUDA-11.3-%2376B900?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit-archive)
   [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
@@ -25,7 +25,7 @@ graph LR
 ## 更新
 - 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
 - 2023.01.04  🍅 更新 yolov7, yolox, yolor
-- 2023.01.05  🎉 更新 u2net, libfacedetction
+- 2023.01.05  🎉 更新 u2net, libfacedetection
 - 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
 
 ## 安装
@@ -35,7 +35,7 @@ graph LR
 - cudnn8.2.0
 - gcc7.5.0
 - tensorrt8.4.2.4
-- opencv3.x、4.x
+- opencv3.x or 4.x
 - cmake3.10.2
 
 ### windows10
@@ -43,7 +43,7 @@ graph LR
 - cudnn8.2.0
 - visual studio 2017 and 2019
 - tensorrt8.4.2.4
-- opencv3.x、4.x
+- opencv3.x or 4.x
 
 python环境（可选）：
 ```bash

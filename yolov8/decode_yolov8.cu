@@ -25,7 +25,6 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 			label = i;
 		}
 	}
-	//confidence *= objectness; // Pr(Class0/Object) * Pr(Object)
 	if (confidence < conf_thresh)
 	{
 		return;
@@ -37,7 +36,6 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	// atomicAdd: return old_count
 	//int index = atomicAdd(dst + dy * dstArea, 1);
 	//assert(dy == 1);
-
 	int index = atomicAdd(dst + dy * dstArea, 1);
 
 	if (index >= topK)
@@ -59,8 +57,6 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	float top = cy;
 	float right = width;
 	float bottom = height;*/
-	
-	//float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
 	float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
 	*pout_item++ = left; // todo
 	*pout_item++ = top;

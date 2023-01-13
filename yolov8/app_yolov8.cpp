@@ -1,7 +1,6 @@
 #include"../utils/yolo.h"
 #include"yolov8.h"
 
-
 void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
@@ -37,13 +36,13 @@ int main(int argc, char** argv)
 {
 	cv::CommandLineParser parser(argc, argv,
 		{
-			"{model 	|| tensorrt model file	}"
-			"{size      || image (h, w), eg: 640}"
-			"{batch_size|| batch size           }"
-			"{video     || video's path			}"
-			"{img       || image's path			}"
-			"{cam_id    || camera's device id	}"
-			"{show      || if show the result	}"
+			"{model 	|| tensorrt model file	   }"
+			"{size      || image (h, w), eg: 640   }"
+			"{batch_size|| batch size              }"
+			"{video     || video's path			   }"
+			"{img       || image's path			   }"
+			"{cam_id    || camera's device id	   }"
+			"{show      || if show the result	   }"
 			"{savePath  || save path, can be ignore}"
 		});
 
