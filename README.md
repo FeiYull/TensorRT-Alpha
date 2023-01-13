@@ -2,7 +2,7 @@
 
 <div align="center">
 
-  [![Cuda](https://img.shields.io/badge/CUDA-v11.3-%2376B900?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit-archive)
+  [![Cuda](https://img.shields.io/badge/CUDA-11.3-%2376B900?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit-archive)
   [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
@@ -25,7 +25,7 @@ graph LR
 ## Update
 - 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6
 - 2023.01.04  🍅 update yolov7, yolox, yolor
-- 2023.01.05  🎉 update u2net, libfacedetction
+- 2023.01.05  🎉 update u2net, libfacedetection
 - 2023.01.08  🚀 The whole network is the first to support yolov8 
 
 ## Installation
@@ -35,15 +35,14 @@ platforms: windows and linux. The following environments have been tested：<br>
 - cudnn8.2.0
 - gcc7.5.0
 - tensorrt8.4.2.4
-- opencv3.x、4.x
+- opencv3.x or 4.x
 - cmake3.10.2
-
 ### windows10
-- cuda11.3
+- cuda11.3 
 - cudnn8.2.0
-- visual studio 2017 and 2019
+- visual studio 2017 or 2019 or 2022
 - tensorrt8.4.2.4
-- opencv3.x、4.x
+- opencv3.x or 4.x
 
 python dependent environment(optional）：
 ```bash
