@@ -12,6 +12,18 @@
   <br>
   </div>
 
+## Visualization
+<div align='center'>
+  <img src='.github/facemesh.jpg' width="145px">
+  <img src='.github/poeple640640.gif' width="320px">
+  <img src='.github/NBA.gif' height="190px" width="230px">
+  <br>
+  <img src='.github/nuScenes.gif'  width="257px">
+  <img src='.github/u2net.gif'  width="190px">
+  <img src='.github/libfacedet.gif'  width="250px">
+  <br>
+</div> 
+
 ## Introduce
 This repository  provides accelerated deployment cases of deep learning CV   popular models, and cuda c accelerated methods for pre-processing and post-processing of mainstream models. Most of the model transformation process is torch->onnx->tensorrt. There are two ways to obtain onnx files:
 - According to the network disk provided by this  repository, download ONNX directly
@@ -90,20 +102,8 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 
-## Visualization
-<div align='center'>
-  <img src='.github/facemesh.jpg' width="145px">
-  <img src='.github/poeple640640.gif' width="320px">
-  <img src='.github/NBA.gif' height="190px" width="230px">
-  <br>
-  <img src='.github/nuScenes.gif'  width="257px">
-  <img src='.github/u2net.gif'  width="190px">
-  <img src='.github/libfacedet.gif'  width="250px">
-  <br>
-</div>  
-
-
-some precision alignment renderings comparison:<br>
+## Some Precision Alignment Renderings Comparison
+<br>
 <div align='center'>			<!--块级封装-->
      <center>	<!--将图片和文字居中-->
     <img src=".github/yolov8n-Offical(left)vsOurs(right).jpg"
@@ -137,7 +137,6 @@ some precision alignment renderings comparison:<br>
     <br>		<!--换行-->
     </center>
 </div>
-
 
 ## Reference
 [0].https://github.com/NVIDIA/TensorRT<br>

@@ -11,6 +11,18 @@
   <br>
   </div>
 
+## 可视化
+<div align='center'>
+  <img src='.github/facemesh.jpg' width="145px">
+  <img src='.github/poeple640640.gif' width="320px">
+  <img src='.github/NBA.gif' height="190px" width="230px">
+  <br>
+  <img src='.github/nuScenes.gif'  width="257px">
+  <img src='.github/u2net.gif'  width="190px">
+  <img src='.github/libfacedet.gif'  width="250px">
+  <br>
+</div> 
+
 ## 介绍
 本仓库提供深度学习CV领域模型加速部署案例，主流模型前处理、后处理提供cuda c加速方法。大部分模型转换流程为：torch->onnx->tensorrt。获取onnx文件以下有两种方式：
 
@@ -89,19 +101,8 @@ waiting for update
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 
-## 可视化
-<div align='center'>
-  <img src='.github/facemesh.jpg' width="145px">
-  <img src='.github/poeple640640.gif' width="320px">
-  <img src='.github/NBA.gif' height="190px" width="230px">
-  <br>
-  <img src='.github/nuScenes.gif'  width="257px">
-  <img src='.github/u2net.gif'  width="190px">
-  <img src='.github/libfacedet.gif'  width="250px">
-  <br>
-</div>   
-
-严格的精度对齐，官方效果 vs TensorRT-Alpha:<br>
+## 严格的精度对齐，官方效果 vs TensorRT-Alpha:
+<br>
 <div align='center'>			<!--块级封装-->
      <center>	<!--将图片和文字居中-->
     <img src=".github/yolov8n-Offical(left)vsOurs(right).jpg"
