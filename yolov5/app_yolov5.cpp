@@ -30,7 +30,10 @@ void setParameters(utils::InitParameter& initParameters)
 	/*initParameters.dst_h = 1280;
 	initParameters.dst_w = 1280;*/
 
+	// yolov5.6.0
 	initParameters.input_output_names = { "images",  "output"};
+	// yolov5.7.0
+	//initParameters.input_output_names = { "images",  "output0"};
 
 	initParameters.conf_thresh = 0.25f;
 	initParameters.iou_thresh = 0.45f;
@@ -61,14 +64,15 @@ int main(int argc, char** argv)
 {
 	cv::CommandLineParser parser(argc, argv,
 		{
-			"{model 	|| tensorrt model file	}"
-			"{size      || image (h, w), eg: 640}"
-			"{batch_size|| batch size           }"
-			"{video     || video's path			}"
-			"{img       || image's path			}"
-			"{cam_id    || camera's device id	}"
-			"{show      || if show the result	}"
-			"{savePath  || save path, can be ignore}"
+			"{model 	|| tensorrt model file			  }"
+			"{size      || image (h, w), eg: 640		  }"
+			"{batch_size|| batch size           		  }"
+			"{video     || video's path					  }"
+			"{img       || image's path					  }"
+			"{cam_id    || camera's device id,eg:0		  }"
+			"{show      || if show the result			  }"
+			"{savePath  || save path, can be ignore		  }"
+			"{version   || v560=yolov5.6.0,v570=yolov5.7.0}"
 		});
 	
 	/************************************************************************************************
@@ -96,6 +100,7 @@ int main(int argc, char** argv)
 	int batch_size = 8;
 	bool is_show = false;
 	bool is_save = false;
+	std::string yolo_version = "v560";
 	if(parser.has("model"))
 	{
 		model_path = parser.get<std::string>("model");
@@ -141,6 +146,16 @@ int main(int argc, char** argv)
 		is_save = true;
 		param.save_path = parser.get<cv::String>("savePath");
 		sample::gLogInfo << "save_path = " << param.save_path << std::endl;
+	}
+	if(parser.has("version"))
+	{
+		yolo_version = parser.get<cv::String>("version");
+		sample::gLogInfo << "yolov5 version = " << yolo_version << std::endl;
+		if (yolo_version=="v570")
+		{
+			param.input_output_names[0] = "images";  // for yolov5.7.0
+			param.input_output_names[1] = "output0"; // note: yolov5.6.0 correspond to "output"
+		}
 	}
 
 

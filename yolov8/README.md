@@ -10,7 +10,7 @@ conda create -n yolov8 python==3.8 -y
 conda activate yolov8
 pip install ultralytics==8.0.5
 
-# download offical weights(".pth" file)
+# download offical weights(".pt" file)
 https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
 https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8s.pt
 https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8m.pt
