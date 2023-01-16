@@ -16,15 +16,19 @@ https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8s.pt
 https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8m.pt
 https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8l.pt
 https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x.pt
+https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x6.pt
 ```
 
 export onnx:
 ```bash
+# 640
 yolo mode=export model=yolov8n.pt format=onnx dynamic=True    #simplify=True
 yolo mode=export model=yolov8s.pt format=onnx dynamic=True    #simplify=True
 yolo mode=export model=yolov8m.pt format=onnx dynamic=True    #simplify=True
 yolo mode=export model=yolov8l.pt format=onnx dynamic=True    #simplify=True
 yolo mode=export model=yolov8x.pt format=onnx dynamic=True    #simplify=True
+# 1280
+yolo mode=export model=yolov8x6.pt format=onnx dynamic=True   #simplify=True
 ```
 
 ## 2.edit and save onnx
@@ -38,11 +42,14 @@ ignore
 # put your onnx file in this path:tensorrt-alpha/data/yolov8
 cd tensorrt-alpha/data/yolov8
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+# 640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8n.onnx  --saveEngine=yolov8n.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8s.onnx  --saveEngine=yolov8s.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8m.onnx  --saveEngine=yolov8m.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8l.onnx  --saveEngine=yolov8l.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8x.onnx  --saveEngine=yolov8x.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+# 1280
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8x6.onnx  --saveEngine=yolov8x6.trt  --buildOnly --minShapes=images:1x3x1280x1280 --optShapes=images:4x3x1280x1280 --maxShapes=images:8x3x1280x1280
 ```
 ## 4.run
 ```bash
@@ -64,5 +71,9 @@ make -j10
 
 # infer camera
 ./app_yolov8  --model=../../data/yolov8/yolov8n.trt     --size=640 --batch_size=2  --cam_id=0  --show
+
+## 1280
+# infer camera
+./app_yolov8  --model=../../data/yolov8/yolov8x6.trt     --size=1280 --batch_size=2  --cam_id=0  --show
 ```
 ## 5. appendix
