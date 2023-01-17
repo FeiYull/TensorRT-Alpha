@@ -41,33 +41,43 @@ graph LR
 - 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
 
 ## 安装
-适用平台: windows and linux. 以下环境已经被测试过：<br>
-### ubuntu18.04
+兼容平台: Windows and Linux. 以下环境已被测过：<br>
+<details>
+<summary>Ubuntu18.04</summary>
+
 - cuda11.3
 - cudnn8.2.0
 - gcc7.5.0
 - tensorrt8.4.2.4
 - opencv3.x or 4.x
 - cmake3.10.2
+</details>
 
-### windows10
-- cuda11.3
+<details>
+<summary>Windows10</summary>
+
+- cuda11.3 
 - cudnn8.2.0
-- visual studio 2017 and 2019
+- visual studio 2017 or 2019 or 2022
 - tensorrt8.4.2.4
 - opencv3.x or 4.x
+</details>
 
-python环境（可选）：
+<details>
+<summary>创建Python环境(可选）</summary>
+
 ```bash
-# 需要安装miniconda
+# install miniconda first
 conda create -n tensorrt-alpha python==3.8 -y
 conda activate tensorrt-alpha
 git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha
-pip install -r requirements.txt  # 安装
+pip install -r requirements.txt  
 ```
+</details>
+
 ## 快速开始
-### ubuntu18.04
+### Ubuntu18.04
 设置TensorRT根目录（安装目录）路径:
 ```bash
 git clone https://github.com/FeiYull/tensorrt-alpha
@@ -78,7 +88,7 @@ vim common.cmake
 ```
 开始编译、运行工程，例如:[yolov8](yolov8/README.md)
 
-### windows10
+### Windows10
 waiting for update
 
 ## 模型
