@@ -267,7 +267,7 @@ void min_int_array_device_kernel(int* src, int size, int* min_val)
 //extern __managed__ int   min_val_int[1];
 
 // change to dynamic batch!
-// dangrous!!!
+// legacy
 __managed__ float max_val_flt[1];
 __managed__ float min_val_flt[1];
 __managed__ int   max_val_int[1];
