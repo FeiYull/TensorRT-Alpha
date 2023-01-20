@@ -34,6 +34,7 @@
 - 2023.01.04  🍅 更新 yolov7, yolox, yolor
 - 2023.01.05  🎉 更新 u2net, libfacedetection
 - 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
+- 2023.01.08     更新 efficientdet, pphunmanseg
 
 ## 安装
 兼容平台: Windows and Linux. 以下环境已被测过：<br>
@@ -103,6 +104,8 @@ waiting for update
 |[u2net](u2net/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |[libfacedet](libfacedetection/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |[facemesh](facemesh/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[pphunmanseg](pphunmanseg/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|  
+|[efficientdet](efficientdet/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)| 
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 

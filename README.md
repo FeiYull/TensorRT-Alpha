@@ -35,6 +35,7 @@ There are two ways to obtain onnx files:
 - 2023.01.04  🍅 update yolov7, yolox, yolor
 - 2023.01.05  🎉 update u2net, libfacedetection
 - 2023.01.08  🚀 The whole network is the first to support yolov8 
+- 2023.01.08     update efficientdet, pphunmanseg
 
 ## Installation
 Platforms: Windows and Linux. The following environments have been tested：<br>
