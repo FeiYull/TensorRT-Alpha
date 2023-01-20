@@ -3,7 +3,7 @@ download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driv
 
 or export onnx:
 ```bash
-# Please refer to following site, it is tensorrt's offical doc, and we will export onnx from efficientdet's offical weights.
+# Please refer to following site, it is tensorrt's offical doc, and it lead you to export onnx from efficientdet's offical weights.
 # TensorRT-Alpha converts python to cuda c.
 https://github.com/NVIDIA/TensorRT/blob/release/8.4/samples/python/efficientdet/README.md
 ```
