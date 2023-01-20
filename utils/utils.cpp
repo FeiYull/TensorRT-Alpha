@@ -130,7 +130,15 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 		{
 			for (auto& box : objectss[bi])
 			{
-				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+				if (classNames.size() == 91) // coco91
+				{
+					color = Colors::color91[box.label];
+				}
+				if (classNames.size() == 80)
+				{
+					color = Colors::color80[box.label];
+				}
+				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2, cv::LINE_AA);
 				// cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
 				// cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
 				cv::String det_info = classNames[box.label] + " " + cv::format("%.4f", box.confidence);
@@ -172,7 +180,15 @@ void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vecto
 		{
 			for (auto& box : objectss[bi])
 			{
-				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+				if (classNames.size() == 91) // coco91
+				{
+					color = Colors::color91[box.label];
+				}
+				if (classNames.size() == 80)
+				{
+					color = Colors::color80[box.label];
+				}
+				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2, cv::LINE_AA);
 				// cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
 				// cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
 				cv::String det_info = classNames[box.label] + " " + cv::format("%.4f", box.confidence);
