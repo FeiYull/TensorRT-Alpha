@@ -25,14 +25,10 @@
 </div> 
 
 ## Introduce
-This repository  provides accelerated deployment cases of deep learning CV   popular models, and cuda c accelerated methods for pre-processing and post-processing of mainstream models. Most of the model transformation process is torch->onnx->tensorrt. There are two ways to obtain onnx files:
-- According to the network disk provided by this  repository, download ONNX directly
-- Follow the instructions provided in this repository to manually export ONNX from the relevant source code framework.
-
-```mermaid
-graph LR
-    pytorch/tensorflow -->onnx-->tensorrt
-```
+This repository  provides accelerated deployment cases of deep learning CV popular models, and cuda c supports dynamic-batch image process, infer, decode, NMS. Most of the model transformation process is torch->onnx->tensorrt.<br>
+There are two ways to obtain onnx files:
+- According to the network disk provided by TensorRT-Alpha, download ONNX directly. [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
+- Follow the instructions provided by TensorRT-Alpha to manually export ONNX from the relevant python source code framework.
 
 ## Update
 - 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6
@@ -98,21 +94,37 @@ At present, more than 30  models have been implemented, and some onnx files of t
 
 <div align='center'>
 
-| model |weiyun |google driver |
- :-: | :-: | :-: |
-|[yolov3](yolov3/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|      
-|[yolov4](yolov4/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|
-|[yolov5](yolov5/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[yolov6](yolov6/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[yolov7](yolov7/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[yolov8](yolov8/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[yolox](yolox/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[yolor](yolor/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[u2net](u2net/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[libfacedet](libfacedetection/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[facemesh](facemesh/README.md)| [weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+| model | tesla v100(32G) |weiyun |google driver |
+  :-: | :-: | :-: | :-: |
+|[yolov3](yolov3/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|      
+|[yolov4](yolov4/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|
+|[yolov5](yolov5/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[yolov6](yolov6/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[yolov7](yolov7/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[yolov8](yolov8/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[yolox](yolox/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[yolor](yolor/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[u2net](u2net/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[libfacedet](libfacedetection/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[facemesh](facemesh/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
+
+🍉We will test the time of all models on tesla v100 and A100! Now let's preview the performance of yolov8n on RTX2070m(8G)：
+<div align='center'>
+
+| model | input size |GPU Memory-Usage |GPU-Util|
+  :-: | :-: | :-: | :-: |
+|yolov8n|640x640(batch_size=8)|1093MiB/7982MiB| 14%| 
+
+ <center>	<!--将图片和文字居中-->
+<img src=".github/cost-time-yolov8n-batch-8-640.png"
+     alt="无法显示图片时显示的文字"
+     style="zoom:50%"/>
+<br>		<!--换行-->
+
+</div>
+<br>
 
 ## Some Precision Alignment Renderings Comparison
 <br>
@@ -120,7 +132,7 @@ At present, more than 30  models have been implemented, and some onnx files of t
      <center>	<!--将图片和文字居中-->
     <img src=".github/yolov8n-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
-         style="zoom:100%"/>
+         style="zoom:80%"/>
     <br>		<!--换行-->
     <center>yolov8n : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
@@ -128,14 +140,28 @@ At present, more than 30  models have been implemented, and some onnx files of t
     <center>	<!--将图片和文字居中-->
     <img src=".github/yolov7-tiny-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
-         style="zoom:100%"/>
+         style="zoom:80%"/>
     <br>		<!--换行-->
     <center>yolov7-tiny : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
-    <img src=".github/yolov5s-Offical(left)vsOurs(right).jpg"
+    <img src=".github/yolov6s-v6.3-Offical(left)vsOurs(right).jpg"
          alt="无法显示图片时显示的文字"
-         style="zoom:100%"/>
+         style="zoom:80%"/>
+    <br>		<!--换行-->
+    <center>yolov6s : Offical( left ) vs Ours( right )	<!--标题--></center>
+    <br>		<!--换行-->
+    <br>		<!--换行-->
+    <img src=".github/yolov5s-v5.7-Offical(left)vsOurs(right)-img2.jpg"
+         alt="无法显示图片时显示的文字"
+         style="zoom:80%"/>
+    <br>		<!--换行-->
+    <center>yolov5s : Offical( left ) vs Ours( right )	<!--标题--></center>
+    <br>		<!--换行-->
+    <br>		<!--换行-->
+    <img src=".github/yolov5s-v5.7-Offical(left)vsOurs(right)-img1.jpg"
+         alt="无法显示图片时显示的文字"
+         style="zoom:80%"/>
     <br>		<!--换行-->
     <center>yolov5s : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
