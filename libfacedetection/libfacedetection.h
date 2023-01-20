@@ -52,7 +52,7 @@ protected:
 
     // input
     float* m_input_src_device;
-    float* m_input_chw_device;
+    float* m_input_hwc_device;
 
     // output
     float* m_output_loc_device;

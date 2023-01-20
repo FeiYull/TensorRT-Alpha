@@ -21,6 +21,7 @@ file(GLOB CPPS
   ${CMAKE_CURRENT_SOURCE_DIR}/../utils/*.cu
   ${CMAKE_CURRENT_SOURCE_DIR}/../utils/*.cpp
   ${TensorRT_ROOT}/samples/common/logger.cpp 
+  ${TensorRT_ROOT}/samples/common/sampleOptions.cpp 
   )
 list(REMOVE_ITEM CPPS u2net.cpp)
 message(*********************************************************)
