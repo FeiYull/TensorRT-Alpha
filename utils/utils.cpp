@@ -119,6 +119,10 @@ bool utils::setInputStream(const utils::InputStream& source, const std::string& 
 void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std::vector<std::string>& classNames,
 	const int& cvDelayTime, std::vector<cv::Mat>& imgsBatch)
 {
+	cv::Scalar color = cv::Scalar(0, 255, 0);
+	cv::Point bbox_points[1][4];
+	const cv::Point* bbox_point0[1] = { bbox_points[0] };
+	int num_points[] = { 4 };
 	//for (size_t bi = 0; bi < objectss.size(); bi++)
 	for (size_t bi = 0; bi < imgsBatch.size(); bi++)
 	{
@@ -127,8 +131,16 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 			for (auto& box : objectss[bi])
 			{
 				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
-				cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
-				cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+				// cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+				// cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+				cv::String det_info = classNames[box.label] + " " + cv::format("%.4f", box.confidence);
+				bbox_points[0][0] = cv::Point(box.left, box.top);
+				bbox_points[0][1] = cv::Point(box.left + det_info.size() * 11, box.top);
+				bbox_points[0][2] = cv::Point(box.left + det_info.size() * 11, box.top - 15);
+				bbox_points[0][3] = cv::Point(box.left, box.top - 15);
+				cv::fillPoly(imgsBatch[bi], bbox_point0, num_points, 1, color);
+				cv::putText(imgsBatch[bi], det_info, bbox_points[0][0], cv::FONT_HERSHEY_DUPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+
 				if (!box.land_marks.empty()) // for facial landmarks
 				{
 					for (auto& pt:box.land_marks)
@@ -149,6 +161,10 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vector<std::string>& classNames,
 	const std::string& savePath, std::vector<cv::Mat>& imgsBatch, const int& batchSize, const int& batchi)
 {
+	cv::Scalar color = cv::Scalar(0, 255, 0);
+	cv::Point bbox_points[1][4];
+	const cv::Point* bbox_point0[1] = { bbox_points[0] };
+	int num_points[] = { 4 };
 	//for (size_t bi = 0; bi < objectss.size(); bi++)
 	for (size_t bi = 0; bi < imgsBatch.size(); bi++)
 	{
@@ -157,8 +173,16 @@ void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vecto
 			for (auto& box : objectss[bi])
 			{
 				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
-				cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
-				cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+				// cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+				// cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+				cv::String det_info = classNames[box.label] + " " + cv::format("%.4f", box.confidence);
+				bbox_points[0][0] = cv::Point(box.left, box.top);
+				bbox_points[0][1] = cv::Point(box.left + det_info.size() * 11, box.top);
+				bbox_points[0][2] = cv::Point(box.left + det_info.size() * 11, box.top - 15);
+				bbox_points[0][3] = cv::Point(box.left, box.top - 15);
+				cv::fillPoly(imgsBatch[bi], bbox_point0, num_points, 1, color);
+				cv::putText(imgsBatch[bi], det_info, bbox_points[0][0], cv::FONT_HERSHEY_DUPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+				
 				if (!box.land_marks.empty())
 				{
 					for (auto& pt : box.land_marks)
