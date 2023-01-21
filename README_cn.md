@@ -12,15 +12,15 @@
 
 ## 可视化
 <div align='center'>
-  <img src='.github/facemesh.jpg' width="145px">
-  <img src='.github/poeple640640.gif' width="320px">
+  <img src='.github/facemesh.jpg' width="143px">
+  <img src='.github/people.gif' width="338px">
   <img src='.github/yolov8-snow.gif' height="190px" width="230px">
   <br>
-  <img src='.github/yolov8-stree.gif'  width="257px">
+  <img src='.github/yolov8-stree.gif'  width="260px">
   <img src='.github/u2net.gif'  width="190px">
-  <img src='.github/libfacedet.gif'  width="250px">
+  <img src='.github/libfacedet.gif'  width="260px">
   <br>
-</div> 
+</div>
 
 ## 介绍
 本仓库提供深度学习CV领域模型加速部署案例，仓库实现的cuda c支持多batch图像预处理、推理、decode、NMS。大部分模型转换流程为：torch->onnx->tensorrt。
@@ -111,9 +111,9 @@ waiting for update
 🍉稍后在tesla v100 和 A100上测量时间开销!现在看看yolov8n在移动端RTX2070m(8G)的性能表现：
 <div align='center'>
 
-| model | input size |GPU Memory-Usage |GPU-Util|
-  :-: | :-: | :-: | :-: |
-|yolov8n|640x640(batch_size=8)|1093MiB/7982MiB| 14%| 
+| 模型 | 视频分辨率 | 模型输入尺寸 |显存占用 |GPU利用率|
+  :-: | :-: | :-: | :-: | :-: |
+|yolov8n|1920x1080|8x3x640x640|1093MiB/7982MiB| 14%| 
 
  <center>	<!--将图片和文字居中-->
 <img src=".github/yolov8n-b8-1080p-to-640.jpg"
