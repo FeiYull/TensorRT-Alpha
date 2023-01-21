@@ -120,7 +120,8 @@ waiting for update
      alt="无法显示图片时显示的文字"
      style="zoom:40%"/>
 <br>		<!--换行-->
-
+<center>一个batch内，平均每一帧的时间开销	<!--标题--></center>
+    <br>		<!--换行-->
 </div>
 <br>
 
