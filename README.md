@@ -124,6 +124,8 @@ At present, more than 30  models have been implemented, and some onnx files of t
      alt="无法显示图片时显示的文字"
      style="zoom:40%"/>
 <br>		<!--换行-->
+<center>cost time per frame	<!--标题--></center>
+    <br>		<!--换行-->
 
 </div>
 <br>
