@@ -115,14 +115,14 @@ At present, more than 30  models have been implemented, and some onnx files of t
 🍉We will test the time of all models on tesla v100 and A100! Now let's preview the performance of yolov8n on RTX2070m(8G)：
 <div align='center'>
 
-| model | input size |GPU Memory-Usage |GPU-Util|
-  :-: | :-: | :-: | :-: |
-|yolov8n|640x640(batch_size=8)|1093MiB/7982MiB| 14%| 
+| model | video resolution | model input size |GPU Memory-Usage |GPU-Util|
+  :-: | :-: | :-: | :-: | :-: |
+|yolov8n|1920x1080|8x3x640x640|1093MiB/7982MiB| 14%| 
 
  <center>	<!--将图片和文字居中-->
-<img src=".github/yolov8n-b8-640.png"
+<img src=".github/yolov8n-b8-1080p-to-640.jpg"
      alt="无法显示图片时显示的文字"
-     style="zoom:50%"/>
+     style="zoom:40%"/>
 <br>		<!--换行-->
 
 </div>
@@ -168,11 +168,11 @@ At present, more than 30  models have been implemented, and some onnx files of t
     <center>yolov5s : Offical( left ) vs Ours( right )	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
-    <img src=".github/libfacedet-Offical(left)vsOurs(right-topk-4000).jpg"
+    <img src=".github/libfacedet-Offical(left)vsOurs(right-topk-2000).jpg"
          alt="无法显示图片时显示的文字"
          style="zoom:100%"/>
     <br>		<!--换行-->
-    <center>libfacedetction : Offical( left ) vs Ours( right topK:4000)	<!--标题--></center>
+    <center>libfacedetction : Offical( left ) vs Ours( right topK:2000)	<!--标题--></center>
     <br>		<!--换行-->
     <br>		<!--换行-->
     </center>
