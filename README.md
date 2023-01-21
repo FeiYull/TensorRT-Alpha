@@ -6,7 +6,6 @@
   [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
-  [![](https://img.shields.io/badge/pytorch-1.9.0-blue.svg?style=flat&logo=pytorch)](https://pytorch.org/)
 
   English | [简体中文](README_cn.md)
   <br>
@@ -16,9 +15,9 @@
 <div align='center'>
   <img src='.github/facemesh.jpg' width="145px">
   <img src='.github/poeple640640.gif' width="320px">
-  <img src='.github/NBA.gif' height="190px" width="230px">
+  <img src='.github/yolov8-snow.gif' height="190px" width="230px">
   <br>
-  <img src='.github/nuScenes.gif'  width="257px">
+  <img src='.github/yolov8-stree.gif'  width="257px">
   <img src='.github/u2net.gif'  width="190px">
   <img src='.github/libfacedet.gif'  width="250px">
   <br>
@@ -121,7 +120,7 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |yolov8n|640x640(batch_size=8)|1093MiB/7982MiB| 14%| 
 
  <center>	<!--将图片和文字居中-->
-<img src=".github/cost-time-yolov8n-batch-8-640.png"
+<img src=".github/yolov8n-b8-640.png"
      alt="无法显示图片时显示的文字"
      style="zoom:50%"/>
 <br>		<!--换行-->

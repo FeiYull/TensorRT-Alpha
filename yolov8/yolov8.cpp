@@ -79,18 +79,7 @@ bool YOLOV8::init(const std::vector<unsigned char>& trtFile)
 
 void YOLOV8::preprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 1.copy to device
-    float* pi = m_input_src_device;
-    //for (size_t i = 0; i < m_param.batch_size; i++)
-    for (size_t i = 0; i < imgsBatch.size(); i++)
-    {
-        std::vector<float> vec_temp = std::vector<float>(imgsBatch[i].reshape(1, 1));
-        checkRuntime(cudaMemcpy(pi, vec_temp.data(), sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
-        /*imgsBatch[i].convertTo(imgsBatch[i], CV_32FC3);
-        checkRuntime(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
-        pi += 3 * m_param.src_h * m_param.src_w;
-    }
-    // 2.resize
+    // 1.resize
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114, m_dst2src);
 
@@ -112,7 +101,7 @@ void YOLOV8::preprocess(const std::vector<cv::Mat>& imgsBatch)
     }
 #endif // 0
 
-    // 3. bgr2rgb
+    // 2. bgr2rgb
     bgr2rgbDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_rgb_device, m_param.dst_w, m_param.dst_h);
 
@@ -134,7 +123,7 @@ void YOLOV8::preprocess(const std::vector<cv::Mat>& imgsBatch)
     }
 #endif // 0
 
-    // 4. norm:scale mean std
+    // 3. norm:scale mean std
     normDevice(m_param.batch_size, m_input_rgb_device, m_param.dst_w, m_param.dst_h,
         m_input_norm_device, m_param.dst_w, m_param.dst_h, m_param);
 
@@ -168,7 +157,7 @@ void YOLOV8::preprocess(const std::vector<cv::Mat>& imgsBatch)
     }
 #endif // 0
 
-    // 5. hwc2chw
+    // 4. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_norm_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
 #if 0

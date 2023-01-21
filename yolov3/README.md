@@ -38,7 +38,11 @@ python export.py  --weights  yolov3-spp.pt  --dynamic
 ## 2.edit and save onnx
 ```bash
 # note: If you have obtained onnx by downloading, this step can be ignored
-ignore
+git clone https://github.com/FeiYull/tensorrt-alpha
+cd tensorrt-alpha/yolov3
+conda activate tensorrt-alpha
+#edit alpha_edit.py on line21 & line25.
+python alpha_edit.py
 ```
 ## 3.compile onnx
 ```bash

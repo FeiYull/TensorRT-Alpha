@@ -93,18 +93,7 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
 
 void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 1.copy to device
-    float* pi = m_input_src_device;
-    //for (size_t i = 0; i < m_param.batch_size; i++)
-    for (size_t i = 0; i < imgsBatch.size(); i++)
-    {
-        std::vector<float> vec_temp = std::vector<float>(imgsBatch[i].reshape(1, 1));
-        checkRuntime(cudaMemcpy(pi, vec_temp.data(), sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
-        /*imgsBatch[i].convertTo(imgsBatch[i], CV_32FC3);
-        checkRuntime(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
-        pi += 3 * m_param.src_h * m_param.src_w;
-    }
-    // 2.resize
+    // 1.resize
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_without_padding_device, m_resized_w, m_resized_h, 114, m_dst2src);
 
@@ -130,7 +119,7 @@ void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
         delete[] phost;
     }
 #endif // 0
-    // 3.copy with padding
+    // 2.copy with padding
     copyWithPaddingDevice(m_param.batch_size, m_input_resize_without_padding_device, m_resized_w, m_resized_h, 
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114.f);
 #if 0 // valid
@@ -151,7 +140,7 @@ void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
     }
 #endif // 0
 
-    // 5. hwc2chw
+    // 3. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
 #if 0

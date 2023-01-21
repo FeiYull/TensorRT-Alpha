@@ -12,6 +12,7 @@ public:
 public:
     bool init(const std::vector<unsigned char>& trtFile);
     void check();
+    void copy(const std::vector<cv::Mat>& imgsBatch);
     void preprocess(const std::vector<cv::Mat>& imgsBatch);
     bool infer();
     void postprocess(const std::vector<cv::Mat>& imgsBatch);

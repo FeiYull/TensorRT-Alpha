@@ -34,10 +34,10 @@ make -j10
 # note: the dstImage will be saved in tensorrt-alpha/efficientdet/build by default
 
 # infer image
-./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt --img=../../data/road.jpg  --size=512 --batch_size=1 --show -savePath
-./app_efficientdet  --model=../../data/efficientdet/efficientdet1.trt --img=../../data/road.jpg  --size=640 --batch_size=1 --show -savePath
-./app_efficientdet  --model=../../data/efficientdet/efficientdet2.trt --img=../../data/road.jpg  --size=768 --batch_size=1 --show -savePath
-./app_efficientdet  --model=../../data/efficientdet/efficientdet3.trt --img=../../data/road.jpg  --size=896 --batch_size=1 --show -savePath
+./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt --img=../../data/road0.png  --size=512 --batch_size=1 --show --savePath
+./app_efficientdet  --model=../../data/efficientdet/efficientdet1.trt --img=../../data/road0.png  --size=640 --batch_size=1 --show --savePath
+./app_efficientdet  --model=../../data/efficientdet/efficientdet2.trt --img=../../data/road0.png  --size=768 --batch_size=1 --show --savePath
+./app_efficientdet  --model=../../data/efficientdet/efficientdet3.trt --img=../../data/road0.png  --size=896 --batch_size=1 --show --savePath
 
 
 # infer video

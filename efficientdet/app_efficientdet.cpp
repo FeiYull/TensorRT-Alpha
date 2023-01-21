@@ -37,6 +37,7 @@ void setParameters(utils::InitParameter& initParameters)
 void task(EfficientDet& efficient_det, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi, 
 	const bool& isShow, const bool& isSave)
 {
+	efficient_det.copy(imgsBatch);
 	utils::DeviceTimer d_t1; efficient_det.preprocess(imgsBatch);  float t1 = d_t1.getUsedTime();
 	utils::DeviceTimer d_t2; efficient_det.infer();				  float t2 = d_t2.getUsedTime();
 	utils::DeviceTimer d_t3; efficient_det.postprocess(imgsBatch); float t3 = d_t3.getUsedTime();
