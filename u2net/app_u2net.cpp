@@ -26,6 +26,7 @@ void setParameters(utils::InitParameter& initParameters)
 void task(u2net::U2NET& u2net, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi,
 	const bool& isShow, const bool& isSave)
 {
+	u2net.copy(imgsBatch);
 	utils::DeviceTimer d_t1; u2net.preprocess(imgsBatch);  float t1 = d_t1.getUsedTime();
 	utils::DeviceTimer d_t2; u2net.infer();				   float t2 = d_t2.getUsedTime();
 	utils::DeviceTimer d_t3; u2net.postprocess(imgsBatch); float t3 = d_t3.getUsedTime();

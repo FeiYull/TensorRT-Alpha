@@ -22,9 +22,11 @@ net_name = "yolov3-tiny"
 # net_name = "yolov3"
 # net_name = "yolov3-spp"
 
-image_input_shape = [1, 3, 640, 640]
+path = "../data/yolov3/"
 
-path = "D:/shiruiyu/tensorrt1964/data/yolov3/"
+
+
+image_input_shape = [1, 3, 640, 640]
 onnx_name = net_name + ".onnx"
 input_names = ["images"]
 output_names = ["output"]

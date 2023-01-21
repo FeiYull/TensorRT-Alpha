@@ -23,6 +23,7 @@ void setParameters(utils::InitParameter& initParameters)
 void task(LibFaceDet& face_det, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi,
 	const bool& isShow, const bool& isSave)
 {
+	face_det.copy(imgsBatch);
 	utils::DeviceTimer d_t1; face_det.preprocess(imgsBatch);  float t1 = d_t1.getUsedTime();
 	utils::DeviceTimer d_t2; face_det.infer();				  float t2 = d_t2.getUsedTime();
 	utils::DeviceTimer d_t3; face_det.postprocess(imgsBatch); float t3 = d_t3.getUsedTime();

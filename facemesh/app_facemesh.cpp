@@ -106,6 +106,7 @@ int main(int argc, char** argv)
 
 	// facemesh
 	face_mesh.resize(imgs_batch); // resize to 192 * 192
+	face_mesh.copy(imgs_batch);
 	face_mesh.preprocess(imgs_batch);
 	face_mesh.infer();
 	face_mesh.postprocess(imgs_batch);

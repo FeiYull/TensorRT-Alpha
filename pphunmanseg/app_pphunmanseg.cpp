@@ -20,6 +20,7 @@ void setParameters(utils::InitParameter& initParameters)
 void task(PPHunmanSeg& hunman_seg, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi, 
 	const bool& isShow, const bool& isSave)
 {
+	hunman_seg.copy(imgsBatch);
 	utils::DeviceTimer d_t1; hunman_seg.preprocess(imgsBatch);  float t1 = d_t1.getUsedTime();
 	utils::DeviceTimer d_t2; hunman_seg.infer();				  float t2 = d_t2.getUsedTime();
 	utils::DeviceTimer d_t3; hunman_seg.postprocess(imgsBatch); float t3 = d_t3.getUsedTime();

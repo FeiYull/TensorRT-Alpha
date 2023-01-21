@@ -237,18 +237,24 @@ void LibFaceDet::check()
     }
 }
 
-void LibFaceDet::preprocess(const std::vector<cv::Mat>& imgsBatch)
+void LibFaceDet::copy(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 1.copy to device
+    // copy to device
     float* pi = m_input_src_device;
+    //for (size_t i = 0; i < m_param.batch_size; i++)
     for (size_t i = 0; i < imgsBatch.size(); i++)
     {
         std::vector<float> vec_temp = std::vector<float>(imgsBatch[i].reshape(1, 1));
         checkRuntime(cudaMemcpy(pi, vec_temp.data(), sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        /*imgsBatch[i].convertTo(imgsBatch[i], CV_32FC3);
+        checkRuntime(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
         pi += 3 * m_param.src_h * m_param.src_w;
     }
+}
 
-    // 2. hwc2chw
+void LibFaceDet::preprocess(const std::vector<cv::Mat>& imgsBatch)
+{
+    // 1. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_hwc_device, m_param.src_w, m_param.src_h);
 #if 0

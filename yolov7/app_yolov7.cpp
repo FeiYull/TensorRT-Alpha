@@ -43,6 +43,7 @@ void setParameters(utils::InitParameter& initParameters)
 void task(YOLOV7& yolo, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi, 
 	const bool& isShow, const bool& isSave)
 {
+	yolo.copy(imgsBatch);
 	utils::DeviceTimer d_t1; yolo.preprocess(imgsBatch);  float t1 = d_t1.getUsedTime();
 	utils::DeviceTimer d_t2; yolo.infer();				  float t2 = d_t2.getUsedTime();
 	utils::DeviceTimer d_t3; yolo.postprocess(imgsBatch); float t3 = d_t3.getUsedTime();

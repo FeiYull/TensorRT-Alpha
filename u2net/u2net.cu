@@ -154,9 +154,9 @@ void u2net::U2NET::check()
     }
 }
 
-void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
+void u2net::U2NET::copy(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 0.copy to device
+    // copy to device
     float* pi = m_input_src_device;
     for (size_t i = 0; i < imgsBatch.size(); i++)
     {
@@ -164,6 +164,10 @@ void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
         checkRuntime(cudaMemcpy(pi, vec_temp.data(), sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         pi += 3 * m_param.src_h * m_param.src_w;
     }
+}
+
+void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
+{
     // 1. bgr2rgb
     bgr2rgbDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_rgb_device, m_param.src_w, m_param.src_h);
