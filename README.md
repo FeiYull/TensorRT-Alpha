@@ -13,13 +13,13 @@
 
 ## Visualization
 <div align='center'>
-  <img src='.github/facemesh.jpg' width="145px">
-  <img src='.github/poeple640640.gif' width="320px">
+  <img src='.github/facemesh.jpg' width="143px">
+  <img src='.github/people.gif' width="338px">
   <img src='.github/yolov8-snow.gif' height="190px" width="230px">
   <br>
-  <img src='.github/yolov8-stree.gif'  width="257px">
+  <img src='.github/yolov8-stree.gif'  width="260px">
   <img src='.github/u2net.gif'  width="190px">
-  <img src='.github/libfacedet.gif'  width="250px">
+  <img src='.github/libfacedet.gif'  width="260px">
   <br>
 </div> 
 
