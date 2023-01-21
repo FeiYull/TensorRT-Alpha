@@ -6,7 +6,10 @@
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
 
-  [English](README.md) | 简体中文
+  [English](README.md) | 简体中文<br>
+
+  [![](https://img.shields.io/badge/B站-blue.svg?logo=bilibili)](https://www.bilibili.com/video/BV1vY4y1d7Dr/?spm_id_from=333.999.0.0&vd_source=a96c9c3f099f4167807291a34fd50fd5)
+  [![](https://img.shields.io/badge/youtube-red.svg?logo=youtube)](https://www.youtube.com/watch?v=e7OcvZcqSVA)
   <br>
   </div>
 
