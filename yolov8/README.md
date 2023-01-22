@@ -77,3 +77,4 @@ make -j10
 ./app_yolov8  --model=../../data/yolov8/yolov8x6.trt     --size=1280 --batch_size=2  --cam_id=0  --show
 ```
 ## 5. appendix
+ignore
