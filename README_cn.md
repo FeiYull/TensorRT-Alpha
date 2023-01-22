@@ -36,7 +36,7 @@
 - 2023.01.04  🍅 更新 yolov7, yolox, yolor
 - 2023.01.05  🎉 更新 u2net, libfacedetection
 - 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
-- 2023.01.08     更新 efficientdet, pphunmanseg
+- 2023.01.20     更新 efficientdet, pphunmanseg
 
 ## 安装
 兼容平台: Windows and Linux. 以下环境已被测过：<br>

@@ -84,14 +84,23 @@ bool utils::setInputStream(const utils::InputStream& source, const std::string& 
 	cv::VideoCapture& capture, int& totalBatches, int& delayTime, utils::InitParameter& param)
 {
 	int total_frames = 0;
+	std::string img_format;
 	switch (source)
 	{
 	case utils::InputStream::IMAGE:
+		img_format = imagePath.substr(imagePath.size()-4, 4);
+		if (img_format == ".png" || img_format == ".PNG")
+		{
+			sample::gLogWarning << "+-----------------------------------------------------------+" << std::endl;
+			sample::gLogWarning << "| If you use PNG format pictures, the file name must be eg: |" << std::endl;
+			sample::gLogWarning << "| demo0.png, demo1.png, demo2.png ......, but not demo.png. |" << std::endl;
+			sample::gLogWarning << "| The above rules are determined by OpenCV.					|" << std::endl;
+			sample::gLogWarning << "+-----------------------------------------------------------+" << std::endl;
+		}
 		capture.open(imagePath); //cv::CAP_IMAGES : !< OpenCV Image Sequence (e.g. img_%02d.jpg)
 		param.batch_size = 1;
 		total_frames = 1;
 		totalBatches = 1;
-		//numFillFrames = 0;
 		delayTime = 0;
 		break;
 	case utils::InputStream::VIDEO:
@@ -99,13 +108,11 @@ bool utils::setInputStream(const utils::InputStream& source, const std::string& 
 		total_frames = capture.get(cv::CAP_PROP_FRAME_COUNT);
 		totalBatches = (total_frames % param.batch_size == 0) ?
 			(total_frames / param.batch_size) : (total_frames / param.batch_size + 1);
-		//numFillFrames = param.batch_size - total_frames % param.batch_size;
 		break;
 	case utils::InputStream::CAMERA:
 		capture.open(cameraID);
 		total_frames = INT_MAX;
 		totalBatches = INT_MAX;
-		//numFillFrames = 0;
 		break;
 	default:
 		break;
