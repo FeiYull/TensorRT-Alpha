@@ -79,7 +79,7 @@ sudo cp cuda/lib64/libcudnn* /usr/local/cuda/lib64/
 sudo chmod a+r /usr/local/cuda/include/cudnn.h
 sudo chmod a+r /usr/local/cuda/lib64/libcudnn*
 ```
-### 2.4 download tensorrt8.2.4.2
+### 2.4 download tensorrt8.4.2.4
 - enter： https://developer.nvidia.cn/nvidia-tensorrt-8x-download
 - select： I Agree To the Terms of the NVIDIA TensorRT License Agreement
 - select:   TensorRT 8.4 GA Update 1
