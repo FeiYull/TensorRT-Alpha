@@ -75,6 +75,7 @@ pip install -r requirements.txt
 ```
 </details>
 
+[Install For Ubuntu18.04](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)
 
 ## Quick Start
 ### Ubuntu18.04

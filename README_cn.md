@@ -74,6 +74,8 @@ pip install -r requirements.txt
 ```
 </details>
 
+[在Ubuntu18.04安装依赖环境](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)
+
 ## 快速开始
 ### Ubuntu18.04
 设置TensorRT根目录（安装目录）路径:
