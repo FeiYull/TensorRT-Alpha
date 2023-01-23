@@ -67,7 +67,7 @@ Build cuda_11.3.r11.3/compiler.29745058_0<br>
 ### 2.3 install cudnn8.2
 - enter：https://developer.nvidia.com/rdp/cudnn-archive
 - select: Download cuDNN v8.2.0 (April 23rd, 2021), for CUDA 11.x
-- select：select:  cuDNN Library for Linux (x86_64)
+- select： cuDNN Library for Linux (x86_64)
 - you will download file:  "cudnn-11.3-linux-x64-v8.2.0.53.tgz"
 ```bash
 tar -zxvf cudnn-11.3-linux-x64-v8.2.0.53.tgz
