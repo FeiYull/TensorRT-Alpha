@@ -74,7 +74,8 @@ pip install -r requirements.txt
 ```
 </details>
 
-[在Ubuntu18.04安装依赖环境](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)
+[在Ubuntu18.04安装依赖环境](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)<br>
+or [Ubuntu18.04环境配置](http://t.csdn.cn/6FmFv)
 
 ## 快速开始
 ### Ubuntu18.04
