@@ -29,8 +29,19 @@ wget https://developer.download.nvidia.com/compute/cuda/11.3.0/local_installers/
 sudo sh cuda_11.3.0_465.19.01_linux.run
 ```
 The cuda installation process will have a window display.
-- select：[continue] -> [accept] -> Press enter to cancel the first and second options(<font color=#FFFF00 >**it is important!**</font>) -> [Install]<br>
-The bash window prints the following to indicate that the installation is complete：
+- select：[continue] -> [accept] -> Press enter to cancel the first and second options like the following(<font color=#FFFF00 >**it is important!**</font>) -> [Install]<br>
+
+```bash
+CUDA Installer
+[ ] Driver<br>    # cancel the first
+    [ ] 465.19.01 # cancel the second
+[X] CUDA Toolkit 11.3 
+[X] CUDA Samples 11.3 
+[X] CUDA Demo Suite 11.3 
+[X] CUDA Documentation 11.3 0tions 
+```
+
+The bash window prints the following， which means the installation is OK.
 ```bash
 #===========
 #= Summary =
