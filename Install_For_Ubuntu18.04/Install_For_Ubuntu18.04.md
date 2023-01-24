@@ -33,7 +33,7 @@ The cuda installation process will have a window display.
 
 ```bash
 CUDA Installer
-[ ] Driver<br>    # cancel the first
+[ ] Driver        # cancel the first
     [ ] 465.19.01 # cancel the second
 [X] CUDA Toolkit 11.3 
 [X] CUDA Samples 11.3 
