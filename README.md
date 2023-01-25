@@ -40,7 +40,7 @@ There are two ways to obtain onnx files:
 - 2023.01.20     update efficientdet, pphunmanseg
 
 ## Installation
-Platforms: Windows and Linux. The following environments have been tested：<br>
+The following environments have been tested：<br>
 <details>
 <summary>Ubuntu18.04</summary>
 
@@ -75,8 +75,9 @@ pip install -r requirements.txt
 ```
 </details>
 
-[Install For Ubuntu18.04](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)<br>
-or [Ubuntu18.04环境配置](http://t.csdn.cn/6FmFv)
+Installation Tutorial：
+- [Install For Ubuntu18.04](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)<br>
+- [图文详细版：Ubuntu18.04环境配置](http://t.csdn.cn/6FmFv)
 
 ## Quick Start
 ### Ubuntu18.04
