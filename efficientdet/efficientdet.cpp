@@ -212,7 +212,6 @@ bool EfficientDet::infer()
 
 void EfficientDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // result
     // num objects
     checkRuntime(cudaMemcpy(m_output_num_host,     m_output_num_device,     sizeof(int) * m_param.batch_size, cudaMemcpyDeviceToHost));
     // boxes
@@ -224,7 +223,7 @@ void EfficientDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
     // class_id
     checkRuntime(cudaMemcpy(m_output_classes_host, m_output_classes_device, sizeof(int) * m_param.batch_size * 1 * m_param.topK, cudaMemcpyDeviceToHost));
     
-    // show
+    // gather result
     for (int bi = 0; bi < imgsBatch.size(); bi++)
     {
         for (int i = 0; i < m_output_num_host[bi]; i++)
