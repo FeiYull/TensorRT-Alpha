@@ -6,7 +6,7 @@
 void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco91;
-	initParameters.num_class = 90; // for coco91
+	initParameters.num_class = 91; // for coco91
 
 	initParameters.batch_size = 8;
 	// efficientdet d0

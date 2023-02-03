@@ -77,7 +77,9 @@ pip install -r requirements.txt
 
 Installation Tutorial：
 - [Install For Ubuntu18.04](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)<br>
-- [图文详细版：Ubuntu18.04环境配置](http://t.csdn.cn/6FmFv)
+- [图文详细版：Ubuntu18.04环境配置](http://t.csdn.cn/6FmFv)<br>
+- docker for linux (waiting for update)<br>
+- [图文详细版：Windows10环境配置](http://t.csdn.cn/EwNUU)<br>
 
 ## Quick Start
 ### Ubuntu18.04
@@ -93,7 +95,7 @@ start to build project:
 For example:[yolov8](yolov8/README.md)
 
 ### Windows10
-waiting for update
+[图文详细版：Windows10环境配置](http://t.csdn.cn/EwNUU)<br>
 
 ## Onnx
 At present, more than 30  models have been implemented, and some onnx files of them are organized as follows:
