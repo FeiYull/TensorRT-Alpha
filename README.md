@@ -27,10 +27,21 @@
 </div> 
 
 ## Introduce
-This repository  provides accelerated deployment cases of deep learning CV popular models, and cuda c supports dynamic-batch image process, infer, decode, NMS. Most of the model transformation process is torch->onnx->tensorrt.<br>
-There are two ways to obtain onnx files:
-- According to the network disk provided by TensorRT-Alpha, download ONNX directly. [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
-- Follow the instructions provided by TensorRT-Alpha to manually export ONNX from the relevant python source code framework.
+This repository  provides accelerated deployment cases of deep learning CV popular models, and cuda c supports dynamic-batch image process, infer, decode, NMS.<br>
+There are two ways to compile model(pth or onnx):<br>
+
+<details>
+<summary>pth -> trt</summary>
+coming soon.
+</details>
+
+<details>
+<summary>pth -> onnx -> trt:</summary>
+
+  - [i]. According to the network disk provided by TensorRT-Alpha, download ONNX directly. [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
+  - [ii]]. Follow the instructions provided by TensorRT-Alpha to manually export ONNX from the relevant python source code framework.
+
+</details>
 
 ## Update
 - 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6

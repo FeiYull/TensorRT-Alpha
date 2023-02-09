@@ -28,8 +28,19 @@
 ## 介绍
 本仓库提供深度学习CV领域模型加速部署案例，仓库实现的cuda c支持多batch图像预处理、推理、decode、NMS。大部分模型转换流程为：torch->onnx->tensorrt。
 获取onnx文件以下有两种方式：<br>
-- 本仓库提供的网盘直接下载onnx。[weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
-- 按照本仓库提供的指令，手动从相关源代码框架导出onnx。
+
+<details>
+<summary>pth -> trt</summary>
+coming soon.
+</details>
+
+<details>
+<summary>pth -> onnx -> trt:</summary>
+
+- [i]. 本仓库提供的网盘直接下载onnx。[weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
+- [ii]]. 按照本仓库提供的指令，手动从相关源代码框架导出onnx。
+
+</details>
 
 ## 更新
 - 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
