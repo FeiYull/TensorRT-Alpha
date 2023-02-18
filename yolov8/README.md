@@ -6,7 +6,8 @@ download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driv
 # 🚀TensorRT-Alpha will be updated synchronously as soon as possible!
 
 # install yolov8
-conda create -n yolov8 python==3.8 -y
+conda create -n yolov8 python==3.8 -y # for Linux
+# conda create -n yolov8 python=3.9 -y # for Windows10
 conda activate yolov8
 pip install ultralytics==8.0.5
 pip install onnx==1.12.0
