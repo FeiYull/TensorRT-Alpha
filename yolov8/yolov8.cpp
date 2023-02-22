@@ -253,6 +253,7 @@ void YOLOV8::postprocess(const std::vector<cv::Mat>& imgsBatch)
 
     // nms
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
+    //nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
 #if 0 // valid
     {
         float* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];

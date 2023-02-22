@@ -126,6 +126,21 @@ bool utils::setInputStream(const utils::InputStream& source, const std::string& 
 void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std::vector<std::string>& classNames,
 	const int& cvDelayTime, std::vector<cv::Mat>& imgsBatch)
 {
+	// todo
+	std::string windows_title = "image";
+	if(!imgsBatch[0].empty())
+	{
+		cv::namedWindow(windows_title, cv::WINDOW_NORMAL | cv::WINDOW_KEEPRATIO);  // allow window resize(Linux)
+
+		int max_w = 960;
+		int max_h = 540;
+		if (imgsBatch[0].rows > max_h || imgsBatch[0].cols > max_w)
+		{
+			cv::resizeWindow(windows_title, max_w, imgsBatch[0].rows * max_h / imgsBatch[0].cols );
+		}
+	}
+	
+	// vis
 	cv::Scalar color = cv::Scalar(0, 255, 0);
 	cv::Point bbox_points[1][4];
 	const cv::Point* bbox_point0[1] = { bbox_points[0] };
@@ -167,7 +182,7 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 		}
 		
 		//cv::Mat img = imgsBatch[bi];
-		cv::imshow("image", imgsBatch[bi]);
+		cv::imshow(windows_title, imgsBatch[bi]);
 		cv::waitKey(cvDelayTime);
 	}
 
