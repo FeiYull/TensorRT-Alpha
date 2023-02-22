@@ -136,7 +136,7 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 		int max_h = 540;
 		if (imgsBatch[0].rows > max_h || imgsBatch[0].cols > max_w)
 		{
-			cv::resizeWindow(windows_title, max_w, imgsBatch[0].rows * max_h / imgsBatch[0].cols );
+			cv::resizeWindow(windows_title, max_w, imgsBatch[0].rows * max_w / imgsBatch[0].cols );
 		}
 	}
 	
