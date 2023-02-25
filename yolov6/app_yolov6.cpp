@@ -32,9 +32,6 @@ void setParameters(utils::InitParameter& initParameters)
 
 	initParameters.conf_thresh = 0.5f;
 	initParameters.iou_thresh = 0.45f;
-
-	//initParameters.conf_thresh = 0.1f;
-	//initParameters.iou_thresh = 0.2f;
 	initParameters.save_path = "";
 }
 

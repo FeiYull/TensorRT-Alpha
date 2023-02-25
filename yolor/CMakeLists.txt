@@ -22,7 +22,7 @@ file(GLOB CPPS
   ${TensorRT_ROOT}/samples/common/logger.cpp
   ${TensorRT_ROOT}/samples/common/sampleOptions.cpp  
   )
-list(REMOVE_ITEM CPPS app_yolov7.cpp)
+list(REMOVE_ITEM CPPS app_yolor.cpp)
 message(*********************************************************)
 message(STATUS CPPS = ${CPPS})
 message(*********************************************************)

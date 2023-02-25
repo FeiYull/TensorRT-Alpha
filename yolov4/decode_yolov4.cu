@@ -17,7 +17,7 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 	//	return;
 	//}
 	// find max Pr(Classi/Object)
-	//float* class_confidence = pitem + 5;    // Pr(Class0/Object)
+	//float* class_confidence = pitem + 5;  // Pr(Class0/Object)
 	float* class_confidence = pitem + 4;    // Pr(Class0/Object)
 	float confidence = *class_confidence++; // Pr(Class1/Object)
 	int label = 0;

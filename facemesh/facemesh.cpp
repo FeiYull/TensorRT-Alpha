@@ -7,14 +7,13 @@ FaceMesh::FaceMesh(const utils::InitParameter& param) : m_param(param)
     m_input_resize_device = nullptr;
     m_input_rgb_device = nullptr;
     m_input_norm_device = nullptr;
-    m_input_hwc_device = nullptr;  
-
-    //checkRuntime(cudaMalloc(&m_input_src_device, param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
+    m_input_hwc_device = nullptr;
     checkRuntime(cudaMalloc(&m_input_src_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_rgb_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_norm_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_hwc_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    
     // output
     m_output_conf_device = nullptr;
     m_output_preds_device = nullptr;
