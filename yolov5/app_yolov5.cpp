@@ -1,7 +1,4 @@
-//#include"../utils/common_include.h"
-//#include"../utils/utils.h"
 #include"../utils/yolo.h"
-//#include"process.h"
 
 class YOLOV5 : public yolo::YOLO
 {

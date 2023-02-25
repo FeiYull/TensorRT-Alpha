@@ -12,9 +12,6 @@ u2net::U2NET::U2NET(const utils::InitParameter& param) : m_param(param)
     m_input_hwc_device = nullptr;
     m_max_val_device = nullptr;
     m_min_val_device = nullptr;
-    
-    
-
     checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_h * sizeof(float)));

@@ -15,7 +15,7 @@ void setParameters(utils::InitParameter& initParameters)
 	initParameters.dst_h = 640;
 	initParameters.dst_w = 640;
 
-	// tiny, nano
+	// tiny, nano update from command line
 	/*initParameters.dst_h = 416;
 	initParameters.dst_w = 416;*/
 
