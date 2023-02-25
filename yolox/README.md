@@ -57,10 +57,10 @@ make -j10
 
 ## 640
 # infer image
-./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=1  --img=../../data/6406401.jpg  --show --savePath
+./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=1  --img=../../data/6406401.jpg  --show --savePath=../
 
 # infer video
-./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=1  --video=../../data/people.mp4  --show --savePath=../
+./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=1  --video=../../data/people.mp4  --show 
 
 # infer camera
 ./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=8  --cam_id=0  --show

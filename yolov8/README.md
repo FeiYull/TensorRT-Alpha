@@ -65,11 +65,10 @@ make -j10
 
 ## 640
 # infer image
-./app_yolov8  --model=../../data/yolov8/yolov8n.trt --size=640 --batch_size=1  --img=../../data/6406407.jpg   --show --savePath
-./app_yolov8  --model=../../data/yolov8/yolov8n.trt --size=640 --batch_size=8  --video=../../data/people.mp4  --show --savePath
+./app_yolov8  --model=../../data/yolov8/yolov8n.trt --size=640 --batch_size=1  --img=../../data/6406407.jpg   --show --savePath=../
 
 # infer video
-./app_yolov8  --model=../../data/yolov8/yolov8n.trt     --size=640 --batch_size=8  --video=../../data/people.mp4  --show --savePath=../
+./app_yolov8  --model=../../data/yolov8/yolov8n.trt     --size=640 --batch_size=8  --video=../../data/people.mp4  --show 
 
 # infer camera
 ./app_yolov8  --model=../../data/yolov8/yolov8n.trt     --size=640 --batch_size=2  --cam_id=0  --show
