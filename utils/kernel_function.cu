@@ -789,9 +789,6 @@ void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float c
 	{
 		return;
 	}
-	//printf("dy = %d, my_index[dy] = %d \n", dy, my_index[dy]);
-	//printf("index = %d \n", my_index[dy]);
-	//printf("dy = %d,  dx = %d \n", dy, dx);
 	float* pitem = src + dy * srcArea + dx * srcWidth;
 	float objectness = pitem[4]; //  Pr(Object)
 	if (objectness < conf_thresh)
@@ -817,18 +814,14 @@ void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float c
 		return;
 	}
 
-	// parray:count, box1, box2, box3(count:num of good box)
-	// parray[0]:count
-	// atomicAdd -> count += 1
-	// atomicAdd: return the old_count
-	//int index = atomicAdd(dst + dy * dstArea, 1);
-	//assert(dy == 1);
-
-	/*if (dy == 1)
-	{
-		float* add1 = dst + dy * dstArea;
-	}*/
-
+	/*
+	 parray:count, box1, box2, box3(count:num of good box)
+	 parray[0]:count
+	 atomicAdd -> count += 1
+	 atomicAdd: return the old_count
+	 int index = atomicAdd(dst + dy * dstArea, 1);
+	 assert(dy == 1);
+	*/
 	int index = atomicAdd(dst + dy * dstArea, 1);
 
 	//int index = atomicAdd(&(dst + dy * dstWidth)[0], 1);
