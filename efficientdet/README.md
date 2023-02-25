@@ -41,10 +41,10 @@ make -j10
 
 
 # infer video
-./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt  --batch_size=8  --video=../../data/people.mp4  --show
+./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt  --size=512 --batch_size=8  --video=../../data/people.mp4  --show
 
 # infer camera
-./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt  --batch_size=2  --cam_id=0  --show
+./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt  --size=512 --batch_size=2  --cam_id=0  --show
 ```
 ## 5. appendix
 ignore

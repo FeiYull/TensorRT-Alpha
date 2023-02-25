@@ -39,7 +39,7 @@ make -j10
 ./app_u2net  --model=../../data/u2net/u2net.trt --size=320  --batch_size=1  --img=../../data/sailboat3.jpg  --show --savePath
 
 # infer video
-./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=8  --video=../../data/people.mp4  --show --savePath=../
+./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=8  --video=../../data/people.mp4  --show
 
 # infer camera
 ./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=4  --cam_id=0  --show

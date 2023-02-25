@@ -185,8 +185,8 @@ void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
             cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
             ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
             cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
+            //cv::imshow("ret", ret);
+            //cv::waitKey(1);
         }
         delete[] phost;
     }
@@ -207,8 +207,8 @@ void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
             cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
             ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
             cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
+            //cv::imshow("ret", ret);
+            //cv::waitKey(1);
         }
         delete[] phost;
     }
@@ -241,8 +241,8 @@ void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
                 }
             }
             ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
+            //cv::imshow("ret", ret);
+            //cv::waitKey(1);
         }
         delete[] phost;
     }
@@ -270,14 +270,14 @@ void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
             cv::Mat ret;
             cv::merge(bgr, ret);
             ret.convertTo(ret, CV_8UC3, 255, 0.0);
-            cv::imshow("ret", ret);
+            //cv::imshow("ret", ret);
 
             /* SYSTEMTIME st = { 0 };
              GetLocalTime(&st);
              std::string t = std::to_string(st.wHour) + std::to_string(st.wMinute) + std::to_string(st.wMilliseconds);
              std::string save_path = "F:/Data/temp/";;
              cv::imwrite(save_path + t + ".jpg", ret);*/
-            cv::waitKey(1);
+            //cv::waitKey(1);
 
             cv::Mat img_ = imgsBatch[j].clone();
         }
@@ -299,7 +299,8 @@ void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
 #if 0 // valid
     {
-        float* phost = new float[m_param.batch_size * m_output_area];
+        //float* phost = new float[m_param.batch_size * m_output_area];
+        float* phost = new float[m_output_area];
         float* pdevice = m_output_src_device;
         for (size_t j = 0; j < imgsBatch.size(); j++)
         {
@@ -315,7 +316,8 @@ void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
         m_output_objects_device, m_output_objects_width, m_param.topK);
 #if 0 // valid
     {
-        float* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
+        //* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
+        float* phost = new float[1 + m_output_objects_width * m_param.topK];
         float* pdevice = m_output_objects_device;
         for (size_t j = 0; j < imgsBatch.size(); j++)
         {
@@ -337,7 +339,7 @@ void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
 #if 0 // valid
     {
-        float* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
+        float* phost = new float[1 + m_output_objects_width * m_param.topK];
         float* pdevice = m_output_objects_device;
         for (size_t j = 0; j < imgsBatch.size(); j++)
         {
@@ -356,7 +358,7 @@ void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
 #if 0 // valid
     {
         // prediction
-        float* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
+        float* phost = new float[1 + m_output_objects_width * m_param.topK];
         float* pdevice = m_output_objects_device;
         for (size_t j = 0; j < 1; j++)
         {

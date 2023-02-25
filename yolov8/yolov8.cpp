@@ -220,7 +220,7 @@ void YOLOV8::postprocess(const std::vector<cv::Mat>& imgsBatch)
         m_output_src_transpose_device, 4 + m_param.num_class, m_total_objects);
 #if 0 // valid
     {
-        float* phost = new float[m_param.batch_size * m_total_objects * (4 + m_param.num_class)];
+        float* phost = new float[m_total_objects * (4 + m_param.num_class)];
         float* pdevice = m_output_src_transpose_device;
         for (size_t j = 0; j < imgsBatch.size(); j++)
         {
@@ -236,7 +236,7 @@ void YOLOV8::postprocess(const std::vector<cv::Mat>& imgsBatch)
         m_output_objects_device, m_output_objects_width, m_param.topK);
 #if 0 // valid
     {
-        float* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
+        float* phost = new float[1 + m_output_objects_width * m_param.topK];
         float* pdevice = m_output_objects_device;
         for (size_t j = 0; j < imgsBatch.size(); j++)
         {
@@ -252,11 +252,11 @@ void YOLOV8::postprocess(const std::vector<cv::Mat>& imgsBatch)
 #endif // 0
 
     // nms
-    nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
-    //nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
+    //nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
+    nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
 #if 0 // valid
     {
-        float* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
+        float* phost = new float[1 + m_output_objects_width * m_param.topK];
         float* pdevice = m_output_objects_device;
         for (size_t j = 0; j < imgsBatch.size(); j++)
         {

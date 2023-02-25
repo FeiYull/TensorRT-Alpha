@@ -73,7 +73,7 @@ make -j10
 ./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640  --batch_size=1  --img=../../data/6406403.jpg  --show --savePath
 
 # infer video
-./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=8  --video=../../data/people.mp4  --show --savePath=../
+./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=8  --video=../../data/people.mp4  --show
 
 # infer camera
 ./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=4  --cam_id=0  --show
