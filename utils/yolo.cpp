@@ -370,16 +370,14 @@ void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
         delete[] phost;
 
         // conf & idx
-        float* phost_conf = new float[m_param.batch_size * m_param.topK];
-        int* phost_idx = new int[m_param.batch_size * m_param.topK];
+        float* phost_conf = new float[m_param.topK];
+        int* phost_idx = new int[m_param.topK];
         float* pdevice_conf = m_output_conf_device;
         int* pdevice_idx = m_output_idx_device;
         for (size_t j = 0; j < m_param.batch_size; j++)
         {
-            checkRuntime(cudaMemcpy(phost_conf, m_output_conf_device + j * m_param.batch_size * m_param.topK,
-                sizeof(float) * m_param.batch_size * m_param.topK, cudaMemcpyDeviceToHost));
-            checkRuntime(cudaMemcpy(phost_idx, pdevice_idx + j * m_param.batch_size * m_param.topK,
-                sizeof(float) * m_param.batch_size * m_param.topK, cudaMemcpyDeviceToHost));
+            checkRuntime(cudaMemcpy(phost_conf, pdevice_conf + j * m_param.topK, sizeof(float) * m_param.topK, cudaMemcpyDeviceToHost));
+            checkRuntime(cudaMemcpy(phost_idx,  pdevice_idx  + j * m_param.topK, sizeof(float) * m_param.topK, cudaMemcpyDeviceToHost));
             cv::Mat img_conf(m_param.topK, 1, CV_32FC1, phost_conf);
             cv::Mat img_idx(m_param.topK, 1, CV_32S, phost_idx);
         }

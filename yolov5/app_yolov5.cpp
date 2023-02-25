@@ -33,13 +33,10 @@ void setParameters(utils::InitParameter& initParameters)
 	// yolov5.6.0
 	initParameters.input_output_names = { "images",  "output"};
 	// yolov5.7.0
-	//initParameters.input_output_names = { "images",  "output0"};
+	//initParameters.input_output_names = { "images",  "output0"}; // see line 154
 
 	initParameters.conf_thresh = 0.25f;
 	initParameters.iou_thresh = 0.45f;
-
-	//initParameters.conf_thresh = 0.1f;
-	//initParameters.iou_thresh = 0.2f;
 	initParameters.save_path = "";
 }
 
