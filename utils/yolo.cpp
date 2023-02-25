@@ -8,16 +8,14 @@ yolo::YOLO::YOLO(const utils::InitParameter& param) : m_param(param)
     m_input_rgb_device = nullptr;
     m_input_norm_device = nullptr;
     m_input_hwc_device = nullptr;
-    //m_input_dst_device = nullptr;
-    m_output_src_device = nullptr;
     checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_norm_device,   param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_hwc_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    //checkRuntime(cudaMalloc(&m_input_dst_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
 
     // output
+    m_output_src_device = nullptr;
     m_output_objects_device = nullptr;
     m_output_objects_host = nullptr;
     m_output_objects_width = 7;
@@ -77,7 +75,7 @@ bool yolo::YOLO::init(const std::vector<unsigned char>& trtFile)
         return false;
     }
     // binding dim
-    if (m_param.dynamic_batch) // for some models only support static dynamic batch. eg: yolox
+    if (m_param.dynamic_batch) // for some models only support static mutil-batch. eg: yolox
     {
         this->m_context->setBindingDimensions(0, nvinfer1::Dims4(m_param.batch_size, 3, m_param.dst_h, m_param.dst_w));
     }
