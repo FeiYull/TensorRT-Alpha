@@ -176,7 +176,7 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
 #endif
 
     // update 20230302, faster. 
-    // 1. move uint8_to_float in cuda kernel function, for 8*3*1920*1080, cost time 15ms -> 3.9ms
+    // 1. move uint8_to_float in cuda kernel function. For 8*3*1920*1080, cost time 15ms -> 3.9ms
     // 2. Todo
     unsigned char* pi = m_input_src_device;
     for (size_t i = 0; i < imgsBatch.size(); i++)
