@@ -176,7 +176,7 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
 #endif
 
     // update 20230302, faster. 
-    // 1. Do uint8_to_float in cuda kernel function, for 8*3*1920*1080, cost time 15ms -> 3.9ms
+    // 1. move uint8_to_float in cuda kernel function, for 8*3*1920*1080, cost time 15ms -> 3.9ms
     // 2. Todo
     unsigned char* pi = m_input_src_device;
     for (size_t i = 0; i < imgsBatch.size(); i++)
@@ -184,6 +184,21 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
         checkRuntime(cudaMemcpy(pi, imgsBatch[i].data, sizeof(unsigned char) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         pi += 3 * m_param.src_h * m_param.src_w;
     }
+
+#if 0 // cuda stream
+    cudaStream_t streams[32];
+    for (int i = 0; i < imgsBatch.size(); i++) 
+    {
+        checkRuntime(cudaStreamCreate(&streams[i]));
+    }
+    unsigned char* pi = m_input_src_device;
+    for (size_t i = 0; i < imgsBatch.size(); i++)
+    {
+        checkRuntime(cudaMemcpyAsync(pi, imgsBatch[i].data, sizeof(unsigned char) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice, streams[i]));
+        pi += 3 * m_param.src_h * m_param.src_w;
+    }
+    checkRuntime(cudaDeviceSynchronize());
+#endif
 }
 
 void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
