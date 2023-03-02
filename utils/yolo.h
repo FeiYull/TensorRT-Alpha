@@ -38,7 +38,8 @@ namespace yolo
         utils::AffineMat m_dst2src;     // 2*3
 
         // input
-        float* m_input_src_device;
+        //float* m_input_src_device;
+        unsigned char* m_input_src_device;
         float* m_input_resize_device;
         float* m_input_rgb_device;
         float* m_input_norm_device;

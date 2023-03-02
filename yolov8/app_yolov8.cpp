@@ -18,11 +18,13 @@ void setParameters(utils::InitParameter& initParameters)
 void task(YOLOV8& yolo, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi,
 	const bool& isShow, const bool& isSave)
 {
-	yolo.copy(imgsBatch);
+	utils::DeviceTimer d_t0; yolo.copy(imgsBatch);	      float t0 = d_t0.getUsedTime();
 	utils::DeviceTimer d_t1; yolo.preprocess(imgsBatch);  float t1 = d_t1.getUsedTime();
 	utils::DeviceTimer d_t2; yolo.infer();				  float t2 = d_t2.getUsedTime();
 	utils::DeviceTimer d_t3; yolo.postprocess(imgsBatch); float t3 = d_t3.getUsedTime();
-	sample::gLogInfo << "preprocess time = " << t1 / param.batch_size << "; "
+	sample::gLogInfo << //"copy time = " << t0 / param.batch_size << "; "
+		"copy total time = " << t0 << "; "
+		"preprocess time = " << t1 / param.batch_size << "; "
 		"infer time = " << t2 / param.batch_size << "; "
 		"postprocess time = " << t3 / param.batch_size << std::endl;
 

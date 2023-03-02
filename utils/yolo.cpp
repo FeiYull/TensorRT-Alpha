@@ -8,7 +8,8 @@ yolo::YOLO::YOLO(const utils::InitParameter& param) : m_param(param)
     m_input_rgb_device = nullptr;
     m_input_norm_device = nullptr;
     m_input_hwc_device = nullptr;
-    checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
+    //checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
+    checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(unsigned char)));
     checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_norm_device,   param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
@@ -149,7 +150,7 @@ void yolo::YOLO::check()
 // copy to device
 void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
 {
-#if 1 
+#if 0 
     cv::Mat img_fp32 = cv::Mat::zeros(imgsBatch[0].size(), CV_32FC3); // todo 
     cudaHostRegister(img_fp32.data, img_fp32.elemSize() * img_fp32.total(), cudaHostRegisterPortable);
     float* pi = m_input_src_device;
@@ -173,6 +174,16 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
         pi += 3 * m_param.src_h * m_param.src_w;
     }
 #endif
+
+    // update 20230302, faster. 
+    // 1. Do uint8_to_float in cuda kernel function, for 8*3*1920*1080, cost time 15ms -> 3.9ms
+    // 2. Todo
+    unsigned char* pi = m_input_src_device;
+    for (size_t i = 0; i < imgsBatch.size(); i++)
+    {
+        checkRuntime(cudaMemcpy(pi, imgsBatch[i].data, sizeof(unsigned char) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        pi += 3 * m_param.src_h * m_param.src_w;
+    }
 }
 
 void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
@@ -181,7 +192,7 @@ void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114, m_dst2src);
 
-#if 0 // valid
+#if 1 // valid
     {
         float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
         float* pdevice = m_input_resize_device;
