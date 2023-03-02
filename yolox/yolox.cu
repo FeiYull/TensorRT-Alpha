@@ -37,15 +37,15 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
         return false;
     }
     // binding dim
-    if (m_param.dynamic_batch) // for some models only support static dynamic batch. eg: yolox
-    {
-        this->m_context->setBindingDimensions(0, nvinfer1::Dims4(m_param.batch_size, 3, m_param.dst_h, m_param.dst_w));
-    }
+    // ...
+    //nvinfer1::Dims input_dims = this->m_context->getBindingDimensions(0);
 
     // 2. get output's dim
     m_output_dims = this->m_context->getBindingDimensions(1);
     m_total_objects = m_output_dims.d[1];
-    assert(m_param.batch_size <= m_output_dims.d[0]);
+    assert(m_param.batch_size == m_output_dims.d[0] || 
+           m_param.batch_size == 1 // batch_size = 1, but it will infer with "batch_size=m_output_dims.d[0]", only support static batch
+            );
     m_output_area = 1; // 22500 * 85
     for (int i = 1; i < m_output_dims.nbDims; i++)
     {
@@ -58,10 +58,6 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
     checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
 
     // 4. cal affine matrix
-
-    /*initParameters.dst_h = 277;
-    initParameters.dst_w = 416;*/
-
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
     float scale = a < b ? a : b;
@@ -70,24 +66,16 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
 
     checkRuntime(cudaMalloc(&m_input_resize_without_padding_device,
         m_param.batch_size * 3 * m_resized_h * m_resized_w * sizeof(float)));
-
-    /*cv::Mat src2dst = (cv::Mat_<float>(2, 3) << scale, 0.f, (-scale * m_param.src_w + m_resized_w + scale - 1) * 0.5,
-        0.f, scale, (-scale * m_param.src_h + m_resized_h + scale - 1) * 0.5);*/
-    
     cv::Mat src2dst = (cv::Mat_<float>(2, 3) << scale, 0.f, (scale - 1) * 0.5,
         0.f, scale, (scale - 1) * 0.5);
-
-
     cv::Mat dst2src = cv::Mat::zeros(2, 3, CV_32FC1);
     cv::invertAffineTransform(src2dst, dst2src);
-
     m_dst2src.v0 = dst2src.ptr<float>(0)[0];
     m_dst2src.v1 = dst2src.ptr<float>(0)[1];
     m_dst2src.v2 = dst2src.ptr<float>(0)[2];
     m_dst2src.v3 = dst2src.ptr<float>(1)[0];
     m_dst2src.v4 = dst2src.ptr<float>(1)[1];
     m_dst2src.v5 = dst2src.ptr<float>(1)[2];
-
     return true;
 }
 
@@ -96,10 +84,6 @@ void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
     // 1.resize
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_without_padding_device, m_resized_w, m_resized_h, 114, m_dst2src);
-
-   /* resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
-        m_input_resize_without_padding_device, m_resized_w, m_resized_h, utils::ColorMode::RGB, m_dst2src);*/
-
 #if 0 // valid
     {
         float* phost = new float[3 * m_resized_h * m_resized_w];
@@ -170,7 +154,6 @@ void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
 
     }
 #endif
-
 }
 
 __global__
