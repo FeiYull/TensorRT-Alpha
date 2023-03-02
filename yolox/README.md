@@ -7,20 +7,32 @@
 最后，模型支持固定batch size
 
 ## 1. get onnx 
-download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
+download onnx(default:batch_size=8) directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
 or export onnx:
 ```bash
 git clone https://github.com/Megvii-BaseDetection/YOLOX
 git checkout  0.3.0
-# 640
+
+## batch_size > 1
+# 640 for video or camera
 python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=8
 python tools/export_onnx.py --output-name=yolox_m.onnx  --exp_file=exps/default/yolox_m.py --ckpt=yolox_m.pth --decode_in_inference --batch-size=8
 python tools/export_onnx.py --output-name=yolox_x.onnx  --exp_file=exps/default/yolox_x.py --ckpt=yolox_x.pth --decode_in_inference --batch-size=8
 python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=8
 
-# 416
+# 416 for video or camera
 python tools/export_onnx.py --output-name=yolox_nano.onnx --exp_file=exps/default/yolox_nano.py --ckpt=yolox_nano.pth --decode_in_inference --batch-size=8
 python tools/export_onnx.py --output-name=yolox_tiny.onnx --exp_file=exps/default/yolox_tiny.py --ckpt=yolox_tiny.pth --decode_in_inference --batch-size=8
+
+## batch_size=1
+# 640 for image
+python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_m.onnx  --exp_file=exps/default/yolox_m.py --ckpt=yolox_m.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_x.onnx  --exp_file=exps/default/yolox_x.py --ckpt=yolox_x.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=1
+# 416 for image
+python tools/export_onnx.py --output-name=yolox_nano.onnx --exp_file=exps/default/yolox_nano.py --ckpt=yolox_nano.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_tiny.onnx --exp_file=exps/default/yolox_tiny.py --ckpt=yolox_tiny.pth --decode_in_inference --batch-size=1
 ```
 
 ## 2.edit and save onnx
@@ -55,13 +67,14 @@ cmake ..
 make -j10
 # note: the dstImage will be saved in tensorrt-alpha/yolox/build by default
 # only support static multi-batch inference!
+# the values of batch_size are different, and onnx needs to be compiled additionally
 
 ## 640
 # infer image
 ./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=1  --img=../../data/6406401.jpg  --show --savePath=../
 
 # infer video
-./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=1  --video=../../data/people.mp4  --show 
+./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=8  --video=../../data/people.mp4  --show 
 
 # infer camera
 ./app_yolox  --model=../../data/yolox/yolox_s.trt     --size=640 --batch_size=8  --cam_id=0  --show
