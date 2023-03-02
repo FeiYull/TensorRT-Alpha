@@ -463,7 +463,10 @@ void resize_rgb_padding_device_kernel(unsigned char* src, int src_width, int src
 			int x_low = floorf(src_x); // 0.6 -> 0
 			int y_high = y_low + 1;    // 0 -> 1
 			int x_high = x_low + 1;    // 1 -> 2
-			unsigned char const_values[] = { padding_value, padding_value, padding_value }; // todo
+			unsigned char const_values[] = { 
+				(unsigned char)padding_value, 
+				(unsigned char)padding_value, 
+				(unsigned char)padding_value }; 
 			// cal four areas
 			float ly = src_y - y_low;
 			float lx = src_x - x_low;
