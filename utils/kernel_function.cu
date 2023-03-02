@@ -378,12 +378,10 @@ void resize_rgb_padding_device_kernel(float* src, int src_width, int src_height,
 	{
 		int dst_y = dx / dst_width; // dst row
 		int dst_x = dx % dst_width; // dst col
-
 		float src_x = 0;
 		float src_y = 0;
 		affine_project_device_kernel(&matrix, dst_x, dst_y, &src_x, &src_y);
 		float c0 = padding_value, c1 = padding_value, c2 = padding_value;
-		//printf("dst_x = %d, dst_y = %d, src_x = %f, src_y = %f \n", dst_x, dst_y, src_x, src_y);
 		if (src_x < -1 || src_x >= src_width || src_y < -1 || src_y >= src_height)
 		{
 			// todo
@@ -393,8 +391,8 @@ void resize_rgb_padding_device_kernel(float* src, int src_width, int src_height,
 			// get neibor four points
 			int y_low = floorf(src_y); // 0.8 -> 0 
 			int x_low = floorf(src_x); // 0.6 -> 0
-			int y_high = y_low + 1; // 0 -> 1
-			int x_high = x_low + 1; // 1 -> 2
+			int y_high = y_low + 1;    // 0 -> 1
+			int x_high = x_low + 1;    // 1 -> 2
 			float const_values[] = { padding_value, padding_value, padding_value };
 			// cal four areas
 			float ly = src_y - y_low;
@@ -438,6 +436,78 @@ void resize_rgb_padding_device_kernel(float* src, int src_width, int src_height,
 	}
 }
 
+// overload: paddingValue and src's type is uin8
+__global__
+void resize_rgb_padding_device_kernel(unsigned char* src, int src_width, int src_height, int src_area, int src_volume,
+	float* dst, int dst_width, int dst_height, int dst_area, int dst_volume,
+	int batch_size, float padding_value, utils::AffineMat matrix)
+{
+	int dx = blockDim.x * blockIdx.x + threadIdx.x;
+	int dy = blockDim.y * blockIdx.y + threadIdx.y;
+	if (dx < dst_area && dy < batch_size)
+	{
+		int dst_y = dx / dst_width; // dst row
+		int dst_x = dx % dst_width; // dst col
+		float src_x = 0;
+		float src_y = 0;
+		affine_project_device_kernel(&matrix, dst_x, dst_y, &src_x, &src_y);
+		float c0 = padding_value, c1 = padding_value, c2 = padding_value;
+		if (src_x < -1 || src_x >= src_width || src_y < -1 || src_y >= src_height)
+		{
+			// todo
+		}
+		else
+		{
+			// get neibor four points
+			int y_low = floorf(src_y); // 0.8 -> 0 
+			int x_low = floorf(src_x); // 0.6 -> 0
+			int y_high = y_low + 1;    // 0 -> 1
+			int x_high = x_low + 1;    // 1 -> 2
+			unsigned char const_values[] = { 
+				(unsigned char)padding_value, 
+				(unsigned char)padding_value, 
+				(unsigned char)padding_value }; 
+			// cal four areas
+			float ly = src_y - y_low;
+			float lx = src_x - x_low;
+			float hy = 1 - ly;
+			float hx = 1 - lx;
+			float w1 = hy * hx, w2 = hy * lx, w3 = ly * hx, w4 = ly * lx; // areas
+			// default vals
+			unsigned char* v1 = const_values;
+			unsigned char* v2 = const_values;
+			unsigned char* v3 = const_values;
+			unsigned char* v4 = const_values;
+
+			if (y_low >= 0)
+			{
+				if (x_low >= 0)
+					v1 = src + dy * src_volume + y_low * src_width * 3 + x_low * 3;
+
+				if (x_high < src_width)
+					v2 = src + dy * src_volume + y_low * src_width * 3 + x_high * 3;
+			}
+
+			if (y_high < src_height)
+			{
+				if (x_low >= 0)
+					v3 = src + dy * src_volume + y_high * src_width * 3 + x_low * 3;
+
+				if (x_high < src_width)
+					v4 = src + dy * src_volume + y_high * src_width * 3 + x_high * 3;
+			}
+			// 3 channels' val
+			c0 = floorf(w1 * v1[0] + w2 * v2[0] + w3 * v3[0] + w4 * v4[0] + 0.5f);
+			c1 = floorf(w1 * v1[1] + w2 * v2[1] + w3 * v3[1] + w4 * v4[1] + 0.5f);
+			c2 = floorf(w1 * v1[2] + w2 * v2[2] + w3 * v3[2] + w4 * v4[2] + 0.5f);
+		}
+		//uint8_t* pdst = dst + dy * dst_line_size + dx * 3;
+		float* pdst = dst + dy * dst_volume + dst_y * dst_width * 3 + dst_x * 3;
+		pdst[0] = c0;
+		pdst[1] = c1;
+		pdst[2] = c2;
+	}
+}
 __global__
 void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src_height, int src_area, int src_volume,
 	float* dst, int dst_width, int dst_height, int dst_area, int dst_volume,
@@ -654,7 +724,6 @@ void norm_device_kernel(float* src, float* dst,
 			dst[dy * img_volume + dx] = norm_device(src[dy * img_volume + dx], scale, mean2, std2);
 			break;
 		}
-
 		//dst[dy * img_volume + dx] = norm_device(src[dy * img_volume + dx], norm_param.scale, norm_param.means[ch], norm_param.stds[ch]);
 	}
 }
@@ -682,6 +751,26 @@ __global__ void hwc2chw_device_kernel(float* src, float* dst,
 }
 //note: resize rgb with padding
 void resizeDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
+	float* dst, int dstWidth, int dstHeight,
+	float paddingValue, utils::AffineMat matrix)
+{
+	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
+	dim3 grid_size((dstWidth * dstHeight /** 3*/ + BLOCK_SIZE - 1) / BLOCK_SIZE,
+		(batchSize + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
+	int src_volume = 3 * srcHeight * srcWidth;
+	int src_area = srcHeight * srcWidth;
+
+	int dst_volume = 3 * dstHeight * dstWidth;
+	int dst_area = dstHeight * dstWidth;
+
+	resize_rgb_padding_device_kernel << < grid_size, block_size, 0, nullptr >> > (src, srcWidth, srcHeight, src_area, src_volume,
+		dst, dstWidth, dstHeight, dst_area, dst_volume,
+		batchSize, paddingValue, matrix);
+}
+
+//overload:resize rgb with padding, but src's type is uin8
+void resizeDevice(const int& batchSize, unsigned char* src, int srcWidth, int srcHeight,
 	float* dst, int dstWidth, int dstHeight,
 	float paddingValue, utils::AffineMat matrix)
 {
@@ -849,7 +938,6 @@ void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float c
 	*pout_item++ = confidence;
 	*pout_item++ = label;
 	*pout_item++ = 1;// 1 = keep, 0 = ignore
-	//*pout_item = 1;// 1 = keep, 0 = ignore
 }
 
 static __device__ 
@@ -974,7 +1062,6 @@ void nms_sort_kernel(int topK, int batch_size, float iou_thresh,
 		{
 			pitem[6] = 0;  // 1=keep, 0=ignore 
 		}
-		
 	}
 }
 

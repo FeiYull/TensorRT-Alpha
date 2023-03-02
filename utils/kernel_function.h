@@ -39,6 +39,12 @@ std::pair<float, float> minmaxFloatDevice(float* src, int size);
 void resizeDevice(const int& batch_size, float* src, int src_width, int src_height,
     float* dst, int dstWidth, int dstHeight,
     float paddingValue, utils::AffineMat matrix);
+
+//overload:resize rgb with padding, but src's type is uin8
+void resizeDevice(const int& batch_size, unsigned char* src, int src_width, int src_height,
+    float* dst, int dstWidth, int dstHeight,
+    float paddingValue, utils::AffineMat matrix);
+
 // overload: resize rgb/gray without padding
 void resizeDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
     float* dst, int dstWidth, int dstHeight,
