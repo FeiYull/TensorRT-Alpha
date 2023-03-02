@@ -207,7 +207,7 @@ void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114, m_dst2src);
 
-#if 1 // valid
+#if 0 // valid
     {
         float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
         float* pdevice = m_input_resize_device;
