@@ -1,0 +1,33 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/app_yolox",
+            "args": [
+
+            "--model=../data/yolox/yolox_tiny.trt",
+            "--size=416",
+            "--batch_size=8",
+
+            // image
+            //"--img= ../data/6406403.jpg",
+            
+            // video
+            "--video=../data/people.mp4",
+    
+            // camera
+            // "--cam_id=  0",
+            
+            "--show",
+            "--savePath= build/"
+        ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            //"preLaunchTask": "C/C++: g++ build active file",
+            //"miDebuggerPath": "/usr/bin/gdb"
+          }
+    ]
+}
