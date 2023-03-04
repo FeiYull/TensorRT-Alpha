@@ -63,7 +63,7 @@ if __name__ == '__main__':
         global frame
         global source_w
         global source_h
-        det = Detector(dll_path="./yoloDemo.dll", trt_path="./yolov8n.trt", window_width=source_w,
+        det = Detector(dll_path="./python_dll.dll", trt_path="./yolov8n.trt", window_width=source_w,
                        window_height=source_h)
         clock = Clock()
 
