@@ -85,5 +85,10 @@ void Detect(void* yolo, int rows, int cols, unsigned char* src_data, float(*res_
 	utils::DeviceTimer d_t2; yolov8->infer();				  float t2 = d_t2.getUsedTime();
 	utils::DeviceTimer d_t3; yolov8->postprocess(imgs_batch); float t3 = d_t3.getUsedTime();
 
+	sample::gLogInfo << 
+		"preprocess time = " << t1 << "; "
+		"infer time = " << t2 << "; "
+		"postprocess time = " << t3 << std::endl;
+
 	getAimsInfo(yolov8->getObjectss(), res_array);	
 }
