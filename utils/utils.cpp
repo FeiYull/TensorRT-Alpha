@@ -158,7 +158,11 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 				{
 					color = Colors::color91[box.label];
 				}
-				if (classNames.size() == 80)
+				if (classNames.size() == 80) // coco80
+				{
+					color = Colors::color80[box.label];
+				}
+				if (classNames.size() == 20) // voc20
 				{
 					color = Colors::color80[box.label];
 				}
@@ -208,7 +212,11 @@ void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vecto
 				{
 					color = Colors::color91[box.label];
 				}
-				if (classNames.size() == 80)
+				if (classNames.size() == 80) // coco80
+				{
+					color = Colors::color80[box.label];
+				}
+				if (classNames.size() == 20) // voc20
 				{
 					color = Colors::color80[box.label];
 				}
