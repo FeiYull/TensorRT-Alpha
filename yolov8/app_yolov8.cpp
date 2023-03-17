@@ -4,7 +4,9 @@
 void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
+	//initParameters.class_names = utils::dataSets::voc20;
 	initParameters.num_class = 80; // for coco
+	//initParameters.num_class = 20; // for voc2012
 
 	initParameters.batch_size = 8;
 	initParameters.dst_h = 640;

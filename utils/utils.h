@@ -29,6 +29,11 @@ namespace utils
             "desk","toilet","door","tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven","toaster","sink","refrigerator","blender",
             "book","clock","vase","scissors","teddy bear","hair drier","toothbrush","hair brush" 
         };
+        const std::vector<std::string> voc20 = {
+            "aeroplane","bicycle","bird","boat","bottle","bus","car","cat","chair","cow","diningtable",
+            "dog","horse","motorbike","person","pottedplant","sheep","sofa","train","tvmonitor"
+        };
+
         const std::vector<std::string> face2 = {"non-face", "face"};
     }
     namespace Colors // todo : binding "color80" with "coco80" and "coco91"...
@@ -66,6 +71,12 @@ namespace utils
             cv::Scalar(120, 161, 247),cv::Scalar(123, 164, 190),cv::Scalar(15, 191, 40),cv::Scalar(11, 44, 117),cv::Scalar(198, 136, 70),cv::Scalar(14, 224, 240),
             cv::Scalar(60, 186, 193),cv::Scalar(253, 190, 129),cv::Scalar(134, 228, 173),cv::Scalar(219, 156, 214),cv::Scalar(137, 67, 254),cv::Scalar(178, 223, 250),
             cv::Scalar(219, 199, 139)
+        };
+        const std::vector<cv::Scalar> color20{
+            cv::Scalar(128, 77, 207),cv::Scalar(65, 32, 208),cv::Scalar(0, 224, 45),cv::Scalar(3, 141, 219),cv::Scalar(80, 239, 253),cv::Scalar(239, 184, 12),
+            cv::Scalar(7, 144, 145),cv::Scalar(161, 88, 57),cv::Scalar(0, 166, 46),cv::Scalar(218, 113, 53),cv::Scalar(193, 33, 128),cv::Scalar(190, 94, 113),
+            cv::Scalar(113, 123, 232),cv::Scalar(69, 205, 80),cv::Scalar(18, 170, 49),cv::Scalar(89, 51, 241),cv::Scalar(153, 191, 154),cv::Scalar(27, 26, 69),
+            cv::Scalar(20, 186, 194),cv::Scalar(210, 202, 167),cv::Scalar(196, 113, 204),cv::Scalar(9, 81, 88),cv::Scalar(191, 162, 67),cv::Scalar(227, 73, 120)
         };
     }
 
