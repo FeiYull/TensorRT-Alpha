@@ -20,7 +20,9 @@ file(GLOB CPPS
   ${CMAKE_CURRENT_SOURCE_DIR}/../utils/*.cu
   ${CMAKE_CURRENT_SOURCE_DIR}/../utils/*.cpp
   ${TensorRT_ROOT}/samples/common/logger.cpp 
-  ${TensorRT_ROOT}/samples/common/sampleOptions.cpp 
+  ${TensorRT_ROOT}/samples/common/sampleOptions.cpp
+  #fix issues https://github.com/FeiYull/TensorRT-Alpha/issues/34
+  ${TensorRT_ROOT}/samples/common/sampleUtils.cpp  
   )
 list(REMOVE_ITEM CPPS app_facemesh.cpp)
 message(*********************************************************)
