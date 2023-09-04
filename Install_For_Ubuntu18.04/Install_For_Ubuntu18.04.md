@@ -7,6 +7,7 @@ sudo apt-get install gdb
 sudo apt-get install cmake
 ```
 ```bash
+sudo apt-get install pkg-config libgtk-3-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev 
 sudo apt-get install libopencv-dev  
 # pkg-config --modversion opencv
 ```
