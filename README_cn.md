@@ -104,7 +104,7 @@ vim common.cmake
 开始编译、运行工程，例如:[yolov8](yolov8/README.md)
 
 ### Windows10
-[图文详细版：Windows10环境配置](http://t.csdn.cn/EwNUU)<br>
+[图文详细版：Windows10环境配置](http://t.csdn.cn/4O958)<br>
 
 ## 模型
 目前已实现30多个主流模型，部分整理好的onnx文件如下列表：
