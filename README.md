@@ -106,7 +106,7 @@ start to build project:
 For example:[yolov8](yolov8/README.md)
 
 ### Windows10
-[图文详细版：Windows10环境配置](http://t.csdn.cn/EwNUU)<br>
+[图文详细版：Windows10环境配置](http://t.csdn.cn/4O958)<br>
 
 ## Onnx
 At present, more than 30  models have been implemented, and some onnx files of them are organized as follows:
