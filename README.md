@@ -89,7 +89,7 @@ pip install -r requirements.txt
 Installation Tutorial：
 - [Install For Ubuntu18.04](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)<br>
 - [图文详细版：Ubuntu18.04环境配置](https://blog.csdn.net/m0_72734364/article/details/128758544?spm=1001.2014.3001.5502)<br>
-- docker for linux (waiting for update)<br>
+- [Docker For Linux](docker/README.md)<br>
 - [图文详细版：Windows10环境配置](https://blog.csdn.net/m0_72734364/article/details/128865904?spm=1001.2014.3001.5501)<br>
 
 ## Quick Start
