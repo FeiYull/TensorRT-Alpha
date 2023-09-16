@@ -12,5 +12,5 @@ cp TensorRT-8.4.2.4.Linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz .
 
 ## 2. build docker images
 ```bash
-docker build --network=host -t trta .
+docker build -f ubuntu18.04-cu113.Dockerfile --network=host -t trta .
 ```
