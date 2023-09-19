@@ -201,3 +201,15 @@ vim common.cmake
 [2].https://github.com/NVIDIA-AI-IOT/torch2trt<br>
 [3].https://github.com/shouxieai/tensorRT_Pro<br>
 [4].https://github.com/opencv/opencv_zoo<br>
+
+## Citation
+```bash
+@misc{FeiYull_TensorRT-Alpha,  
+  author = {FeiYull},  
+  title = {TensorRT-Alpha},  
+  year = {2023},  
+  publisher = {GitHub},  
+  journal = {GitHub repository},  
+  howpublished = {https://github.com/FeiYull/tensorrt-alpha}
+}
+```
