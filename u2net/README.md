@@ -5,7 +5,7 @@ or export onnx:
 ```bash
 git clone https://github.com/xuebinqin/U-2-Net
 cd U-2-Net-master
-# Use the script alpha_export.py provided by this warehouse to export onnx
+# Use the script alpha_export.py provided by this repo to export onnx
 cp alpha_export.py U-2-Net-master
 python alpha_export.py --net=u2net --weights=saved_models/u2net/u2net.pth
 python alpha_export.py --net=u2netp --weights=saved_models/u2netp/u2netp.pth
@@ -39,10 +39,10 @@ make -j10
 ./app_u2net  --model=../../data/u2net/u2net.trt --size=320  --batch_size=1  --img=../../data/sailboat3.jpg  --show --savePath
 
 # infer video
-./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=8  --video=../../data/people.mp4  --show
+./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=2  --video=../../data/people.mp4  --show
 
 # infer camera
-./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=4  --cam_id=0  --show
+./app_u2net  --model=../../data/u2net/u2net.trt --size=320 --batch_size=2  --cam_id=0  --show
 ```
 ## 5. appendix
 ignore
