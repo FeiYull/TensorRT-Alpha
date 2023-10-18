@@ -1,19 +1,21 @@
 # TensorRT-Alpha
+
 <div align="center">
 
   [![Cuda](https://img.shields.io/badge/CUDA-11.3-%2376B900?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit-archive)
   [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
+  [![](https://img.shields.io/badge/bilibili-blue.svg?logo=bilibili)](https://www.bilibili.com/video/BV1Ay4y1d7M3/?spm_id_from=333.999.0.0&vd_source=a96c9c3f099f4167807291a34fd50fd5)
 
-  [English](README.md) | 简体中文<br>
+  English | [简体中文](README.md)<br>
 
-  [![](https://img.shields.io/badge/B站-blue.svg?logo=bilibili)](https://www.bilibili.com/video/BV1Ay4y1d7M3/?spm_id_from=333.999.0.0&vd_source=a96c9c3f099f4167807291a34fd50fd5)
-  [![](https://img.shields.io/badge/youtube-red.svg?logo=youtube)](https://www.youtube.com/watch?v=e7OcvZcqSVA)
+
+
   <br>
   </div>
 
-## 可视化
+## Visualization
 <div align='center'>
   <img src='.github/facemesh.jpg' width="143px">
   <img src='.github/people.gif' width="338px">
@@ -23,11 +25,11 @@
   <img src='.github/u2net.gif'  width="190px">
   <img src='.github/libfacedet.gif'  width="260px">
   <br>
-</div>
+</div> 
 
-## 介绍
-本仓库提供深度学习CV领域模型加速部署案例，仓库实现的cuda c支持多batch图像预处理、推理、decode、NMS。大部分模型转换流程为：torch->onnx->tensorrt。
-获取onnx文件以下有两种方式：<br>
+## Introduce
+This repository  provides accelerated deployment cases of deep learning CV popular models, and cuda c supports dynamic-batch image process, infer, decode, NMS.<br>
+There are two ways to compile model(pth or onnx):<br>
 
 <details>
 <summary>pth -> trt</summary>
@@ -37,20 +39,20 @@ coming soon.
 <details>
 <summary>pth -> onnx -> trt:</summary>
 
-- [i]. 本仓库提供的网盘直接下载onnx。[weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
-- [ii]]. 按照本仓库提供的指令，手动从相关源代码框架导出onnx。
+  - [i]. According to the network disk provided by TensorRT-Alpha, download ONNX directly. [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
+  - [ii]]. Follow the instructions provided by TensorRT-Alpha to manually export ONNX from the relevant python source code framework.
 
 </details>
 
-## 更新
-- 2023.01.01  🔥 更新 yolov3, yolov4, yolov5, yolov6
-- 2023.01.04  🍅 更新 yolov7, yolox, yolor
-- 2023.01.05  🎉 更新 u2net, libfacedetection
-- 2023.01.08  🚀 全网最快支持yolov8的tensorrt部署
-- 2023.01.20     更新 efficientdet, pphunmanseg
+## Update
+- 2023.01.01  🔥 update yolov3, yolov4, yolov5, yolov6
+- 2023.01.04  🍅 update yolov7, yolox, yolor
+- 2023.01.05  🎉 update u2net, libfacedetection
+- 2023.01.08  🚀 The whole network is the first to support yolov8 
+- 2023.01.20     update efficientdet, pphunmanseg
 
-## 安装
-兼容平台: Windows and Linux. 以下环境已被测过：<br>
+## Installation
+The following environments have been tested：<br>
 <details>
 <summary>Ubuntu18.04</summary>
 
@@ -73,7 +75,7 @@ coming soon.
 </details>
 
 <details>
-<summary>创建Python环境(可选）</summary>
+<summary>Python environment(Optional）</summary>
 
 ```bash
 # install miniconda first
@@ -85,33 +87,35 @@ pip install -r requirements.txt
 ```
 </details>
 
-安装教程：
+Installation Tutorial：
 - [Install For Ubuntu18.04](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)<br>
 - [图文详细版：Ubuntu18.04环境配置](https://blog.csdn.net/m0_72734364/article/details/128758544?spm=1001.2014.3001.5502)<br>
 - [Docker For Linux](docker/README.md)<br>
 - [图文详细版：Windows10环境配置](https://blog.csdn.net/m0_72734364/article/details/128865904?spm=1001.2014.3001.5501)<br>
 
-## 快速开始
+## Quick Start
 ### Ubuntu18.04
-设置TensorRT根目录（安装目录）路径:
+set your TensorRT_ROOT path:
 ```bash
 git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/cmake
 vim common.cmake
-# 把common.cmake文件第20行中的TensorRT_ROOT修改成您的TensorRT安装目录, 例如改成如下:
+# set var TensorRT_ROOT to your path in line 20, eg:
 # set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
 ```
-开始编译、运行工程，例如:[yolov8](yolov8/README.md)
+start to build project:
+For example:[yolov8](yolov8/README.md)
 
 ### Windows10
 [图文详细版：Windows10环境配置](https://blog.csdn.net/m0_72734364/article/details/128865904?spm=1001.2014.3001.5501)<br>
 
-## 模型
-目前已实现30多个主流模型，部分整理好的onnx文件如下列表：
+## Onnx
+At present, more than 30  models have been implemented, and some onnx files of them are organized as follows:
+
 <div align='center'>
 
-| model|tesla v100(32G)|weiyun |google driver |
- :-: | :-: | :-: | :-: |
+| model | tesla v100(32G) |weiyun |google driver |
+  :-: | :-: | :-: | :-: |
 |[yolov3](yolov3/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|      
 |[yolov4](yolov4/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|
 |[yolov5](yolov5/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
@@ -122,16 +126,16 @@ vim common.cmake
 |[yolor](yolor/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |[u2net](u2net/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |[libfacedetection](libfacedetection/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
-|[facemesh](facemesh/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[facemesh](facemesh/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|  
 |[pphumanseg](pphumanseg/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|  
-|[efficientdet](efficientdet/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)| 
+|[efficientdet](efficientdet/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 
-🍉稍后在tesla v100 和 A100上测量时间开销!现在看看yolov8n在移动端RTX2070m(8G)的性能表现：
+🍉We will test the time of all models on tesla v100 and A100! Now let's preview the performance of yolov8n on RTX2070m(8G)：
 <div align='center'>
 
-| 模型 | 视频分辨率 | 模型输入尺寸 |显存占用 |GPU利用率|
+| model | video resolution | model input size |GPU Memory-Usage |GPU-Util|
   :-: | :-: | :-: | :-: | :-: |
 |yolov8n|1920x1080|8x3x640x640|1093MiB/7982MiB| 14%| 
 
@@ -140,12 +144,13 @@ vim common.cmake
      alt="无法显示图片时显示的文字"
      style="zoom:40%"/>
 <br>		<!--换行-->
-<center>一个batch内，平均每一帧的时间开销	<!--标题--></center>
+<center>cost time per frame	<!--标题--></center>
     <br>		<!--换行-->
+
 </div>
 <br>
 
-## 严格的精度对齐，官方效果 vs TensorRT-Alpha:
+## Some Precision Alignment Renderings Comparison
 <br>
 <div align='center'>			<!--块级封装-->
      <center>	<!--将图片和文字居中-->
@@ -195,7 +200,7 @@ vim common.cmake
     </center>
 </div>
 
-## 参考
+## Reference
 [0].https://github.com/NVIDIA/TensorRT<br>
 [1].https://github.com/onnx/onnx-tensorrt<br>
 [2].https://github.com/NVIDIA-AI-IOT/torch2trt<br>
