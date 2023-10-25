@@ -2,7 +2,6 @@
 #include"../utils/utils.h"
 #include"efficientdet.h"
 
-
 void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco91;
@@ -28,7 +27,6 @@ void setParameters(utils::InitParameter& initParameters)
 	// efficientdet d4 d5 d6 ...
 
 	initParameters.input_output_names = { "input",  "num_detections", "detection_boxes", "detection_scores", "detection_classes", };
-
 	initParameters.conf_thresh = 0.45f; 
 	initParameters.topK = 100; // be determined while exporting the onnx!
 	initParameters.save_path = "";
@@ -144,7 +142,7 @@ int main(int argc, char** argv)
 		sample::gLogError << "read the input data errors!" << std::endl;
 		return -1;
 	}
-
+	
 	EfficientDet efficient_det(param);
 
 	// read model

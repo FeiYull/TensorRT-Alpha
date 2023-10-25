@@ -182,7 +182,7 @@ void FaceMesh::copy(const std::vector<cv::Mat>& imgsBatch)
 void  FaceMesh::preprocess(const std::vector<cv::Mat>& imgsBatch)
 {
     // 2.resize
-   /* resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
+    /* resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114, m_dst2src);
 
     resizeDevice(param.batch_size, input_src_device, param.src_w, param.src_h,
@@ -207,7 +207,7 @@ void  FaceMesh::preprocess(const std::vector<cv::Mat>& imgsBatch)
 #endif // 0
 
     // 3. bgr2rgb
-   /* bgr2rgbDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
+    /* bgr2rgbDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_rgb_device, m_param.dst_w, m_param.dst_h); */
     bgr2rgbDevice(m_param.batch_size, m_input_src_device, m_param.dst_w, m_param.dst_h,
         m_input_rgb_device, m_param.dst_w, m_param.dst_h);

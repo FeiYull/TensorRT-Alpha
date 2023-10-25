@@ -19,8 +19,6 @@ class AlphaYolov4(torch.nn.Module):
         return torch.cat((boxes, confs), 3)
         #return torch.cat((y[0].squeeze(dim = 2), y[1]), 2)
 
-
-
 def transform_to_onnx(cfgfile, weightfile, batch_size=1, onnx_file_name=None):
     # model = Darknet(cfgfile)
 

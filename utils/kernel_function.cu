@@ -265,7 +265,6 @@ void min_int_array_device_kernel(int* src, int size, int* min_val)
 //extern __managed__ float min_val_flt[1];
 //extern __managed__ int   max_val_int[1];
 //extern __managed__ int   min_val_int[1];
-
 // change to dynamic batch!
 // legacy
 __managed__ float max_val_flt[1];
@@ -280,15 +279,6 @@ float maxFloatDevice(float* src, int size)
 	cudaDeviceSynchronize();
 	return max_val_flt[0];
 }
-
-/*
-* @note: overload: compute max vals of matrix
-* @in: src : batchSize * srcVolume
-* @in: srcVolume = srcChannel * srcHeight * srcWidth
-* @in: dst : batchSize * 1
-*/
-//void maxFloatDevice(const int& batchSize, float* src, int srcVolume, float* dst);
-
 
 float minFloatDevice(float* src, int size)
 {
@@ -314,7 +304,6 @@ int minIntDevice(int* src, int size)
 	return min_val_int[0];
 }
 
-// ------------------------------------------------
 void maxFloatDevice(float* src, int size, float* dst)
 {
 	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -354,7 +343,6 @@ std::pair<float, float> minmaxFloatDevice(float* src, int size)
 	cudaDeviceSynchronize();
 	return std::pair<float, float>(min_val_flt[0], max_val_flt[0]);
 }
-
 
 /************************************************************************************************
 * preprocess kernel function
@@ -522,10 +510,8 @@ void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src
 		float src_x = 0;
 		float src_y = 0;
 		affine_project_device_kernel(&matrix, dst_x, dst_y, &src_x, &src_y);
-		//float c0 = padding_value, c1 = padding_value, c2 = padding_value;
 		float default_val = 114.f;
 		float c0 = default_val, c1 = default_val, c2 = default_val;
-		//printf("dst_x = %d, dst_y = %d, src_x = %f, src_y = %f \n", dst_x, dst_y, src_x, src_y);
 		if (src_x < -1 || src_x >= src_width || src_y < -1 || src_y >= src_height)
 		{
 			// todo
@@ -536,11 +522,6 @@ void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src
 			int x_low = floorf(fmaxf(src_x, 0.f)); // 0.6 -> 0
 			int y_high = min(y_low + 1, src_height - 1); // 0 -> 1
 			int x_high = min(x_low + 1, src_width - 1); // 1 -> 2
-
-			//int y_low = floorf(src_y); // 0.8 -> 0 
-			//int x_low = floorf(src_x); // 0.6 -> 0
-			//int y_high = y_low + 1; // 0 -> 1
-			//int x_high = x_low + 1; // 1 -> 2
 			float const_values[] = { default_val, default_val, default_val };
 			// 
 			float ly = src_y - y_low;
@@ -576,7 +557,6 @@ void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src
 			c1 = floorf(w1 * v1[1] + w2 * v2[1] + w3 * v3[1] + w4 * v4[1] + 0.5f);
 			c2 = floorf(w1 * v1[2] + w2 * v2[2] + w3 * v3[2] + w4 * v4[2] + 0.5f);
 		}
-		//uint8_t* pdst = dst + dy * dst_line_size + dx * 3;
 		float* pdst = dst + dy * dst_volume + dst_y * dst_width * 3 + dst_x * 3;
 		pdst[0] = c0;
 		pdst[1] = c1;
@@ -585,9 +565,9 @@ void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src
 }
 
 __global__
-void resize_gray_without_padding_device_kernel(float* src, int src_width, int src_height, int src_area, /*int src_volume,*/
-	float* dst, int dst_width, int dst_height, int dst_area, /*int dst_volume,*/
-	int batch_size, /*float padding_value, */utils::AffineMat matrix)
+void resize_gray_without_padding_device_kernel(float* src, int src_width, int src_height, int src_area, 
+	float* dst, int dst_width, int dst_height, int dst_area, 
+	int batch_size, utils::AffineMat matrix)
 {
 	int dx = blockDim.x * blockIdx.x + threadIdx.x;
 	int dy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -598,10 +578,8 @@ void resize_gray_without_padding_device_kernel(float* src, int src_width, int sr
 		float src_x = 0;
 		float src_y = 0;
 		affine_project_device_kernel(&matrix, dst_x, dst_y, &src_x, &src_y);
-		//float c0 = padding_value, c1 = padding_value, c2 = padding_value;
 		float default_val = 114.f;
-		float c0 = default_val/*, c1 = default_val, c2 = default_val*/;
-		//printf("dst_x = %d, dst_y = %d, src_x = %f, src_y = %f \n", dst_x, dst_y, src_x, src_y);
+		float c0 = default_val;
 		if (src_x < -1 || src_x >= src_width || src_y < -1 || src_y >= src_height)
 		{
 			// todo
@@ -612,19 +590,14 @@ void resize_gray_without_padding_device_kernel(float* src, int src_width, int sr
 			int x_low = floorf(fmaxf(src_x, 0.f)); // 0.6 -> 0
 			int y_high = min(y_low + 1, src_height - 1); // 0 -> 1
 			int x_high = min(x_low + 1, src_width - 1); // 1 -> 2
-
-			//int y_low = floorf(src_y); // 0.8 -> 0 
-			//int x_low = floorf(src_x); // 0.6 -> 0
-			//int y_high = y_low + 1; // 0 -> 1
-			//int x_high = x_low + 1; // 1 -> 2
-			float const_values[] = { default_val/*, default_val, default_val*/ };
-			// 
+			float const_values[] = { default_val};
+			
 			float ly = src_y - y_low;
 			float lx = src_x - x_low;
 			float hy = 1 - ly;
 			float hx = 1 - lx;
 			float w1 = hy * hx, w2 = hy * lx, w3 = ly * hx, w4 = ly * lx; // 
-			//
+			
 			float* v1 = const_values;
 			float* v2 = const_values;
 			float* v3 = const_values;
@@ -633,35 +606,24 @@ void resize_gray_without_padding_device_kernel(float* src, int src_width, int sr
 			if (y_low >= 0)
 			{
 				if (x_low >= 0)
-					//v1 = src + dy * src_volume + y_low * src_width * 3 + x_low * 3;
 					v1 = src + dy * src_area + y_low * src_width * 1 + x_low * 1;
 
-				if (x_high < src_width) //
-					//v2 = src + dy * src_volume + y_low * src_width * 3 + x_high * 3;
+				if (x_high < src_width) 
 					v2 = src + dy * src_area + y_low * src_width * 1 + x_high * 1;
 			}
 
 			if (y_high < src_height)
 			{
 				if (x_low >= 0)
-					//v3 = src + dy * src_volume + y_high * src_width * 3 + x_low * 3;
 					v3 = src + dy * src_area + y_high * src_width * 1 + x_low * 1;
 
 				if (x_high < src_width)
-					//v4 = src + dy * src_volume + y_high * src_width * 3 + x_high * 3;
 					v4 = src + dy * src_area + y_high * src_width * 1 + x_high * 1;
 			}
-			// 
 			c0 = floorf(w1 * v1[0] + w2 * v2[0] + w3 * v3[0] + w4 * v4[0] + 0.5f);
-			/*c1 = floorf(w1 * v1[1] + w2 * v2[1] + w3 * v3[1] + w4 * v4[1] + 0.5f);
-			c2 = floorf(w1 * v1[2] + w2 * v2[2] + w3 * v3[2] + w4 * v4[2] + 0.5f);*/
 		}
-		//uint8_t* pdst = dst + dy * dst_line_size + dx * 3;
-		//float* pdst = dst + dy * dst_volume + dst_y * dst_width * 3 + dst_x * 3;
 		float* pdst = dst + dy * dst_area + dst_y * dst_width * 1 + dst_x * 1;
 		pdst[0] = c0;
-	/*	pdst[1] = c1;
-		pdst[2] = c2;*/
 	}
 }
 
@@ -673,7 +635,6 @@ void bgr2rgb_device_kernel(float* src, float* dst,
 	int dy = blockDim.y * blockIdx.y + threadIdx.y;
 	if (dx < img_volume && dy < batch_size)
 	{
-		//dst[dy * img_volume + dx] = src[dy * img_volume + dx];
 		int ch = dx % 3;
 		assert(ch < 3);
 
@@ -724,7 +685,6 @@ void norm_device_kernel(float* src, float* dst,
 			dst[dy * img_volume + dx] = norm_device(src[dy * img_volume + dx], scale, mean2, std2);
 			break;
 		}
-		//dst[dy * img_volume + dx] = norm_device(src[dy * img_volume + dx], norm_param.scale, norm_param.means[ch], norm_param.stds[ch]);
 	}
 }
 
@@ -744,9 +704,6 @@ __global__ void hwc2chw_device_kernel(float* src, float* dst,
 
 		int dx_ = row * (img_width * 3) + col * 3 + ch;
 		dst[dy * img_volume + dx] = src[dy * img_volume + dx_];
-
-		//printf("[x = %d; y = %d] \n", dx, dy);
-
 	}
 }
 //note: resize rgb with padding
@@ -755,7 +712,7 @@ void resizeDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
 	float paddingValue, utils::AffineMat matrix)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 grid_size((dstWidth * dstHeight /** 3*/ + BLOCK_SIZE - 1) / BLOCK_SIZE,
+	dim3 grid_size((dstWidth * dstHeight + BLOCK_SIZE - 1) / BLOCK_SIZE,
 		(batchSize + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
 	int src_volume = 3 * srcHeight * srcWidth;
@@ -775,7 +732,7 @@ void resizeDevice(const int& batchSize, unsigned char* src, int srcWidth, int sr
 	float paddingValue, utils::AffineMat matrix)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 grid_size((dstWidth * dstHeight /** 3*/ + BLOCK_SIZE - 1) / BLOCK_SIZE,
+	dim3 grid_size((dstWidth * dstHeight + BLOCK_SIZE - 1) / BLOCK_SIZE,
 		(batchSize + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
 	int src_volume = 3 * srcHeight * srcWidth;
@@ -795,7 +752,7 @@ void resizeDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
 	utils::ColorMode mode, utils::AffineMat matrix)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 grid_size((dstWidth * dstHeight /** 3*/ + BLOCK_SIZE - 1) / BLOCK_SIZE,
+	dim3 grid_size((dstWidth * dstHeight + BLOCK_SIZE - 1) / BLOCK_SIZE,
 		(batchSize + BLOCK_SIZE - 1) / BLOCK_SIZE);
 	int src_area = srcHeight * srcWidth;
 	int dst_area = dstHeight * dstWidth;
@@ -811,9 +768,8 @@ void resizeDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
 			batchSize, matrix);
 		return;
 	case utils::ColorMode::GRAY:
-		resize_gray_without_padding_device_kernel << < grid_size, block_size, 0, nullptr >> > (src, srcWidth, srcHeight, src_area, /*src_volume,*/
-			dst, dstWidth, dstHeight, dst_area, /*dst_volume,*/
-			batchSize, matrix);
+		resize_gray_without_padding_device_kernel << < grid_size, block_size, 0, nullptr >> > (src, srcWidth, srcHeight, src_area, 
+			dst, dstWidth, dstHeight, dst_area, batchSize, matrix);
 		return;
 	}
 }
@@ -902,15 +858,6 @@ void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float c
 	{
 		return;
 	}
-
-	/*
-	 parray:count, box1, box2, box3(count:num of good box)
-	 parray[0]:count
-	 atomicAdd -> count += 1
-	 atomicAdd: return the old_count
-	 int index = atomicAdd(dst + dy * dstArea, 1);
-	 assert(dy == 1);
-	*/
 	int index = atomicAdd(dst + dy * dstArea, 1);
 
 	//int index = atomicAdd(&(dst + dy * dstWidth)[0], 1);
@@ -918,7 +865,6 @@ void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float c
 	{
 		return;
 	}
-	//printf("count = %f \n", (dst + dy * dstArea)[0]);
 	// xywh -> xyxy
 	float cx = *pitem++;
 	float cy = *pitem++;
@@ -965,8 +911,6 @@ void nms_fast_kernel(int topK, int batch_size, float iou_thresh,
 {
 	int dx = blockDim.x * blockIdx.x + threadIdx.x;
 	int dy = blockDim.y * blockIdx.y + threadIdx.y;
-
-	//int count = min((int)*(src + dy * srcArea), topK);
 	if (dy >= batch_size) // prevent from p_temp out of range, eg: dy >= batch_size
 	{
 		return;
@@ -1016,9 +960,7 @@ void get_key_val_kernel(int batchSize, float* src, int srcWidth, int srcHeight, 
 	}
 	int* p_idx_row    = idx  + dy * srcHeight + dx;
 	float* p_conf_row = conf + dy * srcHeight + dx;
-
 	p_idx_row[0] = dx;
-	// left, top, right, bottom, confidence, class, keepflag
 	float* p_src_row = src + dy * srcArea + 1 + dx * srcWidth; 
 	p_conf_row[0] = p_src_row[4];
 }
@@ -1030,8 +972,6 @@ void nms_sort_kernel(int topK, int batch_size, float iou_thresh,
 {
 	int dx = blockDim.x * blockIdx.x + threadIdx.x;
 	int dy = blockDim.y * blockIdx.y + threadIdx.y;
-
-	//int count = min((int)*(src + dy * srcArea), topK);
 	if (dy >= batch_size) // prevent from p_temp out of range, eg: dy >= batch_size
 	{
 		return;
@@ -1043,17 +983,15 @@ void nms_sort_kernel(int topK, int batch_size, float iou_thresh,
 	{
 		return;
 	}
-
-	//
 	int* p_idx1 = idx + dy * srcHeight + dx;
 	float* pcurrent = src + dy * srcArea + 1 + p_idx1[0] * srcWidth;  // left, top, right, bottom, confidence, class, keepflag
 	
-	for (int i = (dx + 1); i < count; ++i) // 
+	for (int i = (dx + 1); i < count; ++i) 
 	{
 		int* p_idx2 = idx + dy * srcHeight + i;
-		float* pitem = src + dy * srcArea + 1 + p_idx2[0] * srcWidth; //
+		float* pitem = src + dy * srcArea + 1 + p_idx2[0] * srcWidth; 
 		
-		if (abs(pcurrent[5] - pitem[5]) > 1e-3) //
+		if (abs(pcurrent[5] - pitem[5]) > 1e-3) 
 			continue;
 		float iou = box_iou(pcurrent[0], pcurrent[1], pcurrent[2], pcurrent[3],
 			pitem[0], pitem[1], pitem[2], pitem[3]);
@@ -1093,11 +1031,8 @@ void nmsDeviceV2(utils::InitParameter param, float* src, int srcWidth, int srcHe
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
 	dim3 grid_size((param.topK + BLOCK_SIZE - 1) / BLOCK_SIZE, // todo
 		(param.batch_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
-
 	// get keys and vals(confs)
 	get_key_val_kernel << < grid_size, block_size, 0, nullptr >> > (param.batch_size, src, srcWidth, srcHeight, srcArea, idx, conf);
-	//checkRuntime(cudaDeviceSynchronize()); 
-
 	// sort by conf
 	for (size_t i = 0; i < param.batch_size; i++)
 	{

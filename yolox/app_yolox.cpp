@@ -7,21 +7,15 @@ void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
 	initParameters.num_class = 80; // for coco
-
 	initParameters.dynamic_batch = false;
 	initParameters.batch_size = 8; // should be the same as the val while compling the onnx
-
 	// s, m, l
 	initParameters.dst_h = 640;
 	initParameters.dst_w = 640;
-
 	// tiny, nano update from command line
 	/*initParameters.dst_h = 416;
 	initParameters.dst_w = 416;*/
-
-	
 	initParameters.input_output_names = { "images",  "output" };
-
 	initParameters.conf_thresh = 0.25f;
 	initParameters.iou_thresh = 0.45f;
 	initParameters.save_path = "";
@@ -138,9 +132,7 @@ int main(int argc, char** argv)
 		sample::gLogError << "read the input data errors!" << std::endl;
 		return -1;
 	}
-
 	YOLOX yolo(param);
-
 	// read model
 	std::vector<unsigned char> trt_file = utils::loadModel(model_path);
 	if (trt_file.empty())
@@ -179,7 +171,6 @@ int main(int argc, char** argv)
 			{
 				frame = cv::imread(image_path);
 			}
-
 			if (frame.empty())
 			{
 				sample::gLogWarning << "no more video or camera frame" << std::endl;
@@ -193,7 +184,6 @@ int main(int argc, char** argv)
 			{
 				imgs_batch.emplace_back(frame.clone());
 			}
-
 		}
 		else // infer
 		{

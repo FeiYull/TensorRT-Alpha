@@ -7,7 +7,6 @@ void setParameters(utils::InitParameter& initParameters)
 	//initParameters.class_names = utils::dataSets::voc20;
 	initParameters.num_class = 80; // for coco
 	//initParameters.num_class = 20; // for voc2012
-
 	initParameters.batch_size = 8;
 	initParameters.dst_h = 640;
 	initParameters.dst_w = 640;
@@ -187,7 +186,6 @@ int main(int argc, char** argv)
 			{
 				imgs_batch.emplace_back(frame.clone());
 			}
-
 		}
 		else // infer
 		{

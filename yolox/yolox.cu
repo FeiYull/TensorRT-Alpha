@@ -181,8 +181,6 @@ void copy_with_padding_kernel_function(int batchSize, float* src, int srcWidth, 
             pdst[1] = paddingValue;
             pdst[2] = paddingValue;
         }
-       
-
     }
 }
 
@@ -190,7 +188,7 @@ void copyWithPaddingDevice(const int& batchSize, float* src, int srcWidth, int s
     float* dst, int dstWidth, int dstHeight, float paddingValue)
 {
     dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
-    dim3 grid_size((dstWidth * dstHeight /** 3*/ + BLOCK_SIZE - 1) / BLOCK_SIZE,
+    dim3 grid_size((dstWidth * dstHeight + BLOCK_SIZE - 1) / BLOCK_SIZE,
         (batchSize + BLOCK_SIZE - 1) / BLOCK_SIZE);
     int src_area = srcHeight * srcWidth;
     int dst_area = dstHeight * dstWidth;

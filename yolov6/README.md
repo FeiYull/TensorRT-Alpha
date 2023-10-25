@@ -98,14 +98,14 @@ make -j10
 ./app_yolov6  --model=../../data/yolov6/yolov6n.trt --size=640  --batch_size=1  --img=../../data/6406401.jpg  --show --savePath=../
 
 # infer video
-./app_yolov6  --model=../../data/yolov6/yolov6n.trt     --size=640 --batch_size=8  --video=../../data/people.mp4  --show 
+./app_yolov6  --model=../../data/yolov6/yolov6n.trt     --size=640 --batch_size=2  --video=../../data/people.mp4  --show 
 
 # infer camera
-./app_yolov6  --model=../../data/yolov6/yolov6n.trt     --size=640 --batch_size=4  --cam_id=0  --show
+./app_yolov6  --model=../../data/yolov6/yolov6n.trt     --size=640 --batch_size=2  --cam_id=0  --show
 
 ## 1280
 # infer video
-./app_yolov6  --model=../../data/yolov6/yolov6s6.trt --size=1280  --batch_size=8  --video=../../data/people.mp4  --savePath=../
+./app_yolov6  --model=../../data/yolov6/yolov6s6.trt --size=1280  --batch_size=2  --video=../../data/people.mp4  --savePath=../
 ```
 ## 5. appendix
 ignore

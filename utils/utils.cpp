@@ -1,10 +1,5 @@
 #include"../utils/utils.h"
 /************************************************************************************************
-* struct
-*************************************************************************************************/
-
-
-/************************************************************************************************
 * function
 *************************************************************************************************/
 void utils::saveBinaryFile(float* vec, size_t len, const std::string& file)
@@ -58,22 +53,6 @@ std::vector<unsigned char> utils::loadModel(const std::string& file)
     in.close();
     return data;
 }
-//std::string getSystemTimeStr()
-//{
-//	SYSTEMTIME st = { 0 };
-//	GetLocalTime(&st);
-//	/*std::string t = (st.wYear) + st.wMonth + st.wDay + st.wHour + st.wMinute + st.wMilliseconds;*/
-//	std::string t =
-//		std::to_string(st.wYear) + "." +
-//		std::to_string(st.wMonth) + "." +
-//		std::to_string(st.wDay) + "." +
-//		std::to_string(st.wHour) + "." +
-//		std::to_string(st.wMinute) + "." +
-//		std::to_string(st.wSecond) + "." +
-//		std::to_string(st.wMilliseconds);
-//
-//	return t;
-//}
 
 std::string utils::getSystemTimeStr()
 {
@@ -126,7 +105,6 @@ bool utils::setInputStream(const utils::InputStream& source, const std::string& 
 void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std::vector<std::string>& classNames,
 	const int& cvDelayTime, std::vector<cv::Mat>& imgsBatch)
 {
-	// todo
 	std::string windows_title = "image";
 	if(!imgsBatch[0].empty())
 	{
@@ -134,8 +112,6 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 
 		int max_w = 960;
 		int max_h = 540;
-		/*int max_w = 720;
-		int max_h = 405;*/
 		if (imgsBatch[0].rows > max_h || imgsBatch[0].cols > max_w)
 		{
 			cv::resizeWindow(windows_title, max_w, imgsBatch[0].rows * max_w / imgsBatch[0].cols );
@@ -218,7 +194,7 @@ void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vecto
 				}
 				if (classNames.size() == 20) // voc20
 				{
-					color = Colors::color80[box.label];
+					color = Colors::color20[box.label];
 				}
 				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2, cv::LINE_AA);
 				// cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
