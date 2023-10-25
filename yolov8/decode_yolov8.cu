@@ -11,9 +11,6 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 		return;
 	}
 	float* pitem = src + dy * srcArea + dx * srcWidth;
-
-	// find max Pr(Classi/Object)
-	//float* class_confidence = pitem + 5;  // Pr(Class0/Object)
 	float* class_confidence = pitem + 4;    // Pr(Class0/Object)
 	float confidence = *class_confidence++; // Pr(Class1/Object)
 	int label = 0;
@@ -29,13 +26,6 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	{
 		return;
 	}
-
-	// parray:count, box1, box2, box3(count:)
-	// parray[0]:count
-	// atomicAdd -> count += 1
-	// atomicAdd: return old_count
-	//int index = atomicAdd(dst + dy * dstArea, 1);
-	//assert(dy == 1);
 	int index = atomicAdd(dst + dy * dstArea, 1);
 
 	if (index >= topK)
@@ -52,18 +42,11 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	float top = cy - height * 0.5f;
 	float right = cx + width * 0.5f;
 	float bottom = cy + height * 0.5f;
-
-	/*float left = cx;
-	float top = cy;
-	float right = width;
-	float bottom = height;*/
 	float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
 	*pout_item++ = left; // todo
 	*pout_item++ = top;
 	*pout_item++ = right;
 	*pout_item++ = bottom;
-
-
 	*pout_item++ = confidence;
 	*pout_item++ = label;
 	*pout_item++ = 1;// 1 = keep, 0 = ignore
@@ -101,22 +84,6 @@ __global__ void transpose_device_kernel(int batch_size,
 	}
 }
 
-/*
-	src:
-				8400 ->
-	84	  x1 x2  ...... x8400
-	 |    y1 y2  ...... y8400
-	 V	  w1 w2  ...... w8400
-		  h1 h2  ...... h8400
-		  c0  .
-		  c1  .
-		  c2  .
-		  .   .
-		  .   .
-		  .
-		  c79
-
-*/
 void yolov8::transposeDevice(utils::InitParameter param, 
 float* src, int srcWidth, int srcHeight, int srcArea, 
 float* dst, int dstWidth, int dstHeight)

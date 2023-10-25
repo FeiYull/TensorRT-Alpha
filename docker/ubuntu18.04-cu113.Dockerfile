@@ -42,7 +42,7 @@ RUN \
     libopencv-dev \
     && apt-get clean
 
-# py libs
+# python libs
 RUN pip3 install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip install opencv-python-headless==4.8.0.74 && \

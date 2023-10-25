@@ -3,7 +3,6 @@
 #include"../utils/utils.h"
 #include"../utils/kernel_function.h"
 
-
 class FaceMesh
 {
 public:
@@ -37,8 +36,6 @@ protected:
     int m_output_conf_area;
     int m_output_preds_area;
     std::vector<std::vector<utils::Box>> m_objectss;
-
-   
     std::vector<utils::AffineMat> m_dst2src; // 2*3,  (m_param.dst_h, m_param.dst_w) to (m_param.src_h, m_param.src_w) 
     std::vector<utils::AffineMat> m_src2dst; // 2*3
 

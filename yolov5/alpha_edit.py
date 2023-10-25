@@ -45,17 +45,6 @@ def run(mode, net_name, model_path):
     for output in outputs:
         print(output.shape)
 
-    # input = model.graph.input[0]
-    # new_input= helper.make_tensor_value_info(input.name,  # "images"
-    #                                         input.type.tensor_type.elem_type, # 1
-    #                                         ["batch", 3, 640, 640])
-    #empty_node = helper.ValueInfoProto()
-    # empty_node = helper.make_empty_tensor_value_info("")
-    # model.graph.output[1].CopyFrom(empty_node)
-    # model.graph.output[2].CopyFrom(empty_node)
-    # model.graph.output[3].CopyFrom(empty_node)
-
-
     # delete some nodes
     if mode == "p5":
         item1 = model.graph.output[1]

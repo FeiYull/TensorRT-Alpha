@@ -11,13 +11,6 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 		return;
 	}
 	float* pitem = src + dy * srcArea + dx * srcWidth;
-	//float objectness = pitem[4]; //  Pr(Object)
-	//if (objectness < conf_thresh)
-	//{
-	//	return;
-	//}
-	// find max Pr(Classi/Object)
-	//float* class_confidence = pitem + 5;  // Pr(Class0/Object)
 	float* class_confidence = pitem + 4;    // Pr(Class0/Object)
 	float confidence = *class_confidence++; // Pr(Class1/Object)
 	int label = 0;
@@ -29,35 +22,20 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 			label = i;
 		}
 	}
-	//confidence *= objectness; // Pr(Class0/Object) * Pr(Object)
 	if (confidence < conf_thresh)
 	{
 		return;
 	}
-	
-	// parray:count, box1, box2, box3(count:)
-	// parray[0]:count
-	// atomicAdd -> count += 1
-	// atomicAdd: return old_count
-	//int index = atomicAdd(dst + dy * dstArea, 1);
-	//assert(dy == 1);
 	int index = atomicAdd(dst + dy * dstArea, 1);
-	//int index = atomicAdd(&(dst + dy * dstWidth)[0], 1);
 	if (index >= topK)
 	{
 		return;
 	}
-	//printf("count = %f \n", (dst + dy * dstArea)[0]);
 	// xywh -> xyxy
 	float cx = *pitem++;
 	float cy = *pitem++;
 	float width = *pitem++;
 	float height = *pitem++;
-
-	/*float left = cx - width * 0.5f;
-	float top = cy - height * 0.5f;
-	float right = cx + width * 0.5f;
-	float bottom = cy + height * 0.5f;*/
 
 	float left = cx;
 	float top = cy;
@@ -70,16 +48,9 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 	*pout_item++ = top;
 	*pout_item++ = right;
 	*pout_item++ = bottom;
-
-	/**pout_item++ = *pitem++;
-	*pout_item++ = *pitem++;
-	*pout_item++ = *pitem++;
-	*pout_item++ = *pitem++;*/
-
 	*pout_item++ = confidence;
 	*pout_item++ = label;
 	*pout_item++ = 1;// 1 = keep, 0 = ignore
-	//*pout_item = 1;// 1 = keep, 0 = ignore
 }
 
 static __device__ float box_iou(

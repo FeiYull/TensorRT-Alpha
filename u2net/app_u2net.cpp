@@ -8,11 +8,8 @@ void setParameters(utils::InitParameter& initParameters)
 	initParameters.batch_size = 1;
 	initParameters.dst_h = 320;
 	initParameters.dst_w = 320;
-
 	initParameters.input_output_names = { "images",  "output" };
-	
 	initParameters.scale = 1.0; // div by max in u2net!
-
 	initParameters.means[0] = 0.485;
 	initParameters.means[1] = 0.456;
 	initParameters.means[2] = 0.406;

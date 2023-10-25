@@ -42,6 +42,7 @@ protected:
 
     // output
     float* m_output_src_device; // malloc in init()
+    
     // the following array's  val range is 0 or 1
     float* m_output_mask_device;   // (b, 1, 192, 192)
     float* m_output_resize_device; // (b, 1, 192, 192)

@@ -21,10 +21,7 @@ def infer_onnx(onnx_file, input_names, image_input_shape):
 net_name = "yolov3-tiny"
 # net_name = "yolov3"
 # net_name = "yolov3-spp"
-
 path = "../data/yolov3/"
-
-
 
 image_input_shape = [1, 3, 640, 640]
 onnx_name = net_name + ".onnx"

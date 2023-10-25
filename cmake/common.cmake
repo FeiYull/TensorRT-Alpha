@@ -14,7 +14,7 @@ list(APPEND INCLUDE_DRIS ${CUDA_INCLUDE_DIRS})
 # gather TensorRT lib
 #set(TensorRT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../TensorRT)
 #set(TensorRT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../TensorRT-8.2.1.8)
-# my tensorrt's path!!!!!!!!!!!!!!!!!!!1
+# my tensorrt's path!
 #set(TensorRT_ROOT /root/TensorRT-8.2.1.8)
 #set(TensorRT_ROOT /root/TensorRT-Plugin)
 set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
@@ -35,5 +35,4 @@ list(APPEND INCLUDE_DRIS ${TENSORRT_INCLUDE_DIR})
 set(SAMPLES_COMMON_DIR ${TensorRT_ROOT}/samples/common)
 list(APPEND INCLUDE_DRIS ${SAMPLES_COMMON_DIR})
 message(STATUS ***INCLUDE_DRIS*** = ${INCLUDE_DRIS})
-
 message(STATUS "ALL_LIBS: ${ALL_LIBS}")

@@ -40,10 +40,10 @@ make -j10
 ./app_yolov4  --model=../../data/yolov4/alpha_yolov4_-1_3_608_608_dynamic.trt --size=608  --batch_size=1  --img=../../data/6406402.jpg  --show --savePath=../
 
 # infer video
-./app_yolov4  --model=../../data/yolov4/alpha_yolov4_-1_3_608_608_dynamic.trt --size=608 --batch_size=8  --video=../../data/people.mp4  --show 
+./app_yolov4  --model=../../data/yolov4/alpha_yolov4_-1_3_608_608_dynamic.trt --size=608 --batch_size=2  --video=../../data/people.mp4  --show 
 
 # infer camera
-./app_yolov4  --model=../../data/yolov4/alpha_yolov4_-1_3_608_608_dynamic.trt --size=608 --batch_size=4  --cam_id=0  --show
+./app_yolov4  --model=../../data/yolov4/alpha_yolov4_-1_3_608_608_dynamic.trt --size=608 --batch_size=2  --cam_id=0  --show
 ```
 ## 5. appendix
 ignore

@@ -19,17 +19,12 @@ void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
 	initParameters.num_class = 80; // for coco
-
 	initParameters.batch_size = 8;
-
 	initParameters.dst_h = 1280;
 	initParameters.dst_w = 1280;
-
 	/*initParameters.dst_h = 640;
 	initParameters.dst_w = 640;*/
-
 	initParameters.input_output_names = { "images",  "output" };
-
 	initParameters.conf_thresh = 0.25f;
 	initParameters.iou_thresh = 0.5f;
 	initParameters.save_path = "";

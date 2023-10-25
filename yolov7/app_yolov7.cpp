@@ -19,19 +19,14 @@ void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
 	initParameters.num_class = 80; // for coco
-
 	initParameters.batch_size = 8;
 	initParameters.dst_h = 640;
 	initParameters.dst_w = 640;
-
 	/*initParameters.dst_h = 1280;
 	initParameters.dst_w = 1280;*/
-
 	initParameters.input_output_names = { "images",  "output" };
-
 	initParameters.conf_thresh = 0.25f;
 	initParameters.iou_thresh = 0.45f;
-
 	//initParameters.conf_thresh = 0.1f;
 	//initParameters.iou_thresh = 0.2f;
 	initParameters.save_path = "";
@@ -190,7 +185,6 @@ int main(int argc, char** argv)
 			{
 				frame = cv::imread(image_path);
 			}
-
 			if (frame.empty())
 			{
 				sample::gLogWarning << "no more video or camera frame" << std::endl;
@@ -204,7 +198,6 @@ int main(int argc, char** argv)
 			{
 				imgs_batch.emplace_back(frame.clone());
 			}
-
 		}
 		else // infer
 		{

@@ -19,17 +19,12 @@ void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
 	initParameters.num_class = 80; // for coco
-
 	initParameters.batch_size = 8;
 	initParameters.dst_h = 640;
 	initParameters.dst_w = 640;
-
 	/*initParameters.dst_h = 1280;
 	initParameters.dst_w = 1280;*/
-
-
 	initParameters.input_output_names = { "images",  "outputs" };
-
 	initParameters.conf_thresh = 0.5f;
 	initParameters.iou_thresh = 0.45f;
 	initParameters.save_path = "";
@@ -135,8 +130,6 @@ int main(int argc, char** argv)
 		param.save_path = parser.get<std::string>("savePath");
 		sample::gLogInfo << "save_path = " << param.save_path << std::endl;
 	}
-
-
 	int total_batches = 0;
 	int delay_time = 1;
 	cv::VideoCapture capture;
@@ -146,9 +139,7 @@ int main(int argc, char** argv)
 		sample::gLogError << "read the input data errors!" << std::endl;
 		return -1;
 	}
-
 	YOLOV6 yolo(param);
-
 	// read model
 	std::vector<unsigned char> trt_file = utils::loadModel(model_path);
 	if (trt_file.empty())
@@ -188,7 +179,6 @@ int main(int argc, char** argv)
 			{
 				frame = cv::imread(image_path);
 			}
-
 			if (frame.empty())
 			{
 				sample::gLogWarning << "no more video or camera frame" << std::endl;
@@ -202,7 +192,6 @@ int main(int argc, char** argv)
 			{
 				imgs_batch.emplace_back(frame.clone());
 			}
-
 		}
 		else // infer
 		{

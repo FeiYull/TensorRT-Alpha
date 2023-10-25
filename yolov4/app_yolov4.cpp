@@ -1,7 +1,6 @@
 #include"../utils/yolo.h"
 #include"yolov4.h"
 
-
 void setParameters(utils::InitParameter& initParameters)
 {
 	initParameters.class_names = utils::dataSets::coco80;
@@ -10,10 +9,8 @@ void setParameters(utils::InitParameter& initParameters)
 	initParameters.batch_size = 8;
 	initParameters.dst_h = 608;
 	initParameters.dst_w = 608;
-
 	// initParameters.dst_h = 416;
 	// initParameters.dst_w = 416;
-
 	initParameters.input_output_names = { "input",  "output" };
 	initParameters.conf_thresh = 0.4f;
 	initParameters.iou_thresh = 0.6f;

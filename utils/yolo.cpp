@@ -80,7 +80,6 @@ bool yolo::YOLO::init(const std::vector<unsigned char>& trtFile)
     {
         this->m_context->setBindingDimensions(0, nvinfer1::Dims4(m_param.batch_size, 3, m_param.dst_h, m_param.dst_w));
     }
-    
     // 2. get output's dim
     m_output_dims = this->m_context->getBindingDimensions(1);
     m_total_objects = m_output_dims.d[1];
@@ -95,7 +94,6 @@ bool yolo::YOLO::init(const std::vector<unsigned char>& trtFile)
     }
     // 3. malloc
     checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
-
     // 4. cal affine matrix
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
@@ -111,7 +109,6 @@ bool yolo::YOLO::init(const std::vector<unsigned char>& trtFile)
     m_dst2src.v3 = dst2src.ptr<float>(1)[0];
     m_dst2src.v4 = dst2src.ptr<float>(1)[1];
     m_dst2src.v5 = dst2src.ptr<float>(1)[2];
-
     return true;
 }
 
