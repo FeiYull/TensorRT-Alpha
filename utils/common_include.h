@@ -1,6 +1,8 @@
 #pragma once
 // tensorrt
 #include<logger.h>
+// fix issues https://github.com/FeiYull/TensorRT-Alpha/issues/34
+#include <sampleUtils.h>
 #include<parserOnnxConfig.h>
 #include<NvInfer.h>
 
