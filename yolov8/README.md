@@ -24,13 +24,13 @@ https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x6.pt
 export onnx:
 ```bash
 # 640
-yolo mode=export model=yolov8n.pt format=onnx dynamic=True    #simplify=True
-yolo mode=export model=yolov8s.pt format=onnx dynamic=True    #simplify=True
-yolo mode=export model=yolov8m.pt format=onnx dynamic=True    #simplify=True
-yolo mode=export model=yolov8l.pt format=onnx dynamic=True    #simplify=True
-yolo mode=export model=yolov8x.pt format=onnx dynamic=True    #simplify=True
+yolo mode=export model=yolov8n.pt format=onnx dynamic=True opset=12    #simplify=True
+yolo mode=export model=yolov8s.pt format=onnx dynamic=True opset=12    #simplify=True
+yolo mode=export model=yolov8m.pt format=onnx dynamic=True opset=12    #simplify=True
+yolo mode=export model=yolov8l.pt format=onnx dynamic=True opset=12    #simplify=True
+yolo mode=export model=yolov8x.pt format=onnx dynamic=True opset=12    #simplify=True
 # 1280
-yolo mode=export model=yolov8x6.pt format=onnx dynamic=True   #simplify=True
+yolo mode=export model=yolov8x6.pt format=onnx dynamic=True opset=12  #simplify=True
 ```
 
 ## 2.edit and save onnx
