@@ -1,7 +1,5 @@
 #include"../utils/utils.h"
-/************************************************************************************************
-* function
-*************************************************************************************************/
+
 void utils::saveBinaryFile(float* vec, size_t len, const std::string& file)
 {
 	std::ofstream  out(file, std::ios::out | std::ios::binary);
@@ -123,7 +121,6 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 	cv::Point bbox_points[1][4];
 	const cv::Point* bbox_point0[1] = { bbox_points[0] };
 	int num_points[] = { 4 };
-	//for (size_t bi = 0; bi < objectss.size(); bi++)
 	for (size_t bi = 0; bi < imgsBatch.size(); bi++)
 	{
 		if (!objectss.empty())
@@ -143,8 +140,6 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 					color = Colors::color80[box.label];
 				}
 				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2, cv::LINE_AA);
-				// cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
-				// cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
 				cv::String det_info = classNames[box.label] + " " + cv::format("%.4f", box.confidence);
 				bbox_points[0][0] = cv::Point(box.left, box.top);
 				bbox_points[0][1] = cv::Point(box.left + det_info.size() * 11, box.top);
@@ -162,12 +157,9 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 				}
 			}
 		}
-		
-		//cv::Mat img = imgsBatch[bi];
 		cv::imshow(windows_title, imgsBatch[bi]);
 		cv::waitKey(cvDelayTime);
 	}
-
 }
 
 void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vector<std::string>& classNames,
@@ -177,7 +169,6 @@ void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vecto
 	cv::Point bbox_points[1][4];
 	const cv::Point* bbox_point0[1] = { bbox_points[0] };
 	int num_points[] = { 4 };
-	//for (size_t bi = 0; bi < objectss.size(); bi++)
 	for (size_t bi = 0; bi < imgsBatch.size(); bi++)
 	{
 		if (!objectss.empty())
@@ -197,8 +188,6 @@ void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vecto
 					color = Colors::color20[box.label];
 				}
 				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2, cv::LINE_AA);
-				// cv::putText(imgsBatch[bi], cv::format("%.4f", box.confidence), cv::Point(box.left, box.top - 3), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
-				// cv::putText(imgsBatch[bi], classNames[box.label], cv::Point(box.left, box.top + 12), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
 				cv::String det_info = classNames[box.label] + " " + cv::format("%.4f", box.confidence);
 				bbox_points[0][0] = cv::Point(box.left, box.top);
 				bbox_points[0][1] = cv::Point(box.left + det_info.size() * 11, box.top);
@@ -223,9 +212,6 @@ void utils::save(const std::vector<std::vector<Box>>& objectss, const std::vecto
 	}
 }
 
-/************************************************************************************************
-* class
-*************************************************************************************************/
 utils::HostTimer::HostTimer()
 {
     t1 = std::chrono::steady_clock::now();

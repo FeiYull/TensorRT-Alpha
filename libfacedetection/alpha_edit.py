@@ -14,41 +14,28 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     model = onnx.load(opt.onnx)
-
-    # 获取输入dim
     in_b  = model.graph.input[0].type.tensor_type.shape.dim[0]
     in_c  = model.graph.input[0].type.tensor_type.shape.dim[1]
     in_h  = model.graph.input[0].type.tensor_type.shape.dim[2]
     in_w  = model.graph.input[0].type.tensor_type.shape.dim[3]
-
-    # 获取输出dim
     # loc
     out_loc_b               = model.graph.output[0].type.tensor_type.shape.dim[0]
     out_loc_num_candidates  = model.graph.output[0].type.tensor_type.shape.dim[1]
-    out_loc_dim2            = model.graph.output[0].type.tensor_type.shape.dim[2] # 这个维度不修改
-
+    out_loc_dim2            = model.graph.output[0].type.tensor_type.shape.dim[2] 
     # conf
     out_conf_b              = model.graph.output[1].type.tensor_type.shape.dim[0]
     out_conf_num_candidates = model.graph.output[1].type.tensor_type.shape.dim[1]
-    out_conf_dim2           = model.graph.output[1].type.tensor_type.shape.dim[2] # 这个维度不修改
-
+    out_conf_dim2           = model.graph.output[1].type.tensor_type.shape.dim[2] 
     # iou
     out_iou_b               = model.graph.output[2].type.tensor_type.shape.dim[0]
     out_iou_num_candidates  = model.graph.output[2].type.tensor_type.shape.dim[1]
-    out_iou_dim2            = model.graph.output[2].type.tensor_type.shape.dim[2] # 这个维度不修改
-
-
-    # 修改输入
+    out_iou_dim2            = model.graph.output[2].type.tensor_type.shape.dim[2] 
     in_b.dim_param= "batch_size"
     in_h.dim_param= "height"
     in_w.dim_param= "width"
-
-    # 修改输出
     out_loc_b.dim_param = "batch_size"
     out_conf_b.dim_param= "batch_size"
     out_iou_b.dim_param = "batch_size"
-
-    # 在原始框架中能够验证，三者维度是一致的
     out_loc_num_candidates.dim_param  = "num_condidates"
     out_conf_num_candidates.dim_param = "num_condidates"
     out_iou_num_candidates.dim_param  = "num_condidates"

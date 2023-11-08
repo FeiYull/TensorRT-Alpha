@@ -3,12 +3,10 @@
 YOLOX::YOLOX(const utils::InitParameter& param) :yolo::YOLO(param)
 {
 }
-
 YOLOX::~YOLOX()
 {
     checkRuntime(cudaFree(m_input_resize_without_padding_device));
 }
-
 bool YOLOX::init(const std::vector<unsigned char>& trtFile)
 {
     // 1. init engine & context
@@ -78,84 +76,20 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
     m_dst2src.v5 = dst2src.ptr<float>(1)[2];
     return true;
 }
-
 void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
 {
     // 1.resize
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_without_padding_device, m_resized_w, m_resized_h, 114, m_dst2src);
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_resized_h * m_resized_w];
-        float* pdevice = m_input_resize_without_padding_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_resized_h * m_resized_w,
-                sizeof(float) * 3 * m_resized_h * m_resized_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_resized_h, m_resized_w, CV_32FC3, phost);
-            cv::Mat img_resized = cv::Mat::zeros(cv::Size(m_resized_w, m_resized_h), CV_8UC3);
-            cv::resize(imgsBatch[j], img_resized, cv::Size(m_resized_w, m_resized_h));
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
+
     // 2.copy with padding
     copyWithPaddingDevice(m_param.batch_size, m_input_resize_without_padding_device, m_resized_w, m_resized_h, 
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114.f);
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_w * m_param.dst_h];
-        float* pdevice = m_input_resize_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_w * m_param.dst_h,
-                sizeof(float) * 3 * m_param.dst_w * m_param.dst_h, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            ret.convertTo(ret, CV_8UC3);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
 
     // 3. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
-#if 0
-    {
-
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_hwc_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-
-            cv::Mat tmp = imgsBatch[j].clone();
-
-            cv::Mat b(m_param.dst_h, m_param.dst_w, CV_32FC1, phost);
-            cv::Mat g(m_param.dst_h, m_param.dst_w, CV_32FC1, phost + 1 * m_param.dst_h * m_param.dst_w);
-            cv::Mat r(m_param.dst_h, m_param.dst_w, CV_32FC1, phost + 2 * m_param.dst_h * m_param.dst_w);
-            std::vector<cv::Mat> bgr{ b, g, r };
-            cv::Mat ret;
-            cv::merge(bgr, ret);
-            ret.convertTo(ret, CV_8UC3);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-
-        }
-        delete[] phost;
-
-    }
-#endif
 }
-
 __global__
 void copy_with_padding_kernel_function(int batchSize, float* src, int srcWidth, int srcHeight, int srcArea, int srcVolume,
     float* dst, int dstWidth, int dstHeight, int dstArea, int dstVolume, float paddingValue)
@@ -183,7 +117,6 @@ void copy_with_padding_kernel_function(int batchSize, float* src, int srcWidth, 
         }
     }
 }
-
 void copyWithPaddingDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
     float* dst, int dstWidth, int dstHeight, float paddingValue)
 {

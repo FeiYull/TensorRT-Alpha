@@ -12,341 +12,7 @@ bool __check_cuda_runtime(cudaError_t code, const char* op, const char* file, in
 	}
 	return true;
 }
-/************************************************************************************************
-* math kernel function
-*************************************************************************************************/
-__device__ 
-float atomicMaxf(float* address, float val)
-{
-	int* address_as_int = (int*)address;
-	int old = *address_as_int, assumed;
-	while (val > __int_as_float(old)) {
-		assumed = old;
-		old = atomicCAS(address_as_int, assumed,
-			__float_as_int(val));
-	}
-	return __int_as_float(old);
-}
 
-__device__ 
-float atomicMinf(float* address, float val)
-{
-	int* address_as_int = (int*)address;
-	int old = *address_as_int, assumed;
-	while (val < __int_as_float(old)) {
-		assumed = old;
-		old = atomicCAS(address_as_int, assumed,
-			__float_as_int(val));
-	}
-	return __int_as_float(old);
-}
-
-__global__ 
-void max_float_array_device_kernel(float* src, int size, float* max_val)
-{
-	// get data
-	int idx = threadIdx.x + blockIdx.x * blockDim.x;
-	__shared__ float shared_per_block[BLOCK_SIZE];
-	if (idx < size)
-	{
-		shared_per_block[threadIdx.x] = src[idx];
-	}
-	else
-	{
-		shared_per_block[threadIdx.x] = -FLT_MAX; // alpha
-	}
-	__syncthreads();
-
-	// get max val in per block
-	float temp_val;
-	for (int length = BLOCK_SIZE / 2; length >= 1; length /= 2)
-	{
-		if (threadIdx.x < length)
-		{
-			temp_val = max(shared_per_block[threadIdx.x], shared_per_block[threadIdx.x + length]);
-		}
-		__syncthreads();
-		if (threadIdx.x < length)
-		{
-			shared_per_block[threadIdx.x] = temp_val;
-		}
-		__syncthreads();
-	}
-	// automic
-	if (blockDim.x * blockIdx.x < size)
-	{
-		if (threadIdx.x == 0)
-		{
-			max_val[0] = -FLT_MAX; // alpha
-			atomicMaxf(max_val, shared_per_block[0]);
-		}
-	}
-}
-
-__global__ 
-void min_float_array_device_kernel(float* src, int size, float* min_val)
-{
-	// get data
-	int idx = threadIdx.x + blockIdx.x * blockDim.x;
-	__shared__ float shared_per_block[BLOCK_SIZE];
-	if (idx < size)
-	{
-		shared_per_block[threadIdx.x] = src[idx];
-	}
-	else
-	{
-		shared_per_block[threadIdx.x] = FLT_MAX; // alpha
-	}
-	__syncthreads();
-
-	// get max val in per block
-	float temp_val;
-	for (int length = BLOCK_SIZE / 2; length >= 1; length /= 2)
-	{
-		if (threadIdx.x < length)
-		{
-			temp_val = min(shared_per_block[threadIdx.x], shared_per_block[threadIdx.x + length]);
-		}
-		__syncthreads();
-		if (threadIdx.x < length)
-		{
-			shared_per_block[threadIdx.x] = temp_val;
-		}
-		__syncthreads();
-	}
-	
-	// automic
-	if (blockDim.x * blockIdx.x < size)
-	{
-		if (threadIdx.x == 0)
-		{
-			min_val[0] = FLT_MAX; // alpha
-			atomicMinf(min_val, shared_per_block[0]);
-		}
-	}
-}
-
-__global__ 
-void min_max_float_array_device_kernel(float* src, int size, float* min_val, float* max_val)
-{
-	// get data
-	int idx = threadIdx.x + blockIdx.x * blockDim.x;
-	__shared__ float shared_per_block_min[BLOCK_SIZE];
-	__shared__ float shared_per_block_max[BLOCK_SIZE];
-	if (idx < size)
-	{
-		shared_per_block_min[threadIdx.x] = src[idx];
-		shared_per_block_max[threadIdx.x] = src[idx];
-	}
-	else
-	{
-		shared_per_block_min[threadIdx.x] = FLT_MAX; 
-		shared_per_block_max[threadIdx.x] = -FLT_MAX;
-	}
-	__syncthreads();
-
-	// get max val in per block
-	float t1, t2;
-	for (int length = BLOCK_SIZE / 2; length >= 1; length /= 2)
-	{
-		if (threadIdx.x < length)
-		{
-			t1 = min(shared_per_block_min[threadIdx.x], shared_per_block_min[threadIdx.x + length]);
-			t2 = max(shared_per_block_max[threadIdx.x], shared_per_block_max[threadIdx.x + length]);
-		}
-		__syncthreads();
-		if (threadIdx.x < length)
-		{
-			shared_per_block_min[threadIdx.x] = t1;
-			shared_per_block_max[threadIdx.x] = t2;
-		}
-		__syncthreads();
-	}
-	// automic
-	if (blockDim.x * blockIdx.x < size)
-	{
-		if (threadIdx.x == 0)
-		{
-			min_val[0] = FLT_MAX;  
-			max_val[0] = -FLT_MAX; 
-			atomicMinf(min_val, shared_per_block_min[0]);
-			atomicMaxf(max_val, shared_per_block_max[0]);
-		}
-	}
-}
-
-__global__ 
-void max_int_array_device_kernel(int* src, int size, int* max_val)
-{
-	// get data
-	__shared__ int shared_per_block[BLOCK_SIZE];
-	int idx = threadIdx.x + blockIdx.x * blockDim.x;
-	if (idx < size)
-	{
-		shared_per_block[threadIdx.x] = src[idx];
-	}
-	else
-	{
-		shared_per_block[threadIdx.x] = -INT_MAX;
-	}
-	__syncthreads();
-
-	// get max val in per block
-	int temp_val;
-	for (int length = BLOCK_SIZE / 2; length >= 1; length /= 2)
-	{
-		if (threadIdx.x < length)
-		{
-			temp_val = max(shared_per_block[threadIdx.x], shared_per_block[threadIdx.x + length]);
-		}
-		__syncthreads();
-		if (threadIdx.x < length)
-		{
-			shared_per_block[threadIdx.x] = temp_val;
-		}
-		__syncthreads();
-	}
-
-	// automic
-	if (blockDim.x * blockIdx.x < size)
-	{
-		if (threadIdx.x == 0)
-		{
-			max_val[0] = -INT_MAX;
-			atomicMax(max_val, shared_per_block[0]);
-		}
-	}
-}
-
-__global__ 
-void min_int_array_device_kernel(int* src, int size, int* min_val)
-{
-	// get data
-	__shared__ float shared_per_block[BLOCK_SIZE];
-	int idx = threadIdx.x + blockIdx.x * blockDim.x;
-	if (idx < size)
-	{
-		shared_per_block[threadIdx.x] = src[idx];
-	}
-	else
-	{
-		shared_per_block[threadIdx.x] = INT_MAX; 
-	}
-	__syncthreads();
-
-	// get max val in per block
-	int temp_val;
-	for (int length = BLOCK_SIZE / 2; length >= 1; length /= 2)
-	{
-		if (threadIdx.x < length)
-		{
-			temp_val = min(shared_per_block[threadIdx.x], shared_per_block[threadIdx.x + length]);
-		}
-		__syncthreads();
-		if (threadIdx.x < length)
-		{
-			shared_per_block[threadIdx.x] = temp_val;
-		}
-		__syncthreads();
-	}
-	// automic
-	if (blockDim.x * blockIdx.x < size)
-	{
-		if (threadIdx.x == 0)
-		{
-			min_val[0] = INT_MAX;
-			atomicMin(min_val, shared_per_block[0]);
-		}
-			
-	}
-}
-
-//extern __managed__ float max_val_flt[1];
-//extern __managed__ float min_val_flt[1];
-//extern __managed__ int   max_val_int[1];
-//extern __managed__ int   min_val_int[1];
-// change to dynamic batch!
-// legacy
-__managed__ float max_val_flt[1];
-__managed__ float min_val_flt[1];
-__managed__ int   max_val_int[1];
-__managed__ int   min_val_int[1];
-
-float maxFloatDevice(float* src, int size)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	max_float_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, max_val_flt);
-	cudaDeviceSynchronize();
-	return max_val_flt[0];
-}
-
-float minFloatDevice(float* src, int size)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	min_float_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, min_val_flt);
-	cudaDeviceSynchronize();
-	return min_val_flt[0];
-}
-
-int maxIntDevice(int* src, int size)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	max_int_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, max_val_int);
-	cudaDeviceSynchronize();
-	return max_val_int[0];
-}
-
-int minIntDevice(int* src, int size)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	min_int_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, min_val_int);
-	cudaDeviceSynchronize();
-	return min_val_int[0];
-}
-
-void maxFloatDevice(float* src, int size, float* dst)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	max_float_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, dst);
-	cudaDeviceSynchronize();
-	return;
-}
-
-void minFloatDevice(float* src, int size, float* dst)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	min_float_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, dst);
-	cudaDeviceSynchronize();
-	return;
-}
-
-void maxIntDevice(int* src, int size, int* dst)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	max_int_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, dst);
-	cudaDeviceSynchronize();
-	return;
-}
-
-void minIntDevice(int* src, int size, int* dst)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	max_int_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, dst);
-	cudaDeviceSynchronize();
-	return;
-}
-
-std::pair<float, float> minmaxFloatDevice(float* src, int size)
-{
-	unsigned int grid_size = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	min_max_float_array_device_kernel << < grid_size, BLOCK_SIZE, 0, nullptr >> > (src, size, min_val_flt, max_val_flt);
-	cudaDeviceSynchronize();
-	return std::pair<float, float>(min_val_flt[0], max_val_flt[0]);
-}
-
-/************************************************************************************************
-* preprocess kernel function
-*************************************************************************************************/
 // (x, y) -> (proj_x, proj_y)
 __device__ 
 void affine_project_device_kernel(utils::AffineMat* matrix, int x, int y, float* proj_x, float* proj_y)
@@ -364,15 +30,14 @@ void resize_rgb_padding_device_kernel(float* src, int src_width, int src_height,
 	int dy = blockDim.y * blockIdx.y + threadIdx.y;
 	if (dx < dst_area && dy < batch_size)
 	{
-		int dst_y = dx / dst_width; // dst row
-		int dst_x = dx % dst_width; // dst col
+		int dst_y = dx / dst_width; 
+		int dst_x = dx % dst_width; 
 		float src_x = 0;
 		float src_y = 0;
 		affine_project_device_kernel(&matrix, dst_x, dst_y, &src_x, &src_y);
 		float c0 = padding_value, c1 = padding_value, c2 = padding_value;
 		if (src_x < -1 || src_x >= src_width || src_y < -1 || src_y >= src_height)
 		{
-			// todo
 		}
 		else
 		{
@@ -416,7 +81,6 @@ void resize_rgb_padding_device_kernel(float* src, int src_width, int src_height,
 			c1 = floorf(w1 * v1[1] + w2 * v2[1] + w3 * v3[1] + w4 * v4[1] + 0.5f);
 			c2 = floorf(w1 * v1[2] + w2 * v2[2] + w3 * v3[2] + w4 * v4[2] + 0.5f);
 		}
-		//uint8_t* pdst = dst + dy * dst_line_size + dx * 3;
 		float* pdst = dst + dy * dst_volume + dst_y * dst_width * 3 + dst_x * 3;
 		pdst[0] = c0;
 		pdst[1] = c1;
@@ -442,7 +106,6 @@ void resize_rgb_padding_device_kernel(unsigned char* src, int src_width, int src
 		float c0 = padding_value, c1 = padding_value, c2 = padding_value;
 		if (src_x < -1 || src_x >= src_width || src_y < -1 || src_y >= src_height)
 		{
-			// todo
 		}
 		else
 		{
@@ -489,7 +152,6 @@ void resize_rgb_padding_device_kernel(unsigned char* src, int src_width, int src
 			c1 = floorf(w1 * v1[1] + w2 * v2[1] + w3 * v3[1] + w4 * v4[1] + 0.5f);
 			c2 = floorf(w1 * v1[2] + w2 * v2[2] + w3 * v3[2] + w4 * v4[2] + 0.5f);
 		}
-		//uint8_t* pdst = dst + dy * dst_line_size + dx * 3;
 		float* pdst = dst + dy * dst_volume + dst_y * dst_width * 3 + dst_x * 3;
 		pdst[0] = c0;
 		pdst[1] = c1;
@@ -499,7 +161,7 @@ void resize_rgb_padding_device_kernel(unsigned char* src, int src_width, int src
 __global__
 void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src_height, int src_area, int src_volume,
 	float* dst, int dst_width, int dst_height, int dst_area, int dst_volume,
-	int batch_size, /*float padding_value, */utils::AffineMat matrix)
+	int batch_size, utils::AffineMat matrix)
 {
 	int dx = blockDim.x * blockIdx.x + threadIdx.x;
 	int dy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -528,7 +190,7 @@ void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src
 			float lx = src_x - x_low;
 			float hy = 1 - ly;
 			float hx = 1 - lx;
-			float w1 = hy * hx, w2 = hy * lx, w3 = ly * hx, w4 = ly * lx; // 
+			float w1 = hy * hx, w2 = hy * lx, w3 = ly * hx, w4 = ly * lx; 
 			//
 			float* v1 = const_values;
 			float* v2 = const_values;
@@ -540,7 +202,7 @@ void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src
 				if (x_low >= 0)
 					v1 = src + dy * src_volume + y_low * src_width * 3 + x_low * 3;
 
-				if (x_high < src_width) // 
+				if (x_high < src_width) 
 					v2 = src + dy * src_volume + y_low * src_width * 3 + x_high * 3;
 			}
 
@@ -552,7 +214,6 @@ void resize_rgb_without_padding_device_kernel(float* src, int src_width, int src
 				if (x_high < src_width)
 					v4 = src + dy * src_volume + y_high * src_width * 3 + x_high * 3;
 			}
-			// 
 			c0 = floorf(w1 * v1[0] + w2 * v2[0] + w3 * v3[0] + w4 * v4[0] + 0.5f);
 			c1 = floorf(w1 * v1[1] + w2 * v2[1] + w3 * v3[1] + w4 * v4[1] + 0.5f);
 			c2 = floorf(w1 * v1[2] + w2 * v2[2] + w3 * v3[2] + w4 * v4[2] + 0.5f);
@@ -582,7 +243,6 @@ void resize_gray_without_padding_device_kernel(float* src, int src_width, int sr
 		float c0 = default_val;
 		if (src_x < -1 || src_x >= src_width || src_y < -1 || src_y >= src_height)
 		{
-			// todo
 		}
 		else
 		{
@@ -706,6 +366,7 @@ __global__ void hwc2chw_device_kernel(float* src, float* dst,
 		dst[dy * img_volume + dx] = src[dy * img_volume + dx_];
 	}
 }
+
 //note: resize rgb with padding
 void resizeDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
 	float* dst, int dstWidth, int dstHeight,
@@ -819,10 +480,6 @@ void hwc2chwDevice(const int& batchSize, float* src, int srcWidth, int srcHeight
 	hwc2chw_device_kernel << < grid_size, block_size, 0, nullptr >> > (src, dst, batchSize, img_height, img_width, img_area, img_volume);
 }
 
-/************************************************************************************************
-* postprocess kernel function  
-*************************************************************************************************/
-// for yolo3 yolo5 yolo6 yolo7
 __global__ 
 void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float conf_thresh,
 	float* src, int srcWidth, int srcHeight, int srcArea,
@@ -859,8 +516,6 @@ void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float c
 		return;
 	}
 	int index = atomicAdd(dst + dy * dstArea, 1);
-
-	//int index = atomicAdd(&(dst + dy * dstWidth)[0], 1);
 	if (index >= topK)
 	{
 		return;
@@ -875,7 +530,6 @@ void decode_yolo_device_kernel(int batch_size, int  num_class, int topK, float c
 	float right = cx + width * 0.5f;
 	float bottom = cy + height * 0.5f;
 	// 1st element of parray is: count
-	//float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
 	float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
 	*pout_item++ = left;
 	*pout_item++ = top;
@@ -1018,7 +672,7 @@ void decodeDevice(utils::InitParameter param, float* src, int srcWidth, int srcH
 void nmsDeviceV1(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 grid_size((param.topK + BLOCK_SIZE - 1) / BLOCK_SIZE, // todo
+	dim3 grid_size((param.topK + BLOCK_SIZE - 1) / BLOCK_SIZE, 
 		(param.batch_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
 	nms_fast_kernel << < grid_size, block_size, 0, nullptr >> > (param.topK, param.batch_size, param.iou_thresh,
@@ -1029,7 +683,7 @@ void nmsDeviceV2(utils::InitParameter param, float* src, int srcWidth, int srcHe
 	int* idx, float* conf)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 grid_size((param.topK + BLOCK_SIZE - 1) / BLOCK_SIZE, // todo
+	dim3 grid_size((param.topK + BLOCK_SIZE - 1) / BLOCK_SIZE, 
 		(param.batch_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
 	// get keys and vals(confs)
 	get_key_val_kernel << < grid_size, block_size, 0, nullptr >> > (param.batch_size, src, srcWidth, srcHeight, srcArea, idx, conf);

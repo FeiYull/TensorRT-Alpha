@@ -177,46 +177,12 @@ void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
     // 1. bgr2rgb
     bgr2rgbDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_rgb_device, m_param.src_w, m_param.src_h);
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.src_h * m_param.src_w];
-        float* pdevice = m_input_rgb_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.src_h * m_param.src_w,
-                sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.src_h, m_param.src_w, CV_32FC3, phost);
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(0);
-        }
-        delete[] phost;
-    }
-#endif // 0
 
     // 2. resize 
     resizeDevice(m_param.batch_size, m_input_rgb_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, utils::ColorMode::RGB, m_dst2src);
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_resize_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(0);
-        }
-        delete[] phost;
-    }
-#endif // 0
+
     // 3. norm:scale mean std
-    
     // cal max value
     float* p_tmp = m_input_resize_device;
     float* p_max = m_max_val_device;
@@ -224,13 +190,6 @@ void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
     {
         float* max_dev = thrust::max_element(thrust::device, p_tmp, p_tmp + m_param.dst_h * m_param.dst_w);
         p_tmp += m_param.dst_h * m_param.dst_w;
-
-#if 0     
-        float max_host[1] = { -FLT_MAX };
-        checkRuntime(cudaMemcpy(max_host, max_dev, sizeof(float), cudaMemcpyDeviceToHost));
-        std::cout << " max_host = " << max_host[0] << std::endl;
-#endif // 0
-
         // copy
         checkRuntime(cudaMemcpy(p_max++, max_dev, sizeof(float), cudaMemcpyDeviceToDevice));
 
@@ -238,102 +197,13 @@ void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
     
     // div by max
     u2netDivMaxDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h, 3, m_max_val_device);
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_resize_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            for (size_t y = 0; y < ret.rows; y++)
-            {
-                for (size_t x = 0; x < ret.cols; x++)
-                {
-                    for (size_t c = 0; c < 3; c++)
-                    {
-                        ret.at<cv::Vec3f>(y, x)[c]
-                            = 255. * (ret.at<cv::Vec3f>(y, x)[c]);
-                    }
 
-                }
-            }
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
     normDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_norm_device, m_param.dst_w, m_param.dst_h, m_param);
 
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_norm_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            for (size_t y = 0; y < ret.rows; y++)
-            {
-                for (size_t x = 0; x < ret.cols; x++)
-                {
-                    for (size_t c = 0; c < 3; c++)
-                    {
-                        ret.at<cv::Vec3f>(y, x)[c]
-                            = 255. * (ret.at<cv::Vec3f>(y, x)[c] * m_param.stds[c] + m_param.means[c]);
-                    }
-
-                }
-            }
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
     // 4. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_norm_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
-#if 0
-    {
-
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_hwc_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-
-            cv::Mat tmp = imgsBatch[j].clone();
-
-            cv::Mat b(m_param.dst_h, m_param.dst_w, CV_32FC1, phost);
-            cv::Mat g(m_param.dst_h, m_param.dst_w, CV_32FC1, phost + 1 * m_param.dst_h * m_param.dst_w);
-            cv::Mat r(m_param.dst_h, m_param.dst_w, CV_32FC1, phost + 2 * m_param.dst_h * m_param.dst_w);
-            std::vector<cv::Mat> bgr{ b, g, r };
-            cv::Mat ret;
-            cv::merge(bgr, ret);
-            ret.convertTo(ret, CV_8UC3, 255, 0.0);
-            cv::imshow("ret", ret);
-
-            /* SYSTEMTIME st = { 0 };
-             GetLocalTime(&st);
-             std::string t = std::to_string(st.wHour) + std::to_string(st.wMinute) + std::to_string(st.wMilliseconds);
-             std::string save_path = "F:/Data/temp/";;
-             cv::imwrite(save_path + t + ".jpg", ret);*/
-            cv::waitKey(1);
-
-            cv::Mat img_ = imgsBatch[j].clone();
-        }
-        delete[] phost;
-
-    }
-#endif
 }
 
 bool u2net::U2NET::infer()
@@ -345,21 +215,7 @@ bool u2net::U2NET::infer()
 
 void u2net::U2NET::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-#if 0 // valid
-    {
-        float* phost = new float[m_output_area];
-        float* pdevice = m_output_src_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * m_output_area, sizeof(float) * m_output_area, cudaMemcpyDeviceToHost));
-            cv::Mat prediction(m_param.dst_h, m_param.dst_w, CV_32FC1, phost);
-        }
-        delete[] phost;
-    }
-#endif // 0
-
-    // 1. norm : 
-
+    // 1. norm
     // min and max value
     float* p_tmp = m_output_src_device;
     float* p_max = m_max_val_device;
@@ -368,35 +224,13 @@ void u2net::U2NET::postprocess(const std::vector<cv::Mat>& imgsBatch)
     {
         thrust::pair<float*, float*> min_max_dev = thrust::minmax_element(thrust::device, p_tmp, p_tmp + m_param.dst_h * m_param.dst_w);
         p_tmp += m_param.dst_h * m_param.dst_w;
-
-#if 0     
-        float min_host[1] = { FLT_MAX };
-        float max_host[1] = { -FLT_MAX };
-        checkRuntime(cudaMemcpy(min_host, min_max_dev.first, sizeof(float), cudaMemcpyDeviceToHost));
-        checkRuntime(cudaMemcpy(max_host, min_max_dev.second, sizeof(float), cudaMemcpyDeviceToHost));
-        std::cout << " min_host = " << min_host[0] << " max_host = " << max_host[0] << std::endl;
-#endif // 0
-
         // copy
         checkRuntime(cudaMemcpy(p_min++, min_max_dev.first, sizeof(float), cudaMemcpyDeviceToDevice));
         checkRuntime(cudaMemcpy(p_max++, min_max_dev.second, sizeof(float), cudaMemcpyDeviceToDevice));
-
     }
     
     // 2. element = [255 * (element - min)] / (max - min)
     u2netNormPredDevice(m_param.batch_size, m_output_src_device, m_param.dst_w, m_param.dst_h, 255.f, m_min_val_device, m_max_val_device);
-#if 0 // valid
-    {
-        float* phost = new float[m_output_area];
-        float* pdevice = m_output_src_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * m_output_area, sizeof(float) * m_output_area, cudaMemcpyDeviceToHost));
-            cv::Mat prediction(m_param.dst_h, m_param.dst_w, CV_32FC1, phost);
-        }
-        delete[] phost;
-    }
-#endif // 0
 
     // 3. resize gray without padding
     resizeDevice(m_param.batch_size, m_output_src_device, m_param.dst_w, m_param.dst_h,

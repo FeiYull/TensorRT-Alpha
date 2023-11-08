@@ -28,23 +28,18 @@ protected:
 protected:
     utils::InitParameter m_param;
     std::vector<std::vector<utils::Box>> m_objectss;
-
-    // (m_param.dst_h, m_param.dst_w) to (m_param.src_h, m_param.src_w) 
-    utils::AffineMat m_dst2src; // 2*3
-
+    utils::AffineMat m_dst2src;
     // input
     float* m_input_src_device;
     float* m_input_resize_device;
     float* m_input_rgb_device;
-
     // output
-    int* m_output_num_device;      // b * 1
-    int* m_output_boxes_device;    // b * 1 * 100 * 4
-    int* m_output_scores_device;   // b * 1 * 100
-    int* m_output_classes_device;  // b * 1 * 100
-    
-    int* m_output_num_host;        // b * 1
-    int* m_output_boxes_host;      // b * 1 * 100 * 4
-    int* m_output_scores_host;     // b * 1 * 100
-    int* m_output_classes_host;    // b * 1 * 100
+    int* m_output_num_device;     
+    int* m_output_boxes_device;   
+    int* m_output_scores_device;   
+    int* m_output_classes_device; 
+    int* m_output_num_host;       
+    int* m_output_boxes_host;      
+    int* m_output_scores_host;    
+    int* m_output_classes_host;  
 };

@@ -45,13 +45,13 @@ ignore
 cd tensorrt-alpha/data/yolov8
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 # 640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8n.onnx  --saveEngine=yolov8n.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8s.onnx  --saveEngine=yolov8s.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8m.onnx  --saveEngine=yolov8m.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8l.onnx  --saveEngine=yolov8l.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8x.onnx  --saveEngine=yolov8x.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8n.onnx  --saveEngine=yolov8n.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8s.onnx  --saveEngine=yolov8s.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8m.onnx  --saveEngine=yolov8m.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8l.onnx  --saveEngine=yolov8l.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8x.onnx  --saveEngine=yolov8x.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
 # 1280
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8x6.onnx  --saveEngine=yolov8x6.trt  --buildOnly --minShapes=images:1x3x1280x1280 --optShapes=images:4x3x1280x1280 --maxShapes=images:8x3x1280x1280
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8x6.onnx  --saveEngine=yolov8x6.trt  --buildOnly --minShapes=images:1x3x1280x1280 --optShapes=images:2x3x1280x1280 --maxShapes=images:4x3x1280x1280
 ```
 ## 4.run
 ```bash

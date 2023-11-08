@@ -36,13 +36,13 @@ cd tensorrt-alpha/data/yolor
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 
 #1280
-../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_p6.onnx   --saveEngine=yolor_p6.trt  --buildOnly   --minShapes=images:1x3x1280x1280 --optShapes=images:4x3x1280x1280 --maxShapes=images:8x3x1280x1280
+../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_p6.onnx   --saveEngine=yolor_p6.trt  --buildOnly   --minShapes=images:1x3x1280x1280 --optShapes=images:2x3x1280x1280 --maxShapes=images:4x3x1280x1280
 
 # 640
-../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp.onnx          --saveEngine=yolor_csp.trt          --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_star.onnx     --saveEngine=yolor_csp_star.trt     --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_x.onnx        --saveEngine=yolor_csp_x.trt        --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_x_star.onnx   --saveEngine=yolor_csp_x_star.trt   --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp.onnx          --saveEngine=yolor_csp.trt          --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_star.onnx     --saveEngine=yolor_csp_star.trt     --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_x.onnx        --saveEngine=yolor_csp_x.trt        --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_csp_x_star.onnx   --saveEngine=yolor_csp_x_star.trt   --buildOnly   --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
 ```
 ## 4.run
 ```bash
@@ -59,10 +59,10 @@ make -j10
 ./app_yolor  --model=../../data/yolor/yolor_csp.trt --size=640  --batch_size=1  --img=../../data/6406401.jpg  --show --savePath=../
 
 # infer video
-./app_yolor  --model=../../data/yolor/yolor_csp.trt --size=640 --batch_size=8  --video=../../data/people.mp4  --show 
+./app_yolor  --model=../../data/yolor/yolor_csp.trt --size=640 --batch_size=2  --video=../../data/people.mp4  --show 
 
 # infer camera
-./app_yolor  --model=../../data/yolor/yolor_csp.trt --size=640 --batch_size=4  --cam_id=0  --show
+./app_yolor  --model=../../data/yolor/yolor_csp.trt --size=640 --batch_size=2  --cam_id=0  --show
 
 
 ## 1280

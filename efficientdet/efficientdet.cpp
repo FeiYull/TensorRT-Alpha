@@ -10,18 +10,15 @@ EfficientDet::EfficientDet(const utils::InitParameter& param):m_param(param)
     checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-
     // output
-    m_output_num_device     = nullptr;  // b * 1
-    m_output_boxes_device   = nullptr;  // b * 1 * 100 * 4
-    m_output_scores_device  = nullptr;  // b * 1 * 100
-    m_output_classes_device = nullptr;  // b * 1 * 100
-
-    m_output_num_host     = nullptr;    // b * 1
-    m_output_boxes_host   = nullptr;    // b * 1 * 100 * 4
-    m_output_scores_host  = nullptr;    // b * 1 * 100
-    m_output_classes_host = nullptr;    // b * 1 * 100
-
+    m_output_num_device     = nullptr;  
+    m_output_boxes_device   = nullptr;  
+    m_output_scores_device  = nullptr;  
+    m_output_classes_device = nullptr;
+    m_output_num_host     = nullptr;    
+    m_output_boxes_host   = nullptr;    
+    m_output_scores_host  = nullptr;    
+    m_output_classes_host = nullptr;    
     checkRuntime(cudaMalloc(&m_output_num_device,     param.batch_size * sizeof(int)));
     checkRuntime(cudaMalloc(&m_output_boxes_device,   param.batch_size * 1 * param.topK * 4 * sizeof(int)));
     checkRuntime(cudaMalloc(&m_output_scores_device,  param.batch_size * 1 * param.topK * sizeof(int)));
@@ -30,7 +27,6 @@ EfficientDet::EfficientDet(const utils::InitParameter& param):m_param(param)
     m_output_boxes_host   = new int[param.batch_size * 1 * param.topK * 4];
     m_output_scores_host  = new int[param.batch_size * 1 * param.topK];
     m_output_classes_host = new int[param.batch_size * 1 * param.topK];
-
     m_objectss.resize(param.batch_size);
 }
 
@@ -40,7 +36,6 @@ EfficientDet::~EfficientDet()
     checkRuntime(cudaFree(m_input_src_device));
     checkRuntime(cudaFree(m_input_resize_device));
     checkRuntime(cudaFree(m_input_rgb_device));
-    
     // output
     checkRuntime(cudaFree(m_output_num_device));
     checkRuntime(cudaFree(m_output_boxes_device));
@@ -164,45 +159,9 @@ void EfficientDet::preprocess(const std::vector<cv::Mat>& imgsBatch)
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114, m_dst2src);
 
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_resize_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
-
     // 2. bgr2rgb
     bgr2rgbDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_rgb_device, m_param.dst_w, m_param.dst_h);
-
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_rgb_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
 }
 
 bool EfficientDet::infer()
@@ -259,7 +218,6 @@ void EfficientDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
 
 std::vector<std::vector<utils::Box>> EfficientDet::getObjectss() const
 {
-    // todo
     return this->m_objectss;
 }
 

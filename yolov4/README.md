@@ -23,7 +23,7 @@ ignore
 cd tensorrt-alpha/data/yolov4
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 # 608
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov4_-1_3_608_608_dynamic.onnx   --saveEngine=yolov4_-1_3_608_608_dynamic.trt  --buildOnly --minShapes=input:1x3x608x608 --optShapes=input:4x3x608x608 --maxShapes=input:8x3x608x608
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov4_-1_3_608_608_dynamic.onnx   --saveEngine=yolov4_-1_3_608_608_dynamic.trt  --buildOnly --minShapes=input:1x3x608x608 --optShapes=input:2x3x608x608 --maxShapes=input:4x3x608x608
 ```
 ## 4.run
 ```bash

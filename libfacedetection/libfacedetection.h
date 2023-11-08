@@ -28,40 +28,35 @@ private:
     //private:
 protected:
     utils::InitParameter m_param;
-    nvinfer1::Dims m_output_loc_dims;  // 18984*14
-    nvinfer1::Dims m_output_conf_dims; // 18984*2
-    nvinfer1::Dims m_output_iou_dims;  // 18984*1
-    int m_total_objects;  // 18984
+    nvinfer1::Dims m_output_loc_dims;
+    nvinfer1::Dims m_output_conf_dims;
+    nvinfer1::Dims m_output_iou_dims;
+    int m_total_objects;
 
     // const params on host 
     const float  m_min_sizes_host[4 * 3] = 
     { 10, 16, 24,  32, 48, FLT_MAX,  64, 96, FLT_MAX,  128, 192, 256 };
     const int m_min_sizes_host_dim[4] = 
     { 3, 2, 2, 3 };
-    float* m_feat_hw_host;     // 4 * 3
-    float* m_prior_boxes_host;  // 18984 * 4
-    const float m_variances_host[2] = { 0.1f, 0.2f };     // 2 * 1
-
-    
+    float* m_feat_hw_host;
+    float* m_prior_boxes_host;
+    const float m_variances_host[2] = { 0.1f, 0.2f };
     // const params on device
-    float* m_min_sizes_device;    // 4 * 3
-    float* m_feat_hw_host_device; // 4 * 3
-    float* m_prior_boxes_device;  // 18984 * 4
-    float* m_variances_device;    // 2 * 1
-
+    float* m_min_sizes_device;
+    float* m_feat_hw_host_device;
+    float* m_prior_boxes_device;
+    float* m_variances_device;
     std::vector<std::vector<utils::Box>> m_objectss;
-
     // input
     float* m_input_src_device;
     float* m_input_hwc_device;
-
     // output
     float* m_output_loc_device;
     float* m_output_conf_device;
     float* m_output_iou_device;
     float* m_output_objects_device;
     float* m_output_objects_host;
-    int m_output_objects_width; // 7:left, top, right, bottom, confidence, class, keepflag; 
+    int m_output_objects_width; 
 
 };
 

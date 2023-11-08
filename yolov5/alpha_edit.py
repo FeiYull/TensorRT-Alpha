@@ -13,7 +13,6 @@ def infer_onnx(onnx_file, input_names, image_input_shape):
     ort_session = ort.InferenceSession(onnx_file)
     outputs = ort_session.run(
         None,
-        # {"data": np.ones(shape=image_input_shape).astype(np.float32)},
         {input_names[0]: np.ones(shape=image_input_shape).astype(np.float32)},
     )
     return outputs

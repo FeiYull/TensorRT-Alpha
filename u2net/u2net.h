@@ -20,10 +20,6 @@ namespace u2net
         void showMask(const std::vector<cv::Mat>& imgsBatch, const int& cvDelayTime);
         void saveMask(const std::vector<cv::Mat>& imgsBatch, const std::string& savePath, const int& batchSize, const int& batchi);
         void reset();
-
-    //public:
-        //std::vector<std::vector<utils::Box>> getObjectss() const;
-
     private:
         std::shared_ptr<nvinfer1::ICudaEngine> m_engine;
         std::unique_ptr<nvinfer1::IExecutionContext> m_context;
@@ -58,8 +54,6 @@ namespace u2net
     };
 }
 
-// element = element / max
 void u2netDivMaxDevice(const int& batchSize, float* src, int srcWidth, int srcHeight, int channel, float* maxVals);
 
-// element = [255 * (element - min)] / (max - min)
 void u2netNormPredDevice(const int& batchSize, float* src, int srcWidth, int srcHeight, float scale, float* minVals, float* maxVals);
