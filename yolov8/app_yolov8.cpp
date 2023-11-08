@@ -147,7 +147,6 @@ int main(int argc, char** argv)
 	std::vector<cv::Mat> imgs_batch;
 	imgs_batch.reserve(param.batch_size);
 	sample::gLogInfo << imgs_batch.capacity() << std::endl;
-	int i = 0; // debug
 	int batchi = 0;
 	while (capture.isOpened())
 	{
