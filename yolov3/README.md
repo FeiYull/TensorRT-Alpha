@@ -50,9 +50,9 @@ python alpha_edit.py
 cd tensorrt-alpha/data/yolov3
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
 # 640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3.onnx        --saveEngine=alpha_yolov3.trt      --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3-spp.onnx    --saveEngine=alpha_yolov3-spp.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
-../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3-tiny.onnx   --saveEngine=alpha_yolov3-tiny.trt --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3.onnx        --saveEngine=alpha_yolov3.trt      --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3-spp.onnx    --saveEngine=alpha_yolov3-spp.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=alpha_yolov3-tiny.onnx   --saveEngine=alpha_yolov3-tiny.trt --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
 
 # note: When compiling the alpha_yolov3-tiny model, if the following error may occur
 # error: Error Code 4: Internal Error (/model.11/Reshape: IShuffleLayer applied to shape tensor must have 0 or 1 #reshape dimensions: dimensions were [-1,2])
@@ -73,10 +73,10 @@ make -j10
 ./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640  --batch_size=1  --img=../../data/6406403.jpg  --show --savePath
 
 # infer video
-./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=8  --video=../../data/people.mp4  --show
+./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=2  --video=../../data/people.mp4  --show
 
 # infer camera
-./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=4  --cam_id=0  --show
+./app_yolov3  --model=../../data/yolov3/alpha_yolov3-tiny.trt --size=640 --batch_size=2  --cam_id=0  --show
 
 # note:yolov3-tiny has obvious missed detection on the image 6406401.jpg, don't worry, the effect is consistent with the official
 ```

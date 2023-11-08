@@ -12,20 +12,11 @@ class AlphaYolov4(torch.nn.Module):
         
     def forward(self, x):
         y = self.model(x) 
-        # boxes = y[0].squeeze(dim = 2)
-        # confs = y[1]
-        boxes = y[0]#.squeeze(dim = 2) # squeeze will lead to genarate "if" node in onnx graph, trtexec will complile unsuccessfully!
+        boxes = y[0]
         confs = y[1].unsqueeze(dim = 2)
         return torch.cat((boxes, confs), 3)
-        #return torch.cat((y[0].squeeze(dim = 2), y[1]), 2)
 
 def transform_to_onnx(cfgfile, weightfile, batch_size=1, onnx_file_name=None):
-    # model = Darknet(cfgfile)
-
-    # model.print_network()
-    # model.load_weights(weightfile)
-    # print('Loading weights from %s... Done!' % (weightfile))
-
     model = AlphaYolov4(cfgfile, weightfile)
 
     dynamic = False
@@ -33,28 +24,15 @@ def transform_to_onnx(cfgfile, weightfile, batch_size=1, onnx_file_name=None):
         dynamic = True
 
     input_names = ["input"]
-    #output_names = ['boxes', 'confs']
     output_names = ['output']
 
     if dynamic:
-        # x = torch.randn((1, 3, model.height, model.width), requires_grad=True)
         x = torch.randn((1, 3, model.model.height, model.model.width), requires_grad=True)
         if not onnx_file_name:
-            #onnx_file_name = "yolov4_-1_3_{}_{}_dynamic.onnx".format(model.height, model.width)
             onnx_file_name = "yolov4_-1_3_{}_{}_dynamic.onnx".format(model.model.height, model.model.width)
-        #dynamic_axes = {"input": {0: "batch_size"}, "boxes": {0: "batch_size"}, "confs": {0: "batch_size"}}
         dynamic_axes = {"input": {0: "batch_size"}, "output": {0: "batch_size"}}
         # Export the model
         print('Export the onnx model ...')
-        # torch.onnx.export(model,
-        #                   x,
-        #                   onnx_file_name,
-        #                   export_params=True,
-        #                   opset_version=11,
-        #                   do_constant_folding=True,
-        #                   input_names=input_names, output_names=output_names,
-        #                   dynamic_axes=dynamic_axes)
-
         torch.onnx.export(model,
                           x,
                           onnx_file_name,
@@ -68,9 +46,7 @@ def transform_to_onnx(cfgfile, weightfile, batch_size=1, onnx_file_name=None):
         return onnx_file_name
 
     else:
-        #x = torch.randn((batch_size, 3, model.height, model.width), requires_grad=True)
         x = torch.randn((batch_size, 3, model.model.height, model.model.width), requires_grad=True)
-        #onnx_file_name = "yolov4_{}_3_{}_{}_static.onnx".format(batch_size, model.height, model.width)
         onnx_file_name = "yolov4_{}_3_{}_{}_static.onnx".format(batch_size, model.model.height, model.model.width)
         torch.onnx.export(model,
                           x,

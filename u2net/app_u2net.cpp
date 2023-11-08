@@ -147,9 +147,6 @@ int main(int argc, char** argv)
 		return -1;
 	}
 	u2net.check();
-	/************************************************************************************************
-	* recycle
-	*************************************************************************************************/
 	cv::Mat frame;
 	std::vector<cv::Mat> imgs_batch;
 	imgs_batch.reserve(param.batch_size);
@@ -162,7 +159,7 @@ int main(int argc, char** argv)
 		{
 			break;
 		}
-		if (imgs_batch.size() < param.batch_size) // get input
+		if (imgs_batch.size() < param.batch_size)
 		{
 			if (source != utils::InputStream::IMAGE)
 			{
@@ -177,8 +174,7 @@ int main(int argc, char** argv)
 			{
 				sample::gLogWarning << "no more video or camera frame" << std::endl;
 				task(u2net, param, imgs_batch, delay_time, batchi, is_show, is_save);
-				imgs_batch.clear(); // clear
-				//sample::gLogInfo << imgs_batch.capacity() << std::endl;
+				imgs_batch.clear();
 				batchi++;
 				break;
 			}
@@ -188,11 +184,10 @@ int main(int argc, char** argv)
 			}
 
 		}
-		else // infer
+		else
 		{
 			task(u2net, param, imgs_batch, delay_time, batchi, is_show, is_save);
-			imgs_batch.clear(); // clear
-			//sample::gLogInfo << imgs_batch.capacity() << std::endl;
+			imgs_batch.clear();
 			batchi++;
 		}
 	}

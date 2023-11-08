@@ -13,6 +13,16 @@ or export onnx:
 git clone https://github.com/Megvii-BaseDetection/YOLOX
 git checkout  0.3.0
 
+## batch_size=1
+# 640 for image
+python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_m.onnx  --exp_file=exps/default/yolox_m.py --ckpt=yolox_m.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_x.onnx  --exp_file=exps/default/yolox_x.py --ckpt=yolox_x.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=1
+# 416 for image
+python tools/export_onnx.py --output-name=yolox_nano.onnx --exp_file=exps/default/yolox_nano.py --ckpt=yolox_nano.pth --decode_in_inference --batch-size=1
+python tools/export_onnx.py --output-name=yolox_tiny.onnx --exp_file=exps/default/yolox_tiny.py --ckpt=yolox_tiny.pth --decode_in_inference --batch-size=1
+
 ## batch_size > 1
 # 640 for video or camera
 python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=8
@@ -23,16 +33,6 @@ python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/
 # 416 for video or camera
 python tools/export_onnx.py --output-name=yolox_nano.onnx --exp_file=exps/default/yolox_nano.py --ckpt=yolox_nano.pth --decode_in_inference --batch-size=8
 python tools/export_onnx.py --output-name=yolox_tiny.onnx --exp_file=exps/default/yolox_tiny.py --ckpt=yolox_tiny.pth --decode_in_inference --batch-size=8
-
-## batch_size=1
-# 640 for image
-python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=1
-python tools/export_onnx.py --output-name=yolox_m.onnx  --exp_file=exps/default/yolox_m.py --ckpt=yolox_m.pth --decode_in_inference --batch-size=1
-python tools/export_onnx.py --output-name=yolox_x.onnx  --exp_file=exps/default/yolox_x.py --ckpt=yolox_x.pth --decode_in_inference --batch-size=1
-python tools/export_onnx.py --output-name=yolox_s.onnx  --exp_file=exps/default/yolox_s.py --ckpt=yolox_s.pth --decode_in_inference --batch-size=1
-# 416 for image
-python tools/export_onnx.py --output-name=yolox_nano.onnx --exp_file=exps/default/yolox_nano.py --ckpt=yolox_nano.pth --decode_in_inference --batch-size=1
-python tools/export_onnx.py --output-name=yolox_tiny.onnx --exp_file=exps/default/yolox_tiny.py --ckpt=yolox_tiny.pth --decode_in_inference --batch-size=1
 ```
 
 ## 2.edit and save onnx

@@ -1,12 +1,8 @@
 #pragma once
 #include"../utils/common_include.h"
 
-
 namespace utils 
 {
-    /************************************************************************************************
-    * array
-    *************************************************************************************************/
     namespace dataSets
     {
         const std::vector<std::string> coco80 = {
@@ -36,7 +32,7 @@ namespace utils
 
         const std::vector<std::string> face2 = {"non-face", "face"};
     }
-    namespace Colors // todo : binding "color80" with "coco80" and "coco91"...
+    namespace Colors
     {
         const std::vector<cv::Scalar> color80{ 
             cv::Scalar(128, 77, 207),cv::Scalar(65, 32, 208),cv::Scalar(0, 224, 45),cv::Scalar(3, 141, 219),cv::Scalar(80, 239, 253),cv::Scalar(239, 184, 12),
@@ -80,15 +76,10 @@ namespace utils
         };
     }
 
-
-    /************************************************************************************************
-    * struct
-    *************************************************************************************************/
     struct InitParameter
     {
         int num_class{ 80 }; // coco 
         std::vector<std::string> class_names;
-        //std::vector<std::vector<float>> min_sizes;
         std::vector<std::string> input_output_names;
 
         bool dynamic_batch{ true };
@@ -106,7 +97,6 @@ namespace utils
         int topK{ 1000 };
         std::string save_path;
     };
-
 
     // legacy
     struct CandidateObject
@@ -155,9 +145,6 @@ namespace utils
         float v3, v4, v5;
     };
 
-    /************************************************************************************************
-    * function
-    *************************************************************************************************/
     void saveBinaryFile(float* vec, size_t len, const std::string& file);
 
     std::vector<uint8_t> readBinaryFile(const std::string& file);
@@ -175,11 +162,6 @@ namespace utils
 
     void save(const std::vector<std::vector<Box>>& objectss, const std::vector<std::string>& classNames,
         const std::string& savePath, std::vector<cv::Mat>& imgsBatch, const int& batchSize, const int& batchi);
-    
-
-    /************************************************************************************************
-    * class
-    *************************************************************************************************/
 
     class HostTimer
     {

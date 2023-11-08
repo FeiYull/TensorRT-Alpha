@@ -2,39 +2,12 @@
 #include"../utils/common_include.h"
 #include"../utils/utils.h"
 
-/************************************************************************************************
-* cuda check
-*************************************************************************************************/
 #define checkRuntime(op)  __check_cuda_runtime((op), #op, __FILE__, __LINE__)
 
 bool __check_cuda_runtime(cudaError_t code, const char* op, const char* file, int line);
 
-/************************************************************************************************
-* kernel function's interface
-*************************************************************************************************/
 #define BLOCK_SIZE 8
 
-// math 
-float maxFloatDevice(float* src, int size);
-
-float minFloatDevice(float* src, int size);
-
-int maxIntDevice(int* src, int size);
-
-int minIntDevice(int* src, int size);
-
-// overload
-void maxFloatDevice(float* src, int size, float* dst);
-
-void minFloatDevice(float* src, int size, float* dst);
-
-void maxIntDevice(int* src, int size, int* dst);
-
-void minIntDevice(int* src, int size, int* dst);
-
-std::pair<float, float> minmaxFloatDevice(float* src, int size);
-
-/************************************************************************************************/
 //note: resize rgb with padding
 void resizeDevice(const int& batch_size, float* src, int src_width, int src_height,
     float* dst, int dstWidth, int dstHeight,

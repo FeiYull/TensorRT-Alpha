@@ -8,7 +8,6 @@ yolo::YOLO::YOLO(const utils::InitParameter& param) : m_param(param)
     m_input_rgb_device = nullptr;
     m_input_norm_device = nullptr;
     m_input_hwc_device = nullptr;
-    //checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(unsigned char)));
     checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     checkRuntime(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
@@ -22,13 +21,11 @@ yolo::YOLO::YOLO(const utils::InitParameter& param) : m_param(param)
     m_output_objects_width = 7;
     m_output_idx_device = nullptr;
     m_output_conf_device = nullptr;
-
     int output_objects_size = param.batch_size * (1 + param.topK * m_output_objects_width); // 1: count
     checkRuntime(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
     checkRuntime(cudaMalloc(&m_output_idx_device, m_param.batch_size * m_param.topK * sizeof(int)));
     checkRuntime(cudaMalloc(&m_output_conf_device, m_param.batch_size * m_param.topK * sizeof(float)));
     m_output_objects_host = new float[output_objects_size];
-
     m_objectss.resize(param.batch_size);
 }
 
@@ -102,7 +99,6 @@ bool yolo::YOLO::init(const std::vector<unsigned char>& trtFile)
         0.f, scale, (-scale * m_param.src_h + m_param.dst_h + scale - 1) * 0.5);
     cv::Mat dst2src = cv::Mat::zeros(2, 3, CV_32FC1);
     cv::invertAffineTransform(src2dst, dst2src);
-
     m_dst2src.v0 = dst2src.ptr<float>(0)[0];
     m_dst2src.v1 = dst2src.ptr<float>(0)[1];
     m_dst2src.v2 = dst2src.ptr<float>(0)[2];
@@ -204,118 +200,17 @@ void yolo::YOLO::preprocess(const std::vector<cv::Mat>& imgsBatch)
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114, m_dst2src);
 
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_resize_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            //cv::imshow("ret", ret);
-            //cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
-
     // 2. bgr2rgb
     bgr2rgbDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_rgb_device, m_param.dst_w, m_param.dst_h);
-
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_rgb_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            cv::namedWindow("ret", cv::WINDOW_NORMAL);
-            //cv::imshow("ret", ret);
-            //cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
 
     // 3. norm:scale mean std
     normDevice(m_param.batch_size, m_input_rgb_device, m_param.dst_w, m_param.dst_h,
         m_input_norm_device, m_param.dst_w, m_param.dst_h, m_param);
 
-#if 0 // valid
-    {
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_norm_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-            cv::Mat ret(m_param.dst_h, m_param.dst_w, CV_32FC3, phost);
-            for (size_t y = 0; y < ret.rows; y++)
-            {
-                for (size_t x = 0; x < ret.cols; x++)
-                {
-                    for (size_t c = 0; c < 3; c++)
-                    {
-                        //
-                        ret.at<cv::Vec3f>(y, x)[c]
-                            = m_param.scale * (ret.at<cv::Vec3f>(y, x)[c] * m_param.stds[c] + m_param.means[c]);
-                    }
-
-                }
-            }
-            ret.convertTo(ret, CV_8UC3, 1.0, 0.0);
-            //cv::imshow("ret", ret);
-            //cv::waitKey(1);
-        }
-        delete[] phost;
-    }
-#endif // 0
-
     // 4. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_norm_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
-#if 0
-    {
-
-        float* phost = new float[3 * m_param.dst_h * m_param.dst_w];
-        float* pdevice = m_input_hwc_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.dst_h * m_param.dst_w,
-                sizeof(float) * 3 * m_param.dst_h * m_param.dst_w, cudaMemcpyDeviceToHost));
-
-            cv::Mat tmp = imgsBatch[j].clone();
-
-            cv::Mat b(m_param.dst_h, m_param.dst_w, CV_32FC1, phost);
-            cv::Mat g(m_param.dst_h, m_param.dst_w, CV_32FC1, phost + 1 * m_param.dst_h * m_param.dst_w);
-            cv::Mat r(m_param.dst_h, m_param.dst_w, CV_32FC1, phost + 2 * m_param.dst_h * m_param.dst_w);
-            std::vector<cv::Mat> bgr{ b, g, r };
-            cv::Mat ret;
-            cv::merge(bgr, ret);
-            ret.convertTo(ret, CV_8UC3, 255, 0.0);
-            //cv::imshow("ret", ret);
-
-            /* SYSTEMTIME st = { 0 };
-             GetLocalTime(&st);
-             std::string t = std::to_string(st.wHour) + std::to_string(st.wMinute) + std::to_string(st.wMilliseconds);
-             std::string save_path = "F:/Data/temp/";;
-             cv::imwrite(save_path + t + ".jpg", ret);*/
-            //cv::waitKey(1);
-
-            cv::Mat img_ = imgsBatch[j].clone();
-        }
-        delete[] phost;
-
-    }
-#endif
-
 }
 
 bool yolo::YOLO::infer()
@@ -327,94 +222,15 @@ bool yolo::YOLO::infer()
 
 void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-#if 0 // valid
-    {
-        //float* phost = new float[m_param.batch_size * m_output_area];
-        float* phost = new float[m_output_area];
-        float* pdevice = m_output_src_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * m_output_area, sizeof(float) * m_output_area, cudaMemcpyDeviceToHost));
-            cv::Mat prediction(m_total_objects, m_param.num_class + 5, CV_32FC1, phost);
-        }
-        delete[] phost;
-    }
-#endif // 0
-
     // decode
     decodeDevice(m_param, m_output_src_device, 5 + m_param.num_class, m_total_objects, m_output_area,
         m_output_objects_device, m_output_objects_width, m_param.topK);
-#if 0 // valid
-    {
-        //* phost = new float[m_param.batch_size * (1 + m_output_objects_width * m_param.topK)];
-        float* phost = new float[1 + m_output_objects_width * m_param.topK];
-        float* pdevice = m_output_objects_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            /* cv::imshow("srcimg", imgsBatch[j]);
-             cv::waitKey(0);*/
-            checkRuntime(cudaMemcpy(phost, pdevice + j * (1 + m_output_objects_width * m_param.topK), 
-                sizeof(float) * (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
-            int num_candidates = phost[0];
-            cv::Mat prediction(m_param.topK, m_output_objects_width, CV_32FC1, phost + 1);
-
-            //save to binary
-            //utils::saveBinaryFile(phost, (1 + m_output_objects_width * m_param.topK), "yolov7.bin");
-        }
-        delete[] phost;
-    }
-#endif // 0
 
     // nmsv1(nms faster)
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
-#if 0 // valid
-    {
-        float* phost = new float[1 + m_output_objects_width * m_param.topK];
-        float* pdevice = m_output_objects_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            /*cv::imshow("srcimg", imgsBatch[j]);
-            cv::waitKey(0);*/
-            checkRuntime(cudaMemcpy(phost, pdevice + j * (1 + m_output_objects_width * m_param.topK), 
-                sizeof(float) * (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
-            int num_candidates_objects = phost[0];
-            cv::Mat prediction(m_param.topK, m_output_objects_width, CV_32FC1, phost + 1);
-        }
-        delete[] phost;
-    }
-#endif // 0
+
     // nmsv2(nms sort)
     //nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
-#if 0 // valid
-    {
-        // prediction
-        float* phost = new float[1 + m_output_objects_width * m_param.topK];
-        float* pdevice = m_output_objects_device;
-        for (size_t j = 0; j < 1; j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * (1 + m_output_objects_width * m_param.topK),
-                sizeof(float) * (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
-            int num_candidates_objects = phost[0];
-            cv::Mat prediction(m_param.topK, m_output_objects_width, CV_32FC1, phost + 1);
-        }
-        delete[] phost;
-
-        // conf & idx
-        float* phost_conf = new float[m_param.topK];
-        int* phost_idx = new int[m_param.topK];
-        float* pdevice_conf = m_output_conf_device;
-        int* pdevice_idx = m_output_idx_device;
-        for (size_t j = 0; j < m_param.batch_size; j++)
-        {
-            checkRuntime(cudaMemcpy(phost_conf, pdevice_conf + j * m_param.topK, sizeof(float) * m_param.topK, cudaMemcpyDeviceToHost));
-            checkRuntime(cudaMemcpy(phost_idx,  pdevice_idx  + j * m_param.topK, sizeof(float) * m_param.topK, cudaMemcpyDeviceToHost));
-            cv::Mat img_conf(m_param.topK, 1, CV_32FC1, phost_conf);
-            cv::Mat img_idx(m_param.topK, 1, CV_32S, phost_idx);
-        }
-        delete[] phost_idx;
-        delete[] phost_conf;
-    }
-#endif // 0
 
     // copy result
     checkRuntime(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));

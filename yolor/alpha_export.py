@@ -26,8 +26,6 @@ import argparse
 import torch
 from utils.google_utils import attempt_download
 
-# 不支持的op
-# https://blog.csdn.net/weixin_37889356/article/details/121671974
 
 import onnx
 import onnxruntime as ort
@@ -82,11 +80,9 @@ if __name__ == '__main__':
         model = Darknet("cfg/yolor_csp_x.cfg", 640).cpu()
         opt.weights = 'yolor_csp_x_star.pt'
 
-    # model = Darknet("cfg/yolor_csp_x.cfg", 640).cpu()
     model.load_state_dict(torch.load(opt.weights, map_location="cpu")['model'])
 
     model.eval()
-    # model.model[-1].export = True  # set Detect() layer export=True
     y = model(img)  # dry run
     print(y[0][0][0][0:10])
 
@@ -108,7 +104,6 @@ if __name__ == '__main__':
     # Checks
     onnx_model = onnx.load(f)  # load onnx model
 
-    # sry
     input_names = ("images")
     ort_session = ort.InferenceSession(f)
     outputs = ort_session.run(
@@ -120,7 +115,6 @@ if __name__ == '__main__':
     print(onnx.helper.printable_graph(onnx_model.graph))  # print a human readable model
     print('ONNX export success, saved as %s' % f)
 
-    # 删除多余输出节点
     if net == "yolor_p6":   
         item1 = onnx_model.graph.output[1]
         item2 = onnx_model.graph.output[2]
@@ -137,8 +131,6 @@ if __name__ == '__main__':
         onnx_model.graph.output.remove(item1)
         onnx_model.graph.output.remove(item2)
         onnx_model.graph.output.remove(item3)
-    # 修改输出名字
-    # onnx_model.graph.output[0].name = 'output'，修改后节点会孤立，需要指定输入节点
 
     # save
     onnx.save(onnx_model, f)

@@ -27,7 +27,6 @@ void calFeatureMapSize(const cv::Size& size, float* featureMapSize)
     int p4_h = int(p3_h / 2);
     int p4_w = int(p3_w / 2);
 
-    // todo
     featureMapSize[0] = (float)p1_h;
     featureMapSize[1] = (float)p1_w;
     featureMapSize[2] = (float)p1_c;
@@ -48,14 +47,10 @@ void calFeatureMapSize(const cv::Size& size, float* featureMapSize)
 void calPriorBox(float* featureMapSize, const float* minSizes, const int* dim2, const cv::Size& size, float* priorBox)
 {
     float steps[4] = { 8, 16, 32, 64 };
-    /* std::vector<float> min_size;
-     min_size.reserve(3);*/
     cv::Vec4f anchor; // cx cy s_ky s_kx
-
     int idx = 0;
-    for (size_t k = 0; k < 4; k++) // todo
+    for (size_t k = 0; k < 4; k++)
     {
-        //min_size = minSizes[k];
         for (size_t i = 0; i < featureMapSize[k * 3 + 0]; i++)
         {
             for (size_t j = 0; j < featureMapSize[k * 3 + 1]; j++)
@@ -263,35 +258,6 @@ void LibFaceDet::preprocess(const std::vector<cv::Mat>& imgsBatch)
     // 1. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_hwc_device, m_param.src_w, m_param.src_h);
-#if 0
-    {
-
-        float* phost = new float[3 * m_param.src_h * m_param.src_w];
-        float* pdevice = m_input_hwc_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * 3 * m_param.src_h * m_param.src_w,
-                sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyDeviceToHost));
-
-            cv::Mat tmp = imgsBatch[j].clone();
-
-            cv::Mat b(m_param.src_h, m_param.src_w, CV_32FC1, phost);
-            cv::Mat g(m_param.src_h, m_param.src_w, CV_32FC1, phost + 1 * m_param.src_h * m_param.src_w);
-            cv::Mat r(m_param.src_h, m_param.src_w, CV_32FC1, phost + 2 * m_param.src_h * m_param.src_w);
-            std::vector<cv::Mat> bgr{ b, g, r };
-            cv::Mat ret;
-            cv::merge(bgr, ret);
-            ret.convertTo(ret, CV_8UC3);
-            cv::imshow("ret", ret);
-            cv::waitKey(1);
-
-            cv::Mat img_ = imgsBatch[j].clone();
-        }
-        delete[] phost;
-
-    }
-#endif
-
 }
 
 bool LibFaceDet::infer()
@@ -303,33 +269,6 @@ bool LibFaceDet::infer()
 
 void LibFaceDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-#if 0 // valid
-    {
-        float* phost_loc  = new float[m_total_objects * 14];
-        float* phost_conf = new float[m_total_objects * 2];
-        float* phost_iou  = new float[m_total_objects * 1];
-        
-        float* pdevice_loc  = m_output_loc_device;
-        float* pdevice_conf = m_output_conf_device;
-        float* pdevice_iou  = m_output_iou_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost_loc,  pdevice_loc  + j * m_total_objects * 14, sizeof(float) * m_total_objects * 14, cudaMemcpyDeviceToHost));
-            checkRuntime(cudaMemcpy(phost_conf, pdevice_conf + j * m_total_objects * 2,  sizeof(float) * m_total_objects * 2,  cudaMemcpyDeviceToHost));
-            checkRuntime(cudaMemcpy(phost_iou,  pdevice_iou  + j * m_total_objects * 1,  sizeof(float) * m_total_objects * 1,  cudaMemcpyDeviceToHost));
-            //cv::Mat img_loc(m_total_objects, 14, CV_32FC1, phost_loc);
-
-            //save to binary
-            utils::saveBinaryFile(phost_loc,  m_total_objects * 14, "loc.bin");
-            utils::saveBinaryFile(phost_conf, m_total_objects * 2,  "conf.bin");
-            utils::saveBinaryFile(phost_iou,  m_total_objects * 1,  "iou.bin");
-
-        }
-        delete[] phost_loc;
-        delete[] phost_conf;
-        delete[] phost_iou;
-    }
-#endif // 0
     // decode
     decodeLibFaceDetDevice(
         m_min_sizes_device,
@@ -345,50 +284,9 @@ void LibFaceDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
         m_output_iou_device, 1,
         m_output_objects_device, m_output_objects_width, m_param.topK  // 17: xyxy(4) + score(1) + class(1) + keepflag(1) + landmarks(10)
     );
-#if 0 // valid 
-    {
-        // loc
-        float* p_loc_host = new float[m_total_objects * 14];
-        float* p_loc_device = nullptr;
-        p_loc_device = m_output_loc_device;
-        for (size_t i = 0; i < imgsBatch.size(); i++)
-        {
-            checkRuntime(cudaMemcpy(p_loc_host, p_loc_device + i * m_total_objects * 14,
-                m_total_objects * 14 * sizeof(float), cudaMemcpyDeviceToHost));
-            cv::Mat img_loc_(m_total_objects, 14, CV_32FC1, p_loc_host); 
-        }
-        delete[] p_loc_host;
-
-        // m_output_objects_device
-        float* p_obj_host = new float[1 + m_output_objects_width * m_param.topK];   // 17: xyxy(4) + score(1) + class(1) + keepflag(1) + landmarks(10)
-        float* p_obj_device = m_output_objects_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(p_obj_host, p_obj_device + j * (1 + m_output_objects_width * m_param.topK), 
-                sizeof(float) * (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
-            int num_candidates = p_obj_host[0];
-            cv::Mat img_bbox1(m_param.topK, m_output_objects_width, CV_32FC1, p_obj_host + 1);
-        }
-        delete[] p_obj_host;
-    }
-#endif // 0
 
     // nms
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_output_objects_width * m_param.topK + 1);
-#if 0 // valid
-    {
-        float* phost = new float[1 + m_output_objects_width * m_param.topK];   // 17: xyxy(4) + score(1) + class(1) + keepflag(1) + landmarks(10)
-        float* pdevice = m_output_objects_device;
-        for (size_t j = 0; j < imgsBatch.size(); j++)
-        {
-            checkRuntime(cudaMemcpy(phost, pdevice + j * (1 + m_output_objects_width * m_param.topK),
-                sizeof(float) * (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
-            int num_candidates = phost[0];
-            cv::Mat img_bbox2(m_param.topK, m_output_objects_width, CV_32FC1, phost + 1);
-        }
-        delete[] phost;
-    }
-#endif // 0
 
     // copy result
     checkRuntime(cudaMemcpy(m_output_objects_host, m_output_objects_device, 
@@ -460,22 +358,17 @@ void decode_face_det_device_kernel(float* minSizes, float* feat_hw, float* prior
     float e0 = expf(pitem_conf[0]);
     float e1 = expf(pitem_conf[1]);
     float exp_sum = e0 + e1;
-    //pitem_conf[0] = e0 / exp_sum;
     pitem_conf[1] = e1 / exp_sum;
     float score = sqrt(pitem_conf[1] * pitem_iou[0]);
     if (score <= confThreshold)
     {
         return;
     }
-
     int index = atomicAdd(dst + dy * dstArea, 1);
-
-    //int index = atomicAdd(&(dst + dy * dstWidth)[0], 1);
     if (index >= topK) // dstHeight : topK
     {
         return;
     }
-
     // bbox
     float* pitem_loc = srcLoc + dy * srcLocArea + dx * srcLocWidth;
     pitem_loc[0] = priorBoxes[4 * dx] + pitem_loc[0] * variances[0] * priorBoxes[4 * dx + 2];
@@ -509,29 +402,6 @@ void decode_face_det_device_kernel(float* minSizes, float* feat_hw, float* prior
 
     // get dst
     float* pitem_dst = dst + dy * dstArea + index * dstWidth + 1;  // note: not dx but index
-
-    // method1
-    //memcpy(pitem_dst, pitem_loc, srcLocWidth * sizeof(float)); // dstWidth:14 + 1
-    //pitem_dst[14] = score;
-
-    // method2
-    /*pitem_dst[0] = pitem_loc[0];
-    pitem_dst[1] = pitem_loc[1];
-    pitem_dst[2] = pitem_loc[2];
-    pitem_dst[3] = pitem_loc[3];
-    pitem_dst[4] = pitem_loc[4];
-    pitem_dst[5] = pitem_loc[5];
-    pitem_dst[6] = pitem_loc[6];
-    pitem_dst[7] = pitem_loc[7];
-    pitem_dst[8] = pitem_loc[8];
-    pitem_dst[9] = pitem_loc[9];
-    pitem_dst[10] = pitem_loc[10];
-    pitem_dst[11] = pitem_loc[11];
-    pitem_dst[12] = pitem_loc[12];
-    pitem_dst[13] = pitem_loc[13];
-    pitem_dst[14] = score;*/
-
-    // xyxy + landmarks + score -> // 17: xyxy(4) + score(1) + class(1) + keepflag(1) + landmarks(10)
     // xyxy
     pitem_dst[0] = pitem_loc[0];
     pitem_dst[1] = pitem_loc[1];

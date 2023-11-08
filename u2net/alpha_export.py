@@ -53,9 +53,6 @@ if __name__ == '__main__':
         net_name = "u2net"
         onnx_name = net_name + ".onnx"
         model_path = opt.weights
-        # model = U2NET(3, 1)
-        # model.load_state_dict(torch.load(model_path, map_location='cpu'))
-        # model.eval()
         u2net = Alpha_U2Net(model_path)
         torch.onnx.export(u2net, image_input, "saved_models/onnx/" + onnx_name,
                         verbose=True,
@@ -64,38 +61,8 @@ if __name__ == '__main__':
                         opset_version=11,  # try  opset_version=9
                         training=False,
                         dynamic_axes=dynamic_axes)
-        # # simplify onnx
-        # print("-------------------------- simplify onnx --------------------------")
-        # onnx_model = onnx.load("saved_models/onnx/" + onnx_name)
-        # # model_simp, check = onnxsim.simplify(onnx_model)
-        # model_simp, check = onnxsim.simplify(onnx_model, 
-        #     check_n=0,
-        #     input_shapes={'images':[-1, 3, 320, 320]},
-            
-        #     dynamic_input_shape=True)
-
-        # assert check, "Simplified ONNX model could not be validated"
-        # onnx_simplify_name = net_name + "_simplify.onnx"
-        # onnx.save(model_simp, "saved_models/onnx/" + onnx_simplify_name)
-        # # check onnx
-        # print("-------------------------- check onnx --------------------------")
-        # onnx_simplify = onnx.load("saved_models/onnx/" + onnx_simplify_name)
-        # onnx.checker.check_model(onnx_simplify)
-        # print(onnx.helper.printable_graph(onnx_simplify.graph))
-
-        # print("-------------------------- inference onnx --------------------------")
-        # outputs = infer_onnx("saved_models/onnx/" + onnx_name, input_names, image_input_shape)
-        # print(outputs[0][0][0][0][0:10])
-
-        # print("-------------------------- inference onnx(simplify) --------------------------")
-        # outputs_simp = infer_onnx("saved_models/onnx/" + onnx_simplify_name, input_names, image_input_shape)
-        # print(outputs[0][0][0][0][0:10])
-
     elif net=='u2netp':  # for u2netp.pt
         model_path = opt.weights
-        # model = U2NETP(3, 1)
-        # model.load_state_dict(torch.load(model_path, map_location='cpu'))
-        # model.eval()
         u2netp = Alpha_U2Netp(model_path)
         torch.onnx.export(u2netp, image_input, "saved_models/onnx/u2netp.onnx",
                         verbose=True,
@@ -104,5 +71,3 @@ if __name__ == '__main__':
                         opset_version=11,
                         training=False,
                         dynamic_axes=dynamic_axes)
-
-    print()

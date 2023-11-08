@@ -200,12 +200,6 @@ At present, more than 30  models have been implemented, and some onnx files of t
     </center>
 </div>
 
-## Reference
-[0].https://github.com/NVIDIA/TensorRT<br>
-[1].https://github.com/onnx/onnx-tensorrt<br>
-[2].https://github.com/NVIDIA-AI-IOT/torch2trt<br>
-[3].https://github.com/shouxieai/tensorRT_Pro<br>
-[4].https://github.com/opencv/opencv_zoo<br>
 
 ## Citation
 ```bash

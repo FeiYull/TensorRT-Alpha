@@ -41,16 +41,14 @@ __global__ void decode_yolov4_device_kernel(int batch_size, int  num_class, int 
 	float top = cy;
 	float right = width;
 	float bottom = height;
-	// 
-	//float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
 	float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
-	*pout_item++ = left; // todo
+	*pout_item++ = left; 
 	*pout_item++ = top;
 	*pout_item++ = right;
 	*pout_item++ = bottom;
 	*pout_item++ = confidence;
 	*pout_item++ = label;
-	*pout_item++ = 1;// 1 = keep, 0 = ignore
+	*pout_item++ = 1;
 }
 
 static __device__ float box_iou(

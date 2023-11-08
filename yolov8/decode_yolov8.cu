@@ -43,7 +43,7 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	float right = cx + width * 0.5f;
 	float bottom = cy + height * 0.5f;
 	float* pout_item = dst + dy * dstArea + 1 + index * dstWidth;
-	*pout_item++ = left; // todo
+	*pout_item++ = left;
 	*pout_item++ = top;
 	*pout_item++ = right;
 	*pout_item++ = bottom;
