@@ -678,6 +678,7 @@ void nmsDeviceV1(utils::InitParameter param, float* src, int srcWidth, int srcHe
 	nms_fast_kernel << < grid_size, block_size, 0, nullptr >> > (param.topK, param.batch_size, param.iou_thresh,
 		src, srcWidth, srcHeight, srcArea);
 }
+
 // nms with sort
 void nmsDeviceV2(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea, 
 	int* idx, float* conf)
