@@ -33,7 +33,6 @@ void normDevice(const int& batch_size, float* src, int srcWidth, int srcHeight,
 void hwc2chwDevice(const int& batch_size, float* src, int srcWidth, int srcHeight,
     float* dst, int dstWidth, int dstHeight);
 
-// for yolo3 yolo5 yolo6 yolo7
 void decodeDevice(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcLength, float* dst, int dstWidth, int dstHeight);
 
 // nms fast
