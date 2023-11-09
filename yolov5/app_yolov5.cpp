@@ -27,7 +27,7 @@ void setParameters(utils::InitParameter& initParameters)
 	// yolov5.6.0
 	initParameters.input_output_names = { "images",  "output"};
 	// yolov5.7.0
-	//initParameters.input_output_names = { "images",  "output0"}; // see line 154
+	//initParameters.input_output_names = { "images",  "output0"}; // see line 141
 	initParameters.conf_thresh = 0.25f;
 	initParameters.iou_thresh = 0.45f;
 	initParameters.save_path = "";
@@ -152,14 +152,12 @@ int main(int argc, char** argv)
 		return -1;
 	}
 	YOLOV5 yolo(param);
-	// read model
 	std::vector<unsigned char> trt_file = utils::loadModel(model_path);
 	if (trt_file.empty())
 	{
 		sample::gLogError << "trt_file is empty!" << std::endl;
 		return -1;
 	}
-	// init model
 	if (!yolo.init(trt_file))
 	{
 		sample::gLogError << "initEngine() ocur errors!" << std::endl;
@@ -170,7 +168,6 @@ int main(int argc, char** argv)
 	std::vector<cv::Mat> imgs_batch;
 	imgs_batch.reserve(param.batch_size);
 	sample::gLogInfo << imgs_batch.capacity() << std::endl;
-	int i = 0; // debug
 	int batchi = 0;
 	while (capture.isOpened())
 	{
