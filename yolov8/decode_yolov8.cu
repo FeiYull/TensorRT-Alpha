@@ -4,15 +4,15 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	float* src, int srcWidth, int srcHeight, int srcArea,
 	float* dst, int dstWidth, int dstHeight, int dstArea)
 {
-	int dx = blockDim.x * blockIdx.x + threadIdx.x; // "srcArea" dim
-	int dy = blockDim.y * blockIdx.y + threadIdx.y; // "batch size" dim
+	int dx = blockDim.x * blockIdx.x + threadIdx.x;
+	int dy = blockDim.y * blockIdx.y + threadIdx.y;
 	if (dx >= srcHeight || dy >= batch_size)
 	{
 		return;
 	}
 	float* pitem = src + dy * srcArea + dx * srcWidth;
-	float* class_confidence = pitem + 4;    // Pr(Class0/Object)
-	float confidence = *class_confidence++; // Pr(Class1/Object)
+	float* class_confidence = pitem + 4;
+	float confidence = *class_confidence++;
 	int label = 0;
 	for (int i = 1; i < num_class; ++i, ++class_confidence)
 	{
@@ -32,7 +32,6 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	{
 		return;
 	}
-	// xywh -> xyxy
 	float cx = *pitem++;
 	float cy = *pitem++;
 	float width = *pitem++;
@@ -49,7 +48,7 @@ __global__ void decode_yolov8_device_kernel(int batch_size, int  num_class, int 
 	*pout_item++ = bottom;
 	*pout_item++ = confidence;
 	*pout_item++ = label;
-	*pout_item++ = 1;// 1 = keep, 0 = ignore
+	*pout_item++ = 1;
 }
 
 void yolov8::decodeDevice(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea, float* dst, int dstWidth, int dstHeight)
@@ -69,14 +68,14 @@ __global__ void transpose_device_kernel(int batch_size,
 	float* src, int srcWidth, int srcHeight, int srcArea,
 	float* dst, int dstWidth, int dstHeight, int dstArea)
 {
-	int dx = blockDim.x * blockIdx.x + threadIdx.x; // "srcArea" dim
-	int dy = blockDim.y * blockIdx.y + threadIdx.y; // "batch size" dim
+	int dx = blockDim.x * blockIdx.x + threadIdx.x;
+	int dy = blockDim.y * blockIdx.y + threadIdx.y;
 	if (dx >= dstHeight || dy >= batch_size)
 	{
 		return;
 	}
-	float* p_dst_row = dst + dy * dstArea + dx * dstWidth; // row = dx
-	float* p_src_col = src + dy * srcArea + dx; // col = dx
+	float* p_dst_row = dst + dy * dstArea + dx * dstWidth;
+	float* p_src_col = src + dy * srcArea + dx;
 
 	for (int i = 0; i < dstWidth; i++)
 	{

@@ -61,9 +61,6 @@ int main(int argc, char** argv)
 			"{show      || if show the result	}"
 			"{savePath  || save path, can be ignore}"
 		});
-	/************************************************************************************************
-	* init
-	*************************************************************************************************/
 	// parameters
 	utils::InitParameter param;
 	setParameters(param);
@@ -79,7 +76,6 @@ int main(int argc, char** argv)
 	source = utils::InputStream::VIDEO;
 	//source = utils::InputStream::CAMERA;
 
-	// update params from command line parser
 	int size = -1; // w or h
 	int batch_size = 8;
 	bool is_show = false;
