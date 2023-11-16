@@ -9,26 +9,22 @@ YOLOX::~YOLOX()
 }
 bool YOLOX::init(const std::vector<unsigned char>& trtFile)
 {
-    // 1. init engine & context
     if (trtFile.empty())
     {
         return false;
     }
-    // runtime
     std::unique_ptr<nvinfer1::IRuntime> runtime =
         std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(sample::gLogger.getTRTLogger()));
     if (runtime == nullptr)
     {
         return false;
     }
-    // deserializeCudaEngine
     this->m_engine = std::unique_ptr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(trtFile.data(), trtFile.size()));
 
     if (this->m_engine == nullptr)
     {
         return false;
     }
-    // context
     this->m_context = std::unique_ptr<nvinfer1::IExecutionContext>(this->m_engine->createExecutionContext());
     if (this->m_context == nullptr)
     {
@@ -37,14 +33,12 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
     // binding dim
     // ...
     //nvinfer1::Dims input_dims = this->m_context->getBindingDimensions(0);
-
-    // 2. get output's dim
     m_output_dims = this->m_context->getBindingDimensions(1);
     m_total_objects = m_output_dims.d[1];
     assert(m_param.batch_size == m_output_dims.d[0] || 
            m_param.batch_size == 1 // batch_size = 1, but it will infer with "batch_size=m_output_dims.d[0]", only support static batch
             );
-    m_output_area = 1; // 22500 * 85
+    m_output_area = 1;
     for (int i = 1; i < m_output_dims.nbDims; i++)
     {
         if (m_output_dims.d[i] != 0)
@@ -52,10 +46,7 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
             m_output_area *= m_output_dims.d[i];
         }
     }
-    // 3. malloc
     checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
-
-    // 4. cal affine matrix
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
     float scale = a < b ? a : b;
@@ -78,15 +69,10 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
 }
 void YOLOX::preprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 1.resize
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_without_padding_device, m_resized_w, m_resized_h, 114, m_dst2src);
-
-    // 2.copy with padding
     copyWithPaddingDevice(m_param.batch_size, m_input_resize_without_padding_device, m_resized_w, m_resized_h, 
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114.f);
-
-    // 3. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
 }
@@ -98,8 +84,8 @@ void copy_with_padding_kernel_function(int batchSize, float* src, int srcWidth, 
     int dy = blockDim.y * blockIdx.y + threadIdx.y;
     if (dx < dstArea && dy < batchSize)
     {
-        int dst_y = dx / dstWidth; // dst row
-        int dst_x = dx % dstWidth; // dst col
+        int dst_y = dx / dstWidth;
+        int dst_x = dx % dstWidth;
         float* pdst = dst + dy * dstVolume + dst_y * dstWidth * 3 + dst_x * 3;
        
         if (dst_y < srcHeight && dst_x < srcWidth)
