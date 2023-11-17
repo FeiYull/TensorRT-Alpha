@@ -101,7 +101,7 @@ git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/cmake
 vim common.cmake
 # set var TensorRT_ROOT to your path in line 20, eg:
-# set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
+# set(TensorRT_ROOT /home/feiyull/TensorRT-8.4.2.4)
 ```
 start to build project:
 For example:[yolov8](yolov8/README.md)

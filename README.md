@@ -98,7 +98,7 @@ git clone https://github.com/FeiYull/tensorrt-alpha
 cd tensorrt-alpha/cmake
 vim common.cmake
 # 把common.cmake文件第20行中的TensorRT_ROOT修改成您的TensorRT安装目录, 例如改成如下:
-# set(TensorRT_ROOT /root/TensorRT-8.4.2.4)
+# set(TensorRT_ROOT /home/feiyull/TensorRT-8.4.2.4)
 ```
 开始编译、运行工程，例如:[yolov8](yolov8/README.md)
 
