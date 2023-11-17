@@ -49,19 +49,16 @@ EfficientDet::~EfficientDet()
 
 bool EfficientDet::init(const std::vector<unsigned char>& trtFile)
 {
-    // 1. init engine & context
     if (trtFile.empty())
     {
         return false;
     }
-    // runtime
     std::unique_ptr<nvinfer1::IRuntime> runtime =
         std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(sample::gLogger.getTRTLogger()));
     if (runtime == nullptr)
     {
         return false;
     }
-    // deserializeCudaEngine
     initLibNvInferPlugins(&sample::gLogger.getTRTLogger(), ""); // init plugin's lib(Efficient-NMS)
     this->m_engine = std::unique_ptr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(trtFile.data(), trtFile.size()));
 
@@ -69,18 +66,15 @@ bool EfficientDet::init(const std::vector<unsigned char>& trtFile)
     {
         return false;
     }
-    // context
     this->m_context = std::unique_ptr<nvinfer1::IExecutionContext>(this->m_engine->createExecutionContext());
     if (this->m_context == nullptr)
     {
         return false;
     }
-    // binding dim
-    if (m_param.dynamic_batch) // for some models only support static dynamic batch. eg: yolox
+    if (m_param.dynamic_batch)
     {
         this->m_context->setBindingDimensions(0, nvinfer1::Dims4(m_param.batch_size, m_param.dst_h, m_param.dst_w, 3));
     }
-    // 2. cal affine matrix
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
     float scale = a < b ? a : b;
@@ -101,7 +95,6 @@ bool EfficientDet::init(const std::vector<unsigned char>& trtFile)
 
 void EfficientDet::check()
 {
-    // print inputs and outputs' dims
     int idx;
     nvinfer1::Dims dims;
 
@@ -155,11 +148,8 @@ void EfficientDet::copy(const std::vector<cv::Mat>& imgsBatch)
 
 void EfficientDet::preprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 1.resize
     resizeDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, 114, m_dst2src);
-
-    // 2. bgr2rgb
     bgr2rgbDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_rgb_device, m_param.dst_w, m_param.dst_h);
 }
@@ -177,18 +167,12 @@ bool EfficientDet::infer()
 
 void EfficientDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // num objects
     checkRuntime(cudaMemcpy(m_output_num_host,     m_output_num_device,     sizeof(int) * m_param.batch_size, cudaMemcpyDeviceToHost));
-    // boxes
     checkRuntime(cudaMemcpy(m_output_boxes_host,   m_output_boxes_device,   sizeof(int) * m_param.batch_size * 1 * m_param.topK * 4, cudaMemcpyDeviceToHost));
     const auto boxes = reinterpret_cast<const float*>(m_output_boxes_host);
-    // scores
     checkRuntime(cudaMemcpy(m_output_scores_host,  m_output_scores_device,  sizeof(int) * m_param.batch_size * 1 * m_param.topK, cudaMemcpyDeviceToHost));
     const auto scores = reinterpret_cast<const float*>(m_output_scores_host);
-    // class_id
     checkRuntime(cudaMemcpy(m_output_classes_host, m_output_classes_device, sizeof(int) * m_param.batch_size * 1 * m_param.topK, cudaMemcpyDeviceToHost));
-    
-    // gather result
     for (int bi = 0; bi < imgsBatch.size(); bi++)
     {
         for (int i = 0; i < m_output_num_host[bi]; i++)
@@ -210,10 +194,9 @@ void EfficientDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
             }
             int32_t class_id = m_output_classes_host[i + bi * m_param.topK];
             assert(class_id >= 0);  
-            m_objectss[bi].emplace_back(x_lt, y_lt, x_rb, y_rb, score, class_id); //
+            m_objectss[bi].emplace_back(x_lt, y_lt, x_rb, y_rb, score, class_id);
         }
     }
-
 }
 
 std::vector<std::vector<utils::Box>> EfficientDet::getObjectss() const

@@ -51,38 +51,30 @@ u2net::U2NET::~U2NET()
 
 bool u2net::U2NET::init(const std::vector<unsigned char>& trtFile)
 {
-    // 1. init engine & context
     if (trtFile.empty())
     {
         return false;
     }
-    // runtime
     std::unique_ptr<nvinfer1::IRuntime> runtime =
         std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(sample::gLogger.getTRTLogger()));
     if (runtime == nullptr)
     {
         return false;
     }
-    // deserializeCudaEngine
     this->m_engine = std::unique_ptr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(trtFile.data(), trtFile.size()));
 
     if (this->m_engine == nullptr)
     {
         return false;
     }
-    // context
     this->m_context = std::unique_ptr<nvinfer1::IExecutionContext>(this->m_engine->createExecutionContext());
     if (this->m_context == nullptr)
     {
         return false;
     }
-    // binding dim
     this->m_context->setBindingDimensions(0, nvinfer1::Dims4(m_param.batch_size, 3, m_param.dst_h, m_param.dst_w));
-
-    // 2. get output's dim
     m_output_dims = this->m_context->getBindingDimensions(1);
-    //m_total_objects = m_output_dims.d[1];
-    m_output_area = 1; // 320 * 320
+    m_output_area = 1;
     for (int i = 1; i < m_output_dims.nbDims; i++)
     {
         if (m_output_dims.d[i] != 0)
@@ -90,10 +82,7 @@ bool u2net::U2NET::init(const std::vector<unsigned char>& trtFile)
             m_output_area *= m_output_dims.d[i];
         }
     }
-    // 3. malloc
     checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
-
-    // 4. cal affine matrix
     float scale_y = float(m_param.dst_h) / m_param.src_h;
     float scale_x = float(m_param.dst_w) / m_param.src_w;
     cv::Mat src2dst = (cv::Mat_<float>(2, 3) << scale_x, 0.f, (-scale_x * m_param.src_w + m_param.dst_w + scale_x - 1) * 0.5,
@@ -120,7 +109,6 @@ bool u2net::U2NET::init(const std::vector<unsigned char>& trtFile)
 
 void u2net::U2NET::check()
 {
-    // print inputs and outputs' dims
     int idx;
     nvinfer1::Dims dims;
 
@@ -174,34 +162,22 @@ void u2net::U2NET::copy(const std::vector<cv::Mat>& imgsBatch)
 
 void u2net::U2NET::preprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 1. bgr2rgb
     bgr2rgbDevice(m_param.batch_size, m_input_src_device, m_param.src_w, m_param.src_h,
         m_input_rgb_device, m_param.src_w, m_param.src_h);
-
-    // 2. resize 
     resizeDevice(m_param.batch_size, m_input_rgb_device, m_param.src_w, m_param.src_h,
         m_input_resize_device, m_param.dst_w, m_param.dst_h, utils::ColorMode::RGB, m_dst2src);
-
-    // 3. norm:scale mean std
-    // cal max value
     float* p_tmp = m_input_resize_device;
     float* p_max = m_max_val_device;
     for (size_t i = 0; i < imgsBatch.size(); i++)
     {
         float* max_dev = thrust::max_element(thrust::device, p_tmp, p_tmp + m_param.dst_h * m_param.dst_w);
         p_tmp += m_param.dst_h * m_param.dst_w;
-        // copy
         checkRuntime(cudaMemcpy(p_max++, max_dev, sizeof(float), cudaMemcpyDeviceToDevice));
 
     }
-    
-    // div by max
     u2netDivMaxDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h, 3, m_max_val_device);
-
     normDevice(m_param.batch_size, m_input_resize_device, m_param.dst_w, m_param.dst_h,
         m_input_norm_device, m_param.dst_w, m_param.dst_h, m_param);
-
-    // 4. hwc2chw
     hwc2chwDevice(m_param.batch_size, m_input_norm_device, m_param.dst_w, m_param.dst_h,
         m_input_hwc_device, m_param.dst_w, m_param.dst_h);
 }
@@ -215,8 +191,6 @@ bool u2net::U2NET::infer()
 
 void u2net::U2NET::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    // 1. norm
-    // min and max value
     float* p_tmp = m_output_src_device;
     float* p_max = m_max_val_device;
     float* p_min = m_min_val_device;
@@ -224,17 +198,12 @@ void u2net::U2NET::postprocess(const std::vector<cv::Mat>& imgsBatch)
     {
         thrust::pair<float*, float*> min_max_dev = thrust::minmax_element(thrust::device, p_tmp, p_tmp + m_param.dst_h * m_param.dst_w);
         p_tmp += m_param.dst_h * m_param.dst_w;
-        // copy
         checkRuntime(cudaMemcpy(p_min++, min_max_dev.first, sizeof(float), cudaMemcpyDeviceToDevice));
         checkRuntime(cudaMemcpy(p_max++, min_max_dev.second, sizeof(float), cudaMemcpyDeviceToDevice));
     }
-    
-    // 2. element = [255 * (element - min)] / (max - min)
     u2netNormPredDevice(m_param.batch_size, m_output_src_device, m_param.dst_w, m_param.dst_h, 255.f, m_min_val_device, m_max_val_device);
-
-    // 3. resize gray without padding
     resizeDevice(m_param.batch_size, m_output_src_device, m_param.dst_w, m_param.dst_h,
-        m_output_resize_device, m_param.src_w, m_param.src_h, utils::ColorMode::GRAY, m_src2dst); // note: 320*320 -> (src_w, src_h)
+        m_output_resize_device, m_param.src_w, m_param.src_h, utils::ColorMode::GRAY, m_src2dst);
 }
 
 void u2net::U2NET::showMask(const std::vector<cv::Mat>& imgsBatch, const int& cvDelayTime)
@@ -262,7 +231,7 @@ void u2net::U2NET::saveMask(const std::vector<cv::Mat>& imgsBatch, const std::st
         img_mask.convertTo(img_mask, CV_8UC1);
         int imgi = batchi * batchSize + j;
 		cv::imwrite(savePath + "_" + std::to_string(imgi) + ".jpg", img_mask);
-		cv::waitKey(1); // waitting for writting imgs
+		cv::waitKey(1);
     }
 }
 
@@ -308,7 +277,6 @@ void u2netDivMaxDevice(const int& batchSize, float* src, int srcWidth, int srcHe
     int img_height = srcHeight;
     int img_width = srcWidth;
     u2net_div_max_device_kernel << < grid_size, block_size, 0, nullptr >> > (batchSize, src, img_height, img_width, img_volume, maxVals);
-
 }
 
 void u2netNormPredDevice(const int& batchSize, float* src, int srcWidth, int srcHeight, float scale, float* minVals, float* maxVals)

@@ -49,10 +49,6 @@ int main(int argc, char** argv)
 			"{show      || if show the result	}"
 			"{savePath  || save path, can be ignore}"
 		});
-
-	/************************************************************************************************
-	* init
-	*************************************************************************************************/
 	// parameters
 	utils::InitParameter param;
 	setParameters(param);
@@ -130,9 +126,7 @@ int main(int argc, char** argv)
 		sample::gLogError << "read the input data errors!" << std::endl;
 		return -1;
 	}
-
 	u2net::U2NET u2net(param);
-
 	// read model
 	std::vector<unsigned char> trt_file = utils::loadModel(model_path);
 	if (trt_file.empty())
@@ -151,7 +145,6 @@ int main(int argc, char** argv)
 	std::vector<cv::Mat> imgs_batch;
 	imgs_batch.reserve(param.batch_size);
 	sample::gLogInfo << imgs_batch.capacity() << std::endl;
-	int i = 0; // debug
 	int batchi = 0;
 	while (capture.isOpened())
 	{
@@ -182,7 +175,6 @@ int main(int argc, char** argv)
 			{
 				imgs_batch.emplace_back(frame.clone());
 			}
-
 		}
 		else
 		{

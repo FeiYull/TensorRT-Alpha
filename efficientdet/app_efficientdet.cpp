@@ -62,10 +62,6 @@ int main(int argc, char** argv)
 			"{show      || if show the result	}"
 			"{savePath  || save path, can be ignore}"
 		});
-
-	/************************************************************************************************
-	* init
-	*************************************************************************************************/
 	// parameters
 	utils::InitParameter param;
 	setParameters(param);

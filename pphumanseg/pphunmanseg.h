@@ -27,11 +27,11 @@ protected:
 
 protected:
     utils::InitParameter m_param;
-    nvinfer1::Dims m_output_src_dims;   // (b, 2, 192, 192) 
-    int m_output_src_area;              //  b * 2 * 192 * 192
+    nvinfer1::Dims m_output_src_dims; 
+    int m_output_src_area;          
 
-    utils::AffineMat m_dst2src; // 2*3  // (m_param.dst_h, m_param.dst_w) to (m_param.src_h, m_param.src_w) 
-    utils::AffineMat m_src2dst; // 2*3
+    utils::AffineMat m_dst2src;
+    utils::AffineMat m_src2dst; 
 
     // input
     float* m_input_src_device;
@@ -41,10 +41,8 @@ protected:
     float* m_input_hwc_device; 
 
     // output
-    float* m_output_src_device; // malloc in init()
-    
-    // the following array's  val range is 0 or 1
-    float* m_output_mask_device;   // (b, 1, 192, 192)
-    float* m_output_resize_device; // (b, 1, 192, 192)
-    float* m_output_resize_host;   // (b, 1, 192, 192)
+    float* m_output_src_device; 
+    float* m_output_mask_device;   
+    float* m_output_resize_device; 
+    float* m_output_resize_host; 
 };

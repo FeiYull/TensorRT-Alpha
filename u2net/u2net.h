@@ -32,8 +32,8 @@ namespace u2net
         std::vector<std::vector<utils::Box>> m_objectss;
 
         
-        utils::AffineMat m_dst2src; // 2*3, (m_param.dst_h, m_param.dst_w) to (m_param.src_h, m_param.src_w) 
-        utils::AffineMat m_src2dst; // 2*3
+        utils::AffineMat m_dst2src;
+        utils::AffineMat m_src2dst;
 
         // input
         float* m_input_src_device;
@@ -46,7 +46,7 @@ namespace u2net
         float* m_min_val_device;
 
         // output
-        float* m_output_src_device; // malloc in init()
+        float* m_output_src_device;
         float* m_output_resize_device; 
         float* m_output_resize_host; 
         float* m_output_mask_host; 
