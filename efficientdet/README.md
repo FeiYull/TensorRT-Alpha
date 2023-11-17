@@ -17,10 +17,10 @@ ignored
 # put your onnx file in this path:tensorrt-alpha/data/efficientdet
 cd tensorrt-alpha/data/efficientdet
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
-../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet0.onnx   --saveEngine=efficientdet0.trt   --buildOnly --minShapes=input:1x512x512x3 --optShapes=input:4x512x512x3 --maxShapes=input:8x512x512x3
-../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet1.onnx   --saveEngine=efficientdet1.trt   --buildOnly --minShapes=input:1x640x640x3 --optShapes=input:4x640x640x3 --maxShapes=input:8x640x640x3
-../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet2.onnx   --saveEngine=efficientdet2.trt   --buildOnly --minShapes=input:1x768x768x3 --optShapes=input:4x768x768x3 --maxShapes=input:8x768x768x3
-../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet3.onnx   --saveEngine=efficientdet3.trt   --buildOnly --minShapes=input:1x896x896x3 --optShapes=input:4x896x896x3 --maxShapes=input:8x896x896x3
+../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet0.onnx   --saveEngine=efficientdet0.trt   --buildOnly --minShapes=input:1x512x512x3 --optShapes=input:2x512x512x3 --maxShapes=input:4x512x512x3
+../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet1.onnx   --saveEngine=efficientdet1.trt   --buildOnly --minShapes=input:1x640x640x3 --optShapes=input:2x640x640x3 --maxShapes=input:4x640x640x3
+../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet2.onnx   --saveEngine=efficientdet2.trt   --buildOnly --minShapes=input:1x768x768x3 --optShapes=input:2x768x768x3 --maxShapes=input:4x768x768x3
+../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet3.onnx   --saveEngine=efficientdet3.trt   --buildOnly --minShapes=input:1x896x896x3 --optShapes=input:2x896x896x3 --maxShapes=input:4x896x896x3
 
 ```
 ## 4.run
@@ -41,7 +41,7 @@ make -j10
 
 
 # infer video
-./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt  --size=512 --batch_size=8  --video=../../data/people.mp4  --show
+./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt  --size=512 --batch_size=2  --video=../../data/people.mp4  --show
 
 # infer camera
 ./app_efficientdet  --model=../../data/efficientdet/efficientdet0.trt  --size=512 --batch_size=2  --cam_id=0  --show

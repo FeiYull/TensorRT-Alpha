@@ -23,7 +23,7 @@ python alpha_edit.py --onnx=../data/pphumanseg/human_segmentation_pphumanseg_202
 # put your onnx file in this path:tensorrt-alpha/data/pphumanseg
 cd tensorrt-alpha/data/pphumanseg
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
-../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=human_segmentation_pphumanseg_2021oct_dynamic.onnx   --saveEngine=human_segmentation_pphumanseg_2021oct_dynamic.trt  --buildOnly  --minShapes=x:1x3x192x192 --optShapes=x:4x3x192x192 --maxShapes=x:8x3x192x192
+../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=human_segmentation_pphumanseg_2021oct_dynamic.onnx   --saveEngine=human_segmentation_pphumanseg_2021oct_dynamic.trt  --buildOnly  --minShapes=x:1x3x192x192 --optShapes=x:2x3x192x192 --maxShapes=x:4x3x192x192
 ```
 ## 4.run
 ```bash
@@ -39,7 +39,7 @@ make -j10
 ./app_pphunmanseg  --model=../../data/pphumanseg/human_segmentation_pphumanseg_2021oct_dynamic.trt --img=../../data/6.jpg  --size=192 --batch_size=1 --show -savePath
 
 # infer video
-./app_pphunmanseg  --model=../../data/pphumanseg/human_segmentation_pphumanseg_2021oct_dynamic.trt  --batch_size=8  --video=../../data/people.mp4  --show
+./app_pphunmanseg  --model=../../data/pphumanseg/human_segmentation_pphumanseg_2021oct_dynamic.trt  --batch_size=2  --video=../../data/people.mp4  --show
 
 # infer camera
 ./app_pphunmanseg  --model=../../data/pphumanseg/human_segmentation_pphumanseg_2021oct_dynamic.trt  --batch_size=2  --cam_id=0  --show

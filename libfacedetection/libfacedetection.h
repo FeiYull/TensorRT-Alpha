@@ -25,7 +25,6 @@ private:
     std::shared_ptr<nvinfer1::ICudaEngine> m_engine;
     std::unique_ptr<nvinfer1::IExecutionContext> m_context;
 
-    //private:
 protected:
     utils::InitParameter m_param;
     nvinfer1::Dims m_output_loc_dims;
