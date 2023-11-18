@@ -20,8 +20,9 @@ RUN apt-get install -y software-properties-common && \
     && update-alternatives --config python3
 
 #copy and unzip tensorrt8.4.2.4
-COPY TensorRT-8.4.2.4.Linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz /root
-RUN cd /root  && \
+RUN mkdir -p /home/feiyull/
+COPY TensorRT-8.4.2.4.Linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz /home/feiyull/
+RUN cd /home/feiyull/  && \
     tar -zxvf TensorRT-8.4.2.4.Linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz && \
     rm TensorRT-8.4.2.4.Linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz && \
     mkdir workspace
