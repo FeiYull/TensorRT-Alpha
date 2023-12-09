@@ -100,6 +100,36 @@ bool utils::setInputStream(const utils::InputStream& source, const std::string& 
 	return capture.isOpened();
 }
 
+void utils::setRenderWindow(InitParameter& param)
+{
+	if (!param.is_show)
+		return;
+	int max_w = 960;
+	int max_h = 540;
+	float scale_h = (float)param.src_h / max_h;
+	float scale_w = (float)param.src_w / max_w;
+	if (scale_h > 1.f && scale_w > 1.f)
+	{
+		float scale = scale_h < scale_w ? scale_h : scale_w;
+		cv::namedWindow(param.winname, cv::WINDOW_NORMAL | cv::WINDOW_KEEPRATIO);  // for Linux
+		cv::resizeWindow(param.winname, int(param.src_w / scale), int(param.src_h / scale));
+		param.char_width = 16;
+		param.det_info_render_width = 18;
+		param.font_scale = 0.9;
+	}
+	else
+	{
+		cv::namedWindow(param.winname);
+	}
+}
+
+std::string utils::getTimeStamp()
+{
+	std::chrono::nanoseconds t = std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::system_clock::now().time_since_epoch());
+	return std::to_string(t.count());
+}
+
 void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std::vector<std::string>& classNames,
 	const int& cvDelayTime, std::vector<cv::Mat>& imgsBatch)
 {

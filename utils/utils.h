@@ -84,8 +84,8 @@ namespace utils
 
         bool dynamic_batch{ true };
         size_t batch_size;
-        int src_h, src_w; // size of source image eg:unknow * unknow
-        int dst_h, dst_w; // size of net's input, eg:640*640
+        int src_h, src_w; 
+        int dst_h, dst_w;
 
         float scale{ 255.f };
         float means[3] = { 0.f, 0.f, 0.f };
@@ -96,6 +96,13 @@ namespace utils
 
         int topK{ 1000 };
         std::string save_path;
+
+        std::string winname = "TensorRT-Alpha";
+        int char_width = 11; 
+        int det_info_render_width = 15;
+        double font_scale = 0.6;
+        bool is_show = false;
+        bool is_save = false;
     };
 
     // legacy
@@ -156,6 +163,9 @@ namespace utils
     bool setInputStream(const InputStream& source, const std::string& imagePath, const std::string& videoPath, const int& cameraID,
         cv::VideoCapture& capture, int& totalBatches, int& delayTime, InitParameter& param);
 
+    void setRenderWindow(InitParameter& param);
+
+    std::string getTimeStamp();
     
     void show(const std::vector<std::vector<Box>>& objectss, const std::vector<std::string>& classNames,
         const int& cvDelayTime, std::vector<cv::Mat>& imgsBatch);
