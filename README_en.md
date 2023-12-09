@@ -49,7 +49,8 @@ coming soon.
 - 2023.01.04  🍅 update yolov7, yolox, yolor
 - 2023.01.05  🎉 update u2net, libfacedetection
 - 2023.01.08  🚀 The whole network is the first to support yolov8 
-- 2023.01.20     update efficientdet, pphunmanseg
+- 2023.01.20  🍏 update efficientdet, pphunmanseg
+- 2023.12.09  🍁 update yolov8-pose
 
 ## Installation
 The following environments have been tested：<br>
