@@ -22,7 +22,7 @@ python alpha_edit.py --onnx=../data/pphumanseg/human_segmentation_pphumanseg_202
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/pphumanseg
 cd tensorrt-alpha/data/pphumanseg
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/feiyull/TensorRT-8.4.2.4/lib
 ../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=human_segmentation_pphumanseg_2021oct_dynamic.onnx   --saveEngine=human_segmentation_pphumanseg_2021oct_dynamic.trt  --buildOnly  --minShapes=x:1x3x192x192 --optShapes=x:2x3x192x192 --maxShapes=x:4x3x192x192
 ```
 ## 4.run

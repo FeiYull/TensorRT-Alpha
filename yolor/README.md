@@ -33,7 +33,7 @@ ignore
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/yolor
 cd tensorrt-alpha/data/yolor
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/feiyull/TensorRT-8.4.2.4/lib
 
 #1280
 ../../../../TensorRT-8.4.2.4/bin/trtexec  --onnx=yolor_p6.onnx   --saveEngine=yolor_p6.trt  --buildOnly   --minShapes=images:1x3x1280x1280 --optShapes=images:2x3x1280x1280 --maxShapes=images:4x3x1280x1280

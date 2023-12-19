@@ -24,7 +24,7 @@ python alpha_edit.py --onnx=yunet_yunet_final_dynamic_simplify.onnx
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/libfacedetection
 cd tensorrt-alpha/data/libfacedetection
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/feiyull/TensorRT-8.4.2.4/lib
 ../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=alpha_yunet_yunet_final_dynamic_simplify.onnx --saveEngine=alpha_yunet_yunet_final_dynamic_simplify.trt --buildOnly --minShapes=input:1x3x120x120 --optShapes=input:4x3x320x320 --maxShapes=input:8x3x2000x2000
 ```
 ## 4.run

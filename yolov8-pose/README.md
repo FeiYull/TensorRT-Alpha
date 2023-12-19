@@ -39,7 +39,7 @@ ignore
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/yolov8-pose
 cd tensorrt-alpha/data/yolov8-pose
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/feiyull/TensorRT-8.4.2.4/lib
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8n-pose.onnx  --saveEngine=yolov8n-pose.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8s-pose.onnx  --saveEngine=yolov8s-pose.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolov8m-pose.onnx  --saveEngine=yolov8m-pose.trt  --buildOnly --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640

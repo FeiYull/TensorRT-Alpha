@@ -37,7 +37,7 @@ ignore
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/yolox
 cd tensorrt-alpha/data/yolox
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/feiyull/TensorRT-8.4.2.4/lib
 
 # 640
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=yolox_s.onnx   --saveEngine=yolox_s.trt  --buildOnly
