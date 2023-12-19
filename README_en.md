@@ -51,6 +51,7 @@ coming soon.
 - 2023.01.08  🚀 The whole network is the first to support yolov8 
 - 2023.01.20  🍏 update efficientdet, pphunmanseg
 - 2023.12.09  🍁 update yolov8-pose
+- 2023.12.19  🍉 update yolov8-seg
 
 ## Installation
 The following environments have been tested：<br>
@@ -130,6 +131,8 @@ At present, more than 30  models have been implemented, and some onnx files of t
 |[facemesh](facemesh/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|  
 |[pphumanseg](pphumanseg/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|  
 |[efficientdet](efficientdet/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
+|[yolov8-pose](yolov8-pose/README.md)|      |          |
+|[yolov8-seg](yolov8-seg/README.md)|      |          |
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 
