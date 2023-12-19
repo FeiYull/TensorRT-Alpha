@@ -9,16 +9,15 @@ download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driv
 conda create -n yolov8 python==3.8 -y # for Linux
 # conda create -n yolov8 python=3.9 -y # for Windows10
 conda activate yolov8
-pip install ultralytics==8.0.5
+pip install ultralytics==8.0.200
 pip install onnx==1.12.0
 
 # download offical weights(".pt" file)
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8s.pt
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8m.pt
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8l.pt
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x.pt
-https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x6.pt
+https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n-pose.pt
+https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8s-pose.pt
+https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8m-pose.pt
+https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8l-pose.pt
+https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x-pose.pt
 ```
 
 export onnx:

@@ -1,5 +1,5 @@
 #include"../utils/yolo.h"
-#include"yolov8_pose.h"
+#include"yolov8_seg.h"
 
 void setParameters(utils::InitParameter& initParameters)
 {
@@ -16,7 +16,7 @@ void setParameters(utils::InitParameter& initParameters)
 	initParameters.save_path = "D:/Data/1/";
 }
 
-void task(YOLOv8Pose& yolo, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi)
+void task(YOLOv8Seg& yolo, const utils::InitParameter& param, std::vector<cv::Mat>& imgsBatch, const int& delayTime, const int& batchi)
 {
 	yolo.copy(imgsBatch);
 	utils::DeviceTimer d_t1; yolo.preprocess(imgsBatch);  float t1 = d_t1.getUsedTime();
@@ -26,7 +26,7 @@ void task(YOLOv8Pose& yolo, const utils::InitParameter& param, std::vector<cv::M
 	sample::gLogInfo << "preprocess time = " << avg_times[0] << "; "
 		"infer time = " << avg_times[1] << "; "
 		"postprocess time = " << avg_times[2] << std::endl;
-	yolo.showAndSave(param.class_names, delayTime, imgsBatch, avg_times);
+	yolo.showAndSave(param.class_names, delayTime, imgsBatch);
 	yolo.reset();
 }
 
@@ -45,7 +45,7 @@ int main(int argc, char** argv)
 		});
 	utils::InitParameter param;
 	setParameters(param);
-	std::string model_path = "../../data/yolov8/yolov8n-pose.trt";
+	std::string model_path = "../../data/yolov8/yolov8n-seg.trt";
 	std::string video_path = "../../data/people.mp4";
 	std::string image_path = "../../data/bus.jpg";
 	int camera_id = 0;
@@ -53,7 +53,8 @@ int main(int argc, char** argv)
 	source = utils::InputStream::IMAGE;
 	//source = utils::InputStream::VIDEO;
 	//source = utils::InputStream::CAMERA;
-	int size = -1; // w or h
+	// update params from command line parser
+	int size = -1; 
 	int batch_size = 8;
 	bool is_show = false;
 	bool is_save = false;
@@ -92,6 +93,7 @@ int main(int argc, char** argv)
 		camera_id = parser.get<int>("cam_id");
 		sample::gLogInfo << "camera_id = " << camera_id << std::endl;
 	}
+
 	if (parser.has("show"))
 	{
 		param.is_show = true;
@@ -113,7 +115,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 	setRenderWindow(param);
-	YOLOv8Pose yolo(param);
+	YOLOv8Seg yolo(param);
 	std::vector<unsigned char> trt_file = utils::loadModel(model_path);
 	if (trt_file.empty())
 	{
