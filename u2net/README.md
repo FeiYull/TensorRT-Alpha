@@ -19,7 +19,7 @@ ignore
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/u2net
 cd tensorrt-alpha/data/u2net
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/feiyull/TensorRT-8.4.2.4/lib
 
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=u2net.onnx   --saveEngine=u2net.trt   --buildOnly --minShapes=images:1x3x320x320 --optShapes=images:4x3x320x320 --maxShapes=images:8x3x320x320
 ../../../../TensorRT-8.4.2.4/bin/trtexec   --onnx=u2netp.onnx  --saveEngine=u2netp.trt  --buildOnly --minShapes=images:1x3x320x320 --optShapes=images:4x3x320x320 --maxShapes=images:8x3x320x320

@@ -16,7 +16,7 @@ ignored
 ```bash
 # put your onnx file in this path:tensorrt-alpha/data/efficientdet
 cd tensorrt-alpha/data/efficientdet
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/TensorRT-8.4.2.4/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/feiyull/TensorRT-8.4.2.4/lib
 ../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet0.onnx   --saveEngine=efficientdet0.trt   --buildOnly --minShapes=input:1x512x512x3 --optShapes=input:2x512x512x3 --maxShapes=input:4x512x512x3
 ../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet1.onnx   --saveEngine=efficientdet1.trt   --buildOnly --minShapes=input:1x640x640x3 --optShapes=input:2x640x640x3 --maxShapes=input:4x640x640x3
 ../../../../TensorRT-8.4.2.4/bin/trtexec --onnx=efficientdet2.onnx   --saveEngine=efficientdet2.trt   --buildOnly --minShapes=input:1x768x768x3 --optShapes=input:2x768x768x3 --maxShapes=input:4x768x768x3
