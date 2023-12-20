@@ -49,7 +49,7 @@ __global__ void decode_yolov8_seg_device_kernel(int batch_size, int  num_class, 
 	*pout_item++ = confidence;
 	*pout_item++ = label;
 	*pout_item++ = 1;
-	memcpy(pout_item, pitem + 80, 32 * sizeof(float));
+	memcpy(pout_item, pitem + num_class, 32 * sizeof(float));
 }
 
 void yolov8seg::decodeDevice(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea, float* dst, int dstWidth, int dstHeight)
