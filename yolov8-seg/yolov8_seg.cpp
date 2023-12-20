@@ -191,7 +191,7 @@ void YOLOv8Seg::showAndSave(const std::vector<std::string>& classNames, const in
                 cv::addWeighted(m_mask_instance, 0.45, m_img_canvas(roisrc), 1.0, 0., m_img_canvas(roisrc));
 
                 // label's info
-                cv::rectangle(imgsBatch[bi], cv::Point(x_lt_src, y_lt_src), cv::Point(x_rb_src, y_rb_src), color, 2, cv::LINE_AA);
+                cv::rectangle(imgsBatch[bi], roisrc, color, 2, cv::LINE_AA);
                 cv::String det_info = m_param.class_names[label] + " " + cv::format("%.4f", ptr[4]);
                 bbox_points[0][0] = cv::Point(x_lt_src, y_lt_src);
                 bbox_points[0][1] = cv::Point(x_lt_src + det_info.size() * m_param.char_width, y_lt_src);
