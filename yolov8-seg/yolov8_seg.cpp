@@ -183,12 +183,22 @@ void YOLOv8Seg::showAndSave(const std::vector<std::string>& classNames, const in
                 if (roisrc.width == 0 || roisrc.height == 0)
                     continue;      
 
-                cv::Mat m_mask_instance; 
-                cv::resize(cv::Mat(m_mask160, roi160), m_mask_instance, cv::Size(roisrc.width, roisrc.height), cv::INTER_LINEAR);
-                m_mask_instance = m_mask_instance > 0.5f;
-                cv::cvtColor(m_mask_instance, m_mask_instance, cv::COLOR_GRAY2BGR);
-                m_mask_instance.setTo(color, m_mask_instance);          
-                cv::addWeighted(m_mask_instance, 0.45, m_img_canvas(roisrc), 1.0, 0., m_img_canvas(roisrc));
+                // for opencv >=4.7(faster)
+                // cv::Mat mask_instance; 
+                // cv::resize(cv::Mat(m_mask160, roi160), mask_instance, cv::Size(roisrc.width, roisrc.height), cv::INTER_LINEAR);
+                // mask_instance = mask_instance > 0.5f;
+                // cv::cvtColor(mask_instance, mask_instance, cv::COLOR_GRAY2BGR);
+                // mask_instance.setTo(color, mask_instance);          
+                // cv::addWeighted(mask_instance, 0.45, m_img_canvas(roisrc), 1.0, 0., m_img_canvas(roisrc));
+
+                // for opencv >=3.2.0
+                cv::Mat mask_instance;
+                cv::resize(cv::Mat(m_mask160, roi160), mask_instance, cv::Size(roisrc.width, roisrc.height), cv::INTER_LINEAR);
+                mask_instance = mask_instance > 0.5f;
+                cv::Mat mask_instance_bgr;
+                cv::cvtColor(mask_instance, mask_instance_bgr, cv::COLOR_GRAY2BGR);
+                mask_instance_bgr.setTo(color, mask_instance);
+                cv::addWeighted(mask_instance_bgr, 0.45, m_img_canvas(roisrc), 1.0, 0., m_img_canvas(roisrc));
 
                 // label's info
                 cv::rectangle(imgsBatch[bi], roisrc, color, 2, cv::LINE_AA);
