@@ -631,6 +631,40 @@ void nms_sort_kernel(int topK, int batch_size, float iou_thresh,
 	}
 }
 
+__global__
+void copy_with_padding_kernel_function(int batchSize, float* src, int srcWidth, int srcHeight, int srcArea, int srcVolume,
+	float* dst, int dstWidth, int dstHeight, int dstArea, int dstVolume, float paddingValue, int padTop, int padLeft)
+{
+	int dx = blockDim.x * blockIdx.x + threadIdx.x;
+	int dy = blockDim.y * blockIdx.y + threadIdx.y;
+	if (dx < dstArea && dy < batchSize)
+	{
+		int dst_y = dx / dstWidth; // dst row
+		int dst_x = dx % dstWidth; // dst col
+		float* pdst = dst + dy * dstVolume + dst_y * dstWidth * 3 + dst_x * 3;
+
+		if (dst_y < (srcHeight + padTop) &&
+			dst_y >= padTop && // 2
+			dst_x < (srcWidth + padLeft) &&
+			dst_x >= padLeft // 2
+			)
+		{
+			dst_y -= padTop;
+			dst_x -= padLeft;
+			float* psrc = src + dy * srcVolume + dst_y * srcWidth * 3 + dst_x * 3;
+			pdst[0] = psrc[0];
+			pdst[1] = psrc[1];
+			pdst[2] = psrc[2];
+		}
+		else
+		{
+			pdst[0] = paddingValue;
+			pdst[1] = paddingValue;
+			pdst[2] = paddingValue;
+		}
+	}
+}
+
 void decodeDevice(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea, float* dst, int dstWidth, int dstHeight)
 {
 	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
@@ -668,4 +702,21 @@ void nmsDeviceV2(utils::InitParameter param, float* src, int srcWidth, int srcHe
 	}
 	nms_sort_kernel << < grid_size, block_size, 0, nullptr >> > (param.topK, param.batch_size, param.iou_thresh,
 		src, srcWidth, srcHeight, srcArea, idx);
+}
+
+void copyWithPaddingDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
+	float* dst, int dstWidth, int dstHeight, float paddingValue, int padTop, int padLeft)
+{
+	dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
+	dim3 grid_size((dstWidth * dstHeight + BLOCK_SIZE - 1) / BLOCK_SIZE,
+		(batchSize + BLOCK_SIZE - 1) / BLOCK_SIZE);
+	int src_area = srcHeight * srcWidth;
+	int dst_area = dstHeight * dstWidth;
+
+	int src_volume = 3 * srcHeight * srcWidth;
+	int dst_volume = 3 * dstHeight * dstWidth;
+	assert(srcWidth <= dstWidth);
+	assert(srcHeight <= dstHeight);
+	copy_with_padding_kernel_function << < grid_size, block_size, 0, nullptr >> > (batchSize, src, srcWidth, srcHeight, src_area, src_volume,
+		dst, dstWidth, dstHeight, dst_area, dst_volume, paddingValue, padTop, padLeft);
 }

@@ -41,3 +41,6 @@ void nmsDeviceV1(utils::InitParameter param, float* src, int srcWidth, int srcHe
 // nms sort
 void nmsDeviceV2(utils::InitParameter param, float* src, int srcWidth, int srcHeight, int srcArea,
     int* idx, float* conf);
+
+void copyWithPaddingDevice(const int& batchSize, float* src, int srcWidth, int srcHeight,
+    float* dst, int dstWidth, int dstHeight, float paddingValue, int padTop, int padLeft);
