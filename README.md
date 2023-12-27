@@ -49,6 +49,7 @@ coming soon.
 - 2023.01.20  🍏  更新 efficientdet, pphunmanseg
 - 2023.12.09  🍁 更新 yolov8-pose
 - 2023.12.19  🍉 更新 yolov8-seg
+- 2023.12.27  💖 更新 yolonas
 
 ## 安装
 兼容平台: Windows and Linux. 以下环境已被测过：<br>
@@ -126,8 +127,9 @@ vim common.cmake
 |[facemesh](facemesh/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|     
 |[pphumanseg](pphumanseg/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)|  
 |[efficientdet](efficientdet/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)| 
-|[yolov8-pose](yolov8-pose/README.md)|      |          |
-|[yolov8-seg](yolov8-seg/README.md)|      |          |
+|[yolov8-pose](yolov8-pose/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)| 
+|[yolov8-seg](yolov8-seg/README.md)| |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)| 
+|[yolonas](yolonas/README.md)|  |[weiyun](https://share.weiyun.com/3T3mZKBm)| [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)| 
 |more...(🚀: I will be back soon!)    |      |          |
 </div>  
 
