@@ -4,15 +4,10 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_BUILD_TYPE "Release")
 
 PROJECT(yolov4 VERSION 1.0.0 LANGUAGES C CXX CUDA)
-message(*********************************************************)
-message(STATUS CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR})
-message(*********************************************************)
-
+ 
+message(STATUS CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR})                           
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/common.cmake)
-
-message(*********************************************************)
 message(STATUS TensorRT_ROOT = ${TensorRT_ROOT})
-message(*********************************************************)
 
 message(STATUS ${ALL_LIBS})
 file(GLOB CPPS 
@@ -24,27 +19,13 @@ file(GLOB CPPS
   ${TensorRT_ROOT}/samples/common/sampleOptions.cpp  
   )
 list(REMOVE_ITEM CPPS app_yolov4.cpp)
-message(*********************************************************)
 message(STATUS CPPS = ${CPPS})
-message(*********************************************************)
-
 list (LENGTH CPPS length)
-message(*********************************************************)
 message(STATUS ***length*** = ${length}) 
-message(*********************************************************)
-
 find_package(OpenCV REQUIRED)
-
 include_directories(${INCLUDE_DRIS} ${OpenCV_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
-
-message(*********************************************************)
 message(STATUS ***INCLUDE_DRIS*** = ${INCLUDE_DRIS})
-message(*********************************************************)
-
-message(*********************************************************)
 message(STATUS ***OpenCV_INCLUDE_DIRS*** = ${OpenCV_INCLUDE_DIRS})
-message(*********************************************************)
-
 add_library(${PROJECT_NAME} SHARED ${CPPS})
 target_link_libraries(${PROJECT_NAME} ${ALL_LIBS} ${OpenCV_LIBRARIES})
 
