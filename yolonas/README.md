@@ -1,15 +1,14 @@
 ## 1. get onnx 
 download directly at [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv) or export onnx:
 ```bash
-
 pip install super-gradients==3.3.1
 cd super-gradients
-# copy the python script provided in this repository to the yolonas source code root directory.
+# copy the python script provided in this repository to your workspace
 # note:The weight file is downloaded automatically
-cp yolonas\alpha_export_dynamic.py super-gradients
+cp TensorRT-Alpha/yolonas/alpha_export_dynamic.py YOUR_WORKSPACE
 
 # for YOLO_NAS_S
-# Changing lines 9-10 of the code allows you to switch to other models, eg:YOLO_NAS_M
+# Changing lines 9-11 of the code allows you to switch to other models, eg:YOLO_NAS_M
 python alpha_export_dynamic.py
 ```
 
