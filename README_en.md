@@ -6,7 +6,6 @@
   [![](https://img.shields.io/badge/TensorRT-8.4.2.4-%2376B900.svg?style=flat&logo=tensorrt)](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
   [![](https://img.shields.io/badge/ubuntu-18.04-orange.svg?style=flat&logo=ubuntu)](https://releases.ubuntu.com/18.04/)
   [![](https://img.shields.io/badge/windows-10-blue.svg?style=flat&logo=windows)](https://www.microsoft.com/)
-  [![](https://img.shields.io/badge/bilibili-blue.svg?logo=bilibili)](https://www.bilibili.com/video/BV1Ay4y1d7M3/?spm_id_from=333.999.0.0&vd_source=a96c9c3f099f4167807291a34fd50fd5)
 
   English | [简体中文](README.md)<br>
 
@@ -40,7 +39,7 @@ coming soon.
 <summary>pth -> onnx -> trt:</summary>
 
   - [i]. According to the network disk provided by TensorRT-Alpha, download ONNX directly. [weiyun](https://share.weiyun.com/3T3mZKBm) or [google driver](https://drive.google.com/drive/folders/1-8phZHkx_Z274UVqgw6Ma-6u5AKmqCOv?usp=sharing)
-  - [ii]]. Follow the instructions provided by TensorRT-Alpha to manually export ONNX from the relevant python source code framework.
+  - [ii]. Follow the instructions provided by TensorRT-Alpha to manually export ONNX from the relevant python source code framework.
 
 </details>
 
@@ -92,9 +91,7 @@ pip install -r requirements.txt
 
 Installation Tutorial：
 - [Install For Ubuntu18.04](Install_For_Ubuntu18.04/Install_For_Ubuntu18.04.md)<br>
-- [图文详细版：Ubuntu18.04环境配置](https://blog.csdn.net/m0_72734364/article/details/128758544?spm=1001.2014.3001.5502)<br>
 - [Docker For Linux](docker/README.md)<br>
-- [图文详细版：Windows10环境配置](https://blog.csdn.net/m0_72734364/article/details/128865904?spm=1001.2014.3001.5501)<br>
 
 ## Quick Start
 ### Ubuntu18.04
@@ -108,9 +105,6 @@ vim common.cmake
 ```
 start to build project:
 For example:[yolov8](yolov8/README.md)
-
-### Windows10
-[图文详细版：Windows10环境配置](https://blog.csdn.net/m0_72734364/article/details/128865904?spm=1001.2014.3001.5501)<br>
 
 ## Onnx
 At present, more than 30  models have been implemented, and some onnx files of them are organized as follows:
