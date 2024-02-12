@@ -94,7 +94,7 @@ namespace utils
         float iou_thresh;
         float conf_thresh;
 
-        int topK{ 1000 };
+        int topK{ 300 };
         std::string save_path;
 
         std::string winname = "TensorRT-Alpha";
