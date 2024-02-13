@@ -7,7 +7,7 @@ YOLOV8::YOLOV8(const utils::InitParameter& param) :yolo::YOLO(param)
 
 YOLOV8::~YOLOV8()
 {
-    checkRuntime(cudaFree(m_output_src_transpose_device));
+    CHECK(cudaFree(m_output_src_transpose_device));
 }
 
 bool YOLOV8::init(const std::vector<unsigned char>& trtFile)
@@ -48,8 +48,8 @@ bool YOLOV8::init(const std::vector<unsigned char>& trtFile)
             m_output_area *= m_output_dims.d[i];
         }
     }
-    checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_output_src_transpose_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_transpose_device, m_param.batch_size * m_output_area * sizeof(float)));
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
     float scale = a < b ? a : b;
@@ -90,7 +90,7 @@ void YOLOV8::postprocess(const std::vector<cv::Mat>& imgsBatch)
     // nms
     //nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
     nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
-    checkRuntime(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
     for (size_t bi = 0; bi < imgsBatch.size(); bi++)
     {
         int num_boxes = std::min((int)(m_output_objects_host + bi * (m_param.topK * m_output_objects_width + 1))[0], m_param.topK);
