@@ -7,9 +7,9 @@ EfficientDet::EfficientDet(const utils::InitParameter& param):m_param(param)
     m_input_src_device = nullptr;
     m_input_resize_device = nullptr;
     m_input_rgb_device = nullptr;
-    CHECK(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
-    CHECK(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    CHECK(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    checkcuda(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
+    checkcuda(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    checkcuda(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
     // output
     m_output_num_device     = nullptr;  
     m_output_boxes_device   = nullptr;  
@@ -19,10 +19,10 @@ EfficientDet::EfficientDet(const utils::InitParameter& param):m_param(param)
     m_output_boxes_host   = nullptr;    
     m_output_scores_host  = nullptr;    
     m_output_classes_host = nullptr;    
-    CHECK(cudaMalloc(&m_output_num_device,     param.batch_size * sizeof(int)));
-    CHECK(cudaMalloc(&m_output_boxes_device,   param.batch_size * 1 * param.topK * 4 * sizeof(int)));
-    CHECK(cudaMalloc(&m_output_scores_device,  param.batch_size * 1 * param.topK * sizeof(int)));
-    CHECK(cudaMalloc(&m_output_classes_device, param.batch_size * 1 * param.topK * sizeof(int)));
+    checkcuda(cudaMalloc(&m_output_num_device,     param.batch_size * sizeof(int)));
+    checkcuda(cudaMalloc(&m_output_boxes_device,   param.batch_size * 1 * param.topK * 4 * sizeof(int)));
+    checkcuda(cudaMalloc(&m_output_scores_device,  param.batch_size * 1 * param.topK * sizeof(int)));
+    checkcuda(cudaMalloc(&m_output_classes_device, param.batch_size * 1 * param.topK * sizeof(int)));
     m_output_num_host     = new int[param.batch_size];
     m_output_boxes_host   = new int[param.batch_size * 1 * param.topK * 4];
     m_output_scores_host  = new int[param.batch_size * 1 * param.topK];
@@ -33,14 +33,14 @@ EfficientDet::EfficientDet(const utils::InitParameter& param):m_param(param)
 EfficientDet::~EfficientDet()
 {
     // input
-    CHECK(cudaFree(m_input_src_device));
-    CHECK(cudaFree(m_input_resize_device));
-    CHECK(cudaFree(m_input_rgb_device));
+    checkcuda(cudaFree(m_input_src_device));
+    checkcuda(cudaFree(m_input_resize_device));
+    checkcuda(cudaFree(m_input_rgb_device));
     // output
-    CHECK(cudaFree(m_output_num_device));
-    CHECK(cudaFree(m_output_boxes_device));
-    CHECK(cudaFree(m_output_scores_device));
-    CHECK(cudaFree(m_output_classes_device));
+    checkcuda(cudaFree(m_output_num_device));
+    checkcuda(cudaFree(m_output_boxes_device));
+    checkcuda(cudaFree(m_output_scores_device));
+    checkcuda(cudaFree(m_output_classes_device));
     delete[] m_output_num_host;
     delete[] m_output_boxes_host;
     delete[] m_output_scores_host;
@@ -137,9 +137,9 @@ void EfficientDet::copy(const std::vector<cv::Mat>& imgsBatch)
     {
         //std::vector<float> img_vec = std::vector<float>(imgsBatch[i].reshape(1, 1));
         imgsBatch[i].convertTo(img_fp32, CV_32FC3);
-        CHECK(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        checkcuda(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         /*imgsBatch[i].convertTo(imgsBatch[i], CV_32FC3);
-        CHECK(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
+        checkcuda(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
         pi += 3 * m_param.src_h * m_param.src_w;
     }
 
@@ -167,12 +167,12 @@ bool EfficientDet::infer()
 
 void EfficientDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
 {
-    CHECK(cudaMemcpy(m_output_num_host,     m_output_num_device,     sizeof(int) * m_param.batch_size, cudaMemcpyDeviceToHost));
-    CHECK(cudaMemcpy(m_output_boxes_host,   m_output_boxes_device,   sizeof(int) * m_param.batch_size * 1 * m_param.topK * 4, cudaMemcpyDeviceToHost));
+    checkcuda(cudaMemcpy(m_output_num_host,     m_output_num_device,     sizeof(int) * m_param.batch_size, cudaMemcpyDeviceToHost));
+    checkcuda(cudaMemcpy(m_output_boxes_host,   m_output_boxes_device,   sizeof(int) * m_param.batch_size * 1 * m_param.topK * 4, cudaMemcpyDeviceToHost));
     const auto boxes = reinterpret_cast<const float*>(m_output_boxes_host);
-    CHECK(cudaMemcpy(m_output_scores_host,  m_output_scores_device,  sizeof(int) * m_param.batch_size * 1 * m_param.topK, cudaMemcpyDeviceToHost));
+    checkcuda(cudaMemcpy(m_output_scores_host,  m_output_scores_device,  sizeof(int) * m_param.batch_size * 1 * m_param.topK, cudaMemcpyDeviceToHost));
     const auto scores = reinterpret_cast<const float*>(m_output_scores_host);
-    CHECK(cudaMemcpy(m_output_classes_host, m_output_classes_device, sizeof(int) * m_param.batch_size * 1 * m_param.topK, cudaMemcpyDeviceToHost));
+    checkcuda(cudaMemcpy(m_output_classes_host, m_output_classes_device, sizeof(int) * m_param.batch_size * 1 * m_param.topK, cudaMemcpyDeviceToHost));
     for (int bi = 0; bi < imgsBatch.size(); bi++)
     {
         for (int i = 0; i < m_output_num_host[bi]; i++)
