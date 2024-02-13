@@ -9,33 +9,33 @@ PPHunmanSeg::PPHunmanSeg(const utils::InitParameter& param) : m_param(param)
     m_input_rgb_device = nullptr;
     m_input_norm_device = nullptr;
     m_input_hwc_device = nullptr;
-    checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_input_norm_device,   param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_input_hwc_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_norm_device,   param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_hwc_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
 
     // output
     m_output_src_device = nullptr;
     m_output_mask_device = nullptr;
     m_output_resize_device = nullptr;
     m_output_resize_host = nullptr;
-    checkRuntime(cudaMalloc(&m_output_mask_device,   m_param.batch_size * 1 * m_param.dst_h * m_param.dst_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_output_resize_device, m_param.batch_size * 1 * m_param.src_h * m_param.src_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_mask_device,   m_param.batch_size * 1 * m_param.dst_h * m_param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_resize_device, m_param.batch_size * 1 * m_param.src_h * m_param.src_w * sizeof(float)));
     m_output_resize_host = new float[m_param.batch_size * 1 * m_param.src_h * m_param.src_w];
 }
 
 PPHunmanSeg::~PPHunmanSeg()
 {
     // input
-    checkRuntime(cudaFree(m_input_src_device));
-    checkRuntime(cudaFree(m_input_resize_device));
-    checkRuntime(cudaFree(m_input_rgb_device));
-    checkRuntime(cudaFree(m_input_norm_device));
-    checkRuntime(cudaFree(m_input_hwc_device));
+    CHECK(cudaFree(m_input_src_device));
+    CHECK(cudaFree(m_input_resize_device));
+    CHECK(cudaFree(m_input_rgb_device));
+    CHECK(cudaFree(m_input_norm_device));
+    CHECK(cudaFree(m_input_hwc_device));
     // output
-    checkRuntime(cudaFree(m_output_mask_device));
-    checkRuntime(cudaFree(m_output_resize_device));
+    CHECK(cudaFree(m_output_mask_device));
+    CHECK(cudaFree(m_output_resize_device));
     delete[] m_output_resize_host;
 }
 
@@ -79,7 +79,7 @@ bool PPHunmanSeg::init(const std::vector<unsigned char>& trtFile)
         return area;
     };
     m_output_src_area  = get_area(m_output_src_dims);
-    checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_src_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_src_area * sizeof(float)));
     float scale_y = float(m_param.dst_h) / m_param.src_h;
     float scale_x = float(m_param.dst_w) / m_param.src_w;
     cv::Mat src2dst = (cv::Mat_<float>(2, 3) << scale_x, 0.f, (-scale_x * m_param.src_w + m_param.dst_w + scale_x - 1) * 0.5,
@@ -148,9 +148,9 @@ void PPHunmanSeg::copy(const std::vector<cv::Mat>& imgsBatch)
     {
         //std::vector<float> img_vec = std::vector<float>(imgsBatch[i].reshape(1, 1));
         imgsBatch[i].convertTo(img_fp32, CV_32FC3);
-        checkRuntime(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         /*imgsBatch[i].convertTo(imgsBatch[i], CV_32FC3);
-        checkRuntime(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
+        CHECK(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
         pi += 3 * m_param.src_h * m_param.src_w;
     }
 
@@ -182,7 +182,7 @@ void PPHunmanSeg::postprocess(const std::vector<cv::Mat>& imgsBatch)
         m_output_mask_device, m_param.dst_w, m_param.dst_h);
     resizeDevice(m_param.batch_size, m_output_mask_device, m_param.dst_w, m_param.dst_h,
         m_output_resize_device, m_param.src_w, m_param.src_h, utils::ColorMode::GRAY, m_src2dst);
-    checkRuntime(cudaMemcpy(m_output_resize_host, m_output_resize_device, m_param.batch_size * sizeof(float) * m_param.src_w * m_param.src_h, cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_resize_host, m_output_resize_device, m_param.batch_size * sizeof(float) * m_param.src_w * m_param.src_h, cudaMemcpyDeviceToHost));
 }
 
 void PPHunmanSeg::reset()

@@ -10,7 +10,7 @@ YOLOv8Seg::YOLOv8Seg(const utils::InitParameter& param) :yolo::YOLO(param)
     m_output_seg_w = 160 * 160;
     m_output_seg_h = 32;
     int output_objects_size = param.batch_size * m_output_obj_area; 
-    checkRuntime(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
     m_output_objects_host = new float[output_objects_size];
 
     m_mask160 = cv::Mat::zeros(1, 160 * 160, CV_32F);
@@ -24,10 +24,10 @@ YOLOv8Seg::YOLOv8Seg(const utils::InitParameter& param) :yolo::YOLO(param)
 
 YOLOv8Seg::~YOLOv8Seg()
 {
-    checkRuntime(cudaFree(m_output_objects_device));
-    checkRuntime(cudaFree(m_output_src_device));
-    checkRuntime(cudaFree(m_output_src_transpose_device));
-    checkRuntime(cudaFree(m_output_seg_device));
+    CHECK(cudaFree(m_output_objects_device));
+    CHECK(cudaFree(m_output_src_device));
+    CHECK(cudaFree(m_output_src_transpose_device));
+    CHECK(cudaFree(m_output_seg_device));
     delete[] m_output_objects_host;
     delete[] m_output_seg_host;
     m_output_src_device = nullptr;
@@ -84,9 +84,9 @@ bool YOLOv8Seg::init(const std::vector<unsigned char>& trtFile)
         }
     }
    
-    checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_output_src_transpose_device, m_param.batch_size * m_output_area * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_output_seg_device, m_param.batch_size * m_output_seg_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_transpose_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_seg_device, m_param.batch_size * m_output_seg_area * sizeof(float)));
     m_output_seg_host = new float[m_param.batch_size * m_output_seg_area];   
 
     float a = float(m_param.dst_h) / m_param.src_h;
@@ -131,13 +131,13 @@ void YOLOv8Seg::postprocess(const std::vector<cv::Mat>& imgsBatch)
     yolov8seg::decodeDevice(m_param, m_output_src_transpose_device, m_output_src_width, m_total_objects, m_output_area,
         m_output_objects_device, m_output_objects_width, m_param.topK);
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_output_obj_area);
-    checkRuntime(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * m_output_obj_area, cudaMemcpyDeviceToHost));
-    checkRuntime(cudaMemcpy(m_output_seg_host, m_output_seg_device, m_param.batch_size * sizeof(float) * m_output_seg_area, cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * m_output_obj_area, cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_seg_host, m_output_seg_device, m_param.batch_size * sizeof(float) * m_output_seg_area, cudaMemcpyDeviceToHost));
 }
 
 void YOLOv8Seg::reset()
 {
-    checkRuntime(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * m_output_obj_area));
+    CHECK(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * m_output_obj_area));
 }
 
 void YOLOv8Seg::showAndSave(const std::vector<std::string>& classNames, const int& cvDelayTime, std::vector<cv::Mat>& imgsBatch)

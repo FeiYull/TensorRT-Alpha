@@ -8,11 +8,11 @@ yolo::YOLO::YOLO(const utils::InitParameter& param) : m_param(param)
     m_input_rgb_device = nullptr;
     m_input_norm_device = nullptr;
     m_input_hwc_device = nullptr;
-    checkRuntime(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(unsigned char)));
-    checkRuntime(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_input_norm_device,   param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_input_hwc_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_src_device,    param.batch_size * 3 * param.src_h * param.src_w * sizeof(unsigned char)));
+    CHECK(cudaMalloc(&m_input_resize_device, param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_rgb_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_norm_device,   param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_hwc_device,    param.batch_size * 3 * param.dst_h * param.dst_w * sizeof(float)));
 
     // output
     m_output_src_device = nullptr;
@@ -22,9 +22,9 @@ yolo::YOLO::YOLO(const utils::InitParameter& param) : m_param(param)
     m_output_idx_device = nullptr;
     m_output_conf_device = nullptr;
     int output_objects_size = param.batch_size * (1 + param.topK * m_output_objects_width); // 1: count
-    checkRuntime(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
-    checkRuntime(cudaMalloc(&m_output_idx_device, m_param.batch_size * m_param.topK * sizeof(int)));
-    checkRuntime(cudaMalloc(&m_output_conf_device, m_param.batch_size * m_param.topK * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_idx_device, m_param.batch_size * m_param.topK * sizeof(int)));
+    CHECK(cudaMalloc(&m_output_conf_device, m_param.batch_size * m_param.topK * sizeof(float)));
     m_output_objects_host = new float[output_objects_size];
     m_objectss.resize(param.batch_size);
 }
@@ -32,16 +32,16 @@ yolo::YOLO::YOLO(const utils::InitParameter& param) : m_param(param)
 yolo::YOLO::~YOLO()
 {
     // input
-    checkRuntime(cudaFree(m_input_src_device));
-    checkRuntime(cudaFree(m_input_resize_device));
-    checkRuntime(cudaFree(m_input_rgb_device));
-    checkRuntime(cudaFree(m_input_norm_device));
-    checkRuntime(cudaFree(m_input_hwc_device));
+    CHECK(cudaFree(m_input_src_device));
+    CHECK(cudaFree(m_input_resize_device));
+    CHECK(cudaFree(m_input_rgb_device));
+    CHECK(cudaFree(m_input_norm_device));
+    CHECK(cudaFree(m_input_hwc_device));
     // output
-    checkRuntime(cudaFree(m_output_src_device));
-    checkRuntime(cudaFree(m_output_objects_device));
-    checkRuntime(cudaFree(m_output_idx_device));
-    checkRuntime(cudaFree(m_output_conf_device));
+    CHECK(cudaFree(m_output_src_device));
+    CHECK(cudaFree(m_output_objects_device));
+    CHECK(cudaFree(m_output_idx_device));
+    CHECK(cudaFree(m_output_conf_device));
     delete[] m_output_objects_host;
 }
 
@@ -83,7 +83,7 @@ bool yolo::YOLO::init(const std::vector<unsigned char>& trtFile)
             m_output_area *= m_output_dims.d[i];
         }
     }
-    checkRuntime(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
     float scale = a < b ? a : b;
@@ -139,7 +139,7 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
     for (size_t i = 0; i < imgsBatch.size(); i++)
     {
         imgsBatch[i].convertTo(img_fp32, CV_32FC3);
-        checkRuntime(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         pi += 3 * m_param.src_h * m_param.src_w;
     }
     cudaHostUnregister(img_fp32.data);
@@ -152,7 +152,7 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
     {
         std::vector<float> img_vec = std::vector<float>(imgsBatch[i].reshape(1, 1));
         imgsBatch[i].convertTo(img_fp32, CV_32FC3);
-        checkRuntime(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         pi += 3 * m_param.src_h * m_param.src_w;
     }
 #endif
@@ -163,7 +163,7 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
     unsigned char* pi = m_input_src_device;
     for (size_t i = 0; i < imgsBatch.size(); i++)
     {
-        checkRuntime(cudaMemcpy(pi, imgsBatch[i].data, sizeof(unsigned char) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(pi, imgsBatch[i].data, sizeof(unsigned char) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         pi += 3 * m_param.src_h * m_param.src_w;
     }
 
@@ -171,15 +171,15 @@ void yolo::YOLO::copy(const std::vector<cv::Mat>& imgsBatch)
     cudaStream_t streams[32];
     for (int i = 0; i < imgsBatch.size(); i++) 
     {
-        checkRuntime(cudaStreamCreate(&streams[i]));
+        CHECK(cudaStreamCreate(&streams[i]));
     }
     unsigned char* pi = m_input_src_device;
     for (size_t i = 0; i < imgsBatch.size(); i++)
     {
-        checkRuntime(cudaMemcpyAsync(pi, imgsBatch[i].data, sizeof(unsigned char) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice, streams[i]));
+        CHECK(cudaMemcpyAsync(pi, imgsBatch[i].data, sizeof(unsigned char) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice, streams[i]));
         pi += 3 * m_param.src_h * m_param.src_w;
     }
-    checkRuntime(cudaDeviceSynchronize());
+    CHECK(cudaDeviceSynchronize());
 #endif
 }
 
@@ -213,7 +213,7 @@ void yolo::YOLO::postprocess(const std::vector<cv::Mat>& imgsBatch)
     // nmsv2(nms sort)
     //nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
 
-    checkRuntime(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
     for (size_t bi = 0; bi < imgsBatch.size(); bi++)
     {
         int num_boxes = std::min((int)(m_output_objects_host + bi * (m_param.topK * m_output_objects_width + 1))[0], m_param.topK);
@@ -242,7 +242,7 @@ std::vector<std::vector<utils::Box>> yolo::YOLO::getObjectss() const
 
 void yolo::YOLO::reset()
 {
-    checkRuntime(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * (1 + 7 * m_param.topK)));
+    CHECK(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * (1 + 7 * m_param.topK)));
     for (size_t bi = 0; bi < m_param.batch_size; bi++)
     {
         m_objectss[bi].clear();
