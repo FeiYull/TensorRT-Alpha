@@ -167,7 +167,7 @@ void utils::show(const std::vector<std::vector<utils::Box>>& objectss, const std
 				}
 				if (classNames.size() == 20) // voc20
 				{
-					color = Colors::color80[box.label];
+					color = Colors::color20[box.label];
 				}
 				cv::rectangle(imgsBatch[bi], cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2, cv::LINE_AA);
 				cv::String det_info = classNames[box.label] + " " + cv::format("%.4f", box.confidence);
