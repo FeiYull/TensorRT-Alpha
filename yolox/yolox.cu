@@ -5,7 +5,7 @@ YOLOX::YOLOX(const utils::InitParameter& param) :yolo::YOLO(param)
 }
 YOLOX::~YOLOX()
 {
-    checkcuda(cudaFree(m_input_resize_without_padding_device));
+    CHECK(cudaFree(m_input_resize_without_padding_device));
 }
 bool YOLOX::init(const std::vector<unsigned char>& trtFile)
 {
@@ -46,14 +46,14 @@ bool YOLOX::init(const std::vector<unsigned char>& trtFile)
             m_output_area *= m_output_dims.d[i];
         }
     }
-    checkcuda(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
     float scale = a < b ? a : b;
     m_resized_h = roundf((float)m_param.src_h * scale);
     m_resized_w = roundf((float)m_param.src_w * scale);
 
-    checkcuda(cudaMalloc(&m_input_resize_without_padding_device,
+    CHECK(cudaMalloc(&m_input_resize_without_padding_device,
         m_param.batch_size * 3 * m_resized_h * m_resized_w * sizeof(float)));
     cv::Mat src2dst = (cv::Mat_<float>(2, 3) << scale, 0.f, (scale - 1) * 0.5,
         0.f, scale, (scale - 1) * 0.5);

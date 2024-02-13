@@ -78,17 +78,17 @@ LibFaceDet::LibFaceDet(const utils::InitParameter& param) : m_param(param)
     m_feat_hw_host_device = nullptr;
     m_prior_boxes_device = nullptr;
     m_variances_device = nullptr; 
-    checkcuda(cudaMalloc(&m_min_sizes_device, 4 * 3 * sizeof(float)));
-    checkcuda(cudaMalloc(&m_feat_hw_host_device, 4 * 3 * sizeof(float)));
+    CHECK(cudaMalloc(&m_min_sizes_device, 4 * 3 * sizeof(float)));
+    CHECK(cudaMalloc(&m_feat_hw_host_device, 4 * 3 * sizeof(float)));
 
-    checkcuda(cudaMalloc(&m_variances_device, 2 * 1 * sizeof(float)));
+    CHECK(cudaMalloc(&m_variances_device, 2 * 1 * sizeof(float)));
     m_feat_hw_host = new float[4 * 3];   
 
     // input
     m_input_src_device = nullptr;
     m_input_hwc_device = nullptr;
-    checkcuda(cudaMalloc(&m_input_src_device, param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
-    checkcuda(cudaMalloc(&m_input_hwc_device, param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_src_device, param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_hwc_device, param.batch_size * 3 * param.src_h * param.src_w * sizeof(float)));
    
     // output
     m_output_loc_device = nullptr;
@@ -98,7 +98,7 @@ LibFaceDet::LibFaceDet(const utils::InitParameter& param) : m_param(param)
     m_output_objects_width = 17;
 
     int output_objects_size = param.batch_size * (1 + param.topK * m_output_objects_width); 
-    checkcuda(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
     m_output_objects_host = new float[output_objects_size];
     m_objectss.resize(param.batch_size);
 }
@@ -106,22 +106,22 @@ LibFaceDet::LibFaceDet(const utils::InitParameter& param) : m_param(param)
 LibFaceDet::~LibFaceDet()
 {
     // const params
-    checkcuda(cudaFree(m_min_sizes_device));
-    checkcuda(cudaFree(m_feat_hw_host_device));
-    checkcuda(cudaFree(m_prior_boxes_device));
-    checkcuda(cudaFree(m_variances_device));
+    CHECK(cudaFree(m_min_sizes_device));
+    CHECK(cudaFree(m_feat_hw_host_device));
+    CHECK(cudaFree(m_prior_boxes_device));
+    CHECK(cudaFree(m_variances_device));
     delete[] m_feat_hw_host;
     delete[] m_prior_boxes_host;
 
     // input
-    checkcuda(cudaFree(m_input_src_device));
-    checkcuda(cudaFree(m_input_hwc_device));
+    CHECK(cudaFree(m_input_src_device));
+    CHECK(cudaFree(m_input_hwc_device));
    
     // output
-    checkcuda(cudaFree(m_output_loc_device));
-    checkcuda(cudaFree(m_output_conf_device));
-    checkcuda(cudaFree(m_output_iou_device));
-    checkcuda(cudaFree(m_output_objects_device));
+    CHECK(cudaFree(m_output_loc_device));
+    CHECK(cudaFree(m_output_conf_device));
+    CHECK(cudaFree(m_output_iou_device));
+    CHECK(cudaFree(m_output_objects_device));
     delete[] m_output_objects_host;
 }
 
@@ -166,17 +166,17 @@ bool LibFaceDet::init(const std::vector<unsigned char>& trtFile)
     m_output_iou_dims  = this->m_context->getBindingDimensions(3);
     m_total_objects = m_output_loc_dims.d[1]; 
 
-    checkcuda(cudaMalloc(&m_prior_boxes_device, m_total_objects * 4 * sizeof(float))); 
+    CHECK(cudaMalloc(&m_prior_boxes_device, m_total_objects * 4 * sizeof(float))); 
     m_prior_boxes_host = new float[m_total_objects * 4];
-    checkcuda(cudaMalloc(&m_output_loc_device, m_param.batch_size * m_total_objects * 14 * sizeof(float)));
-    checkcuda(cudaMalloc(&m_output_conf_device,m_param.batch_size * m_total_objects * 2 * sizeof(float)));
-    checkcuda(cudaMalloc(&m_output_iou_device, m_param.batch_size * m_total_objects * 1 * sizeof(float)));
-    checkcuda(cudaMemcpy(m_min_sizes_device, m_min_sizes_host, sizeof(float) * 4 * 3, cudaMemcpyHostToDevice));
+    CHECK(cudaMalloc(&m_output_loc_device, m_param.batch_size * m_total_objects * 14 * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_conf_device,m_param.batch_size * m_total_objects * 2 * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_iou_device, m_param.batch_size * m_total_objects * 1 * sizeof(float)));
+    CHECK(cudaMemcpy(m_min_sizes_device, m_min_sizes_host, sizeof(float) * 4 * 3, cudaMemcpyHostToDevice));
     calFeatureMapSize(cv::Size(m_param.src_w, m_param.src_h), m_feat_hw_host);
-    checkcuda(cudaMemcpy(m_feat_hw_host_device, m_feat_hw_host, sizeof(float) * 4 * 3, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(m_feat_hw_host_device, m_feat_hw_host, sizeof(float) * 4 * 3, cudaMemcpyHostToDevice));
     calPriorBox(m_feat_hw_host, m_min_sizes_host, m_min_sizes_host_dim, cv::Size(m_param.src_w, m_param.src_h), m_prior_boxes_host);
-    checkcuda(cudaMemcpy(m_prior_boxes_device, m_prior_boxes_host, sizeof(float) * m_total_objects * 4, cudaMemcpyHostToDevice));
-    checkcuda(cudaMemcpy(m_variances_device, m_variances_host, sizeof(float) * 2, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(m_prior_boxes_device, m_prior_boxes_host, sizeof(float) * m_total_objects * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(m_variances_device, m_variances_host, sizeof(float) * 2, cudaMemcpyHostToDevice));
     return true;
 }
 
@@ -224,9 +224,9 @@ void LibFaceDet::copy(const std::vector<cv::Mat>& imgsBatch)
     {
         //std::vector<float> img_vec = std::vector<float>(imgsBatch[i].reshape(1, 1));
         imgsBatch[i].convertTo(img_fp32, CV_32FC3);
-        checkcuda(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(pi, img_fp32.data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));
         /*imgsBatch[i].convertTo(imgsBatch[i], CV_32FC3);
-        checkcuda(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
+        CHECK(cudaMemcpy(pi, imgsBatch[i].data, sizeof(float) * 3 * m_param.src_h * m_param.src_w, cudaMemcpyHostToDevice));*/
         pi += 3 * m_param.src_h * m_param.src_w;
     }
 
@@ -263,7 +263,7 @@ void LibFaceDet::postprocess(const std::vector<cv::Mat>& imgsBatch)
         m_output_objects_device, m_output_objects_width, m_param.topK
     );
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_output_objects_width * m_param.topK + 1);
-    checkcuda(cudaMemcpy(m_output_objects_host, m_output_objects_device, 
+    CHECK(cudaMemcpy(m_output_objects_host, m_output_objects_device, 
         m_param.batch_size * sizeof(float)* (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
 
     for (size_t bi = 0; bi < imgsBatch.size(); bi++)
@@ -295,7 +295,7 @@ std::vector<std::vector<utils::Box>> LibFaceDet::getObjectss() const
 
 void LibFaceDet::reset()
 {
-    checkcuda(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * (1 + m_output_objects_width * m_param.topK)));
+    CHECK(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * (1 + m_output_objects_width * m_param.topK)));
     for (size_t bi = 0; bi < m_param.batch_size; bi++)
     {
         m_objectss[bi].clear();

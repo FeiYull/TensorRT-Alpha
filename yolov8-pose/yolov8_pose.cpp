@@ -30,16 +30,16 @@ m_nkpts(17)
     m_output_objects_device = nullptr;
     m_output_objects_width = 58; // xywhc + points * 17 = 56  -> left, top, right, bottom, confidence, class, keepflag + points * 17 = 58
     int output_objects_size = param.batch_size * (1 + param.topK * m_output_objects_width); // 1: count
-    checkcuda(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_objects_device, output_objects_size * sizeof(float)));
     m_output_objects_host = new float[output_objects_size];
     m_objectss.resize(param.batch_size);
 }
 
 YOLOv8Pose::~YOLOv8Pose()
 {
-    checkcuda(cudaFree(m_output_objects_device));
-    checkcuda(cudaFree(m_output_src_device));
-    checkcuda(cudaFree(m_output_src_transpose_device));
+    CHECK(cudaFree(m_output_objects_device));
+    CHECK(cudaFree(m_output_src_device));
+    CHECK(cudaFree(m_output_src_transpose_device));
     delete[] m_output_objects_host;
     m_output_src_device = nullptr;
 }
@@ -81,8 +81,8 @@ bool YOLOv8Pose::init(const std::vector<unsigned char>& trtFile)
             m_output_area *= m_output_dims.d[i];
         }
     }
-    checkcuda(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
-    checkcuda(cudaMalloc(&m_output_src_transpose_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_transpose_device, m_param.batch_size * m_output_area * sizeof(float)));
     float a = float(m_param.dst_h) / m_param.src_h;
     float b = float(m_param.dst_w) / m_param.src_w;
     float scale = a < b ? a : b;
@@ -121,12 +121,12 @@ void YOLOv8Pose::postprocess(const std::vector<cv::Mat>& imgsBatch)
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
 
     //nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
-    checkcuda(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + m_output_objects_width * m_param.topK), cudaMemcpyDeviceToHost));
 }
 
 void YOLOv8Pose::reset()
 {
-    checkcuda(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * (1 + m_output_objects_width * m_param.topK)));
+    CHECK(cudaMemset(m_output_objects_device, 0, sizeof(float) * m_param.batch_size * (1 + m_output_objects_width * m_param.topK)));
 }
 
 void YOLOv8Pose::showAndSave(const std::vector<std::string>& classNames, const int& cvDelayTime, std::vector<cv::Mat>& imgsBatch, float* avg_times)
