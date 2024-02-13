@@ -5,12 +5,12 @@ YOLO_NAS::YOLO_NAS(const utils::InitParameter& param) :yolo::YOLO(param)
 {
     m_resize_shape = cv::Size(636, 636);
     m_input_resize_padding_device = nullptr;
-    checkcuda(cudaMalloc(&m_input_resize_padding_device, param.batch_size * 3 * m_param.dst_h * m_param.dst_w * sizeof(float)));
+    CHECK(cudaMalloc(&m_input_resize_padding_device, param.batch_size * 3 * m_param.dst_h * m_param.dst_w * sizeof(float)));
 }
 
 YOLO_NAS::~YOLO_NAS()
 {
-    checkcuda(cudaFree(m_input_resize_padding_device));
+    CHECK(cudaFree(m_input_resize_padding_device));
 }
 
 bool YOLO_NAS::init(const std::vector<unsigned char>& trtFile)
@@ -50,7 +50,7 @@ bool YOLO_NAS::init(const std::vector<unsigned char>& trtFile)
             m_output_area *= m_output_dims.d[i];
         }
     }
-    checkcuda(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
+    CHECK(cudaMalloc(&m_output_src_device, m_param.batch_size * m_output_area * sizeof(float)));
     float a = float(m_resize_shape.height) / m_param.src_h;
     float b = float(m_resize_shape.width) / m_param.src_w;
     float scale = a < b ? a : b;
@@ -91,7 +91,7 @@ void YOLO_NAS::postprocess(const std::vector<cv::Mat>& imgsBatch)
         m_output_objects_device, m_output_objects_width, m_param.topK);
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
     //nmsDeviceV2(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1, m_output_idx_device, m_output_conf_device);
-    checkcuda(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
     for (size_t bi = 0; bi < imgsBatch.size(); bi++)
     {
         int num_boxes = std::min((int)(m_output_objects_host + bi * (m_param.topK * m_output_objects_width + 1))[0], m_param.topK);

@@ -2,7 +2,7 @@
 #include"../utils/common_include.h"
 #include"../utils/utils.h"
 
-#define checkcuda(op)  __check_cuda_runtime((op), #op, __FILE__, __LINE__)
+#define CHECK(op)  __check_cuda_runtime((op), #op, __FILE__, __LINE__)
 
 bool __check_cuda_runtime(cudaError_t code, const char* op, const char* file, int line);
 

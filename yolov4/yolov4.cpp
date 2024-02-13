@@ -14,7 +14,7 @@ void YOLOV4::postprocess(const std::vector<cv::Mat>& imgsBatch)
     yolov4::decodeDevice(m_param, m_output_src_device, 4 + m_param.num_class, m_total_objects, m_output_area,
         m_output_objects_device, m_output_objects_width, m_param.topK);
     nmsDeviceV1(m_param, m_output_objects_device, m_output_objects_width, m_param.topK, m_param.topK * m_output_objects_width + 1);
-    checkcuda(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(m_output_objects_host, m_output_objects_device, m_param.batch_size * sizeof(float) * (1 + 7 * m_param.topK), cudaMemcpyDeviceToHost));
     for (size_t bi = 0; bi < imgsBatch.size(); bi++)
     {
         int num_boxes = std::min((int)(m_output_objects_host + bi * (m_param.topK * m_output_objects_width + 1))[0], m_param.topK);
