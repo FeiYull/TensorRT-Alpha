@@ -38,14 +38,14 @@ RUN \
     libopencv-dev \
     && apt-get clean
 
-RUN pip3 install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-RUN pip install opencv-python-headless==4.8.0.74 && \
-    pip install opencv-python==4.8.0.74 \
-    pip install onnx==1.9.0 \
-    pip install torch==1.9.0 \
-    pip install torchvision==0.10.0 \
-    pip install onnx-simplifier==0.4.8
+# RUN pip3 install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+# RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# RUN pip install opencv-python-headless==4.8.0.74 && \
+#     pip install opencv-python==4.8.0.74 \
+#     pip install onnx==1.9.0 \
+#     pip install torch==1.9.0 \
+#     pip install torchvision==0.10.0 \
+#     pip install onnx-simplifier==0.4.8
 
 RUN cd /root/.cache/pip && \
     rm -r *
