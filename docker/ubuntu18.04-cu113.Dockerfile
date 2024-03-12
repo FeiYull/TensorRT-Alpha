@@ -47,5 +47,5 @@ RUN \
 #     pip install torchvision==0.10.0 \
 #     pip install onnx-simplifier==0.4.8
 
-RUN cd /root/.cache/pip && \
-    rm -r *
+#RUN cd /root/.cache/pip && \
+#    rm -r *
