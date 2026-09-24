@@ -1,0 +1,3 @@
+add_executable(test_paths test_paths.cpp)
+
+target_link_libraries(test_paths PRIVATE trt_alpha_core)

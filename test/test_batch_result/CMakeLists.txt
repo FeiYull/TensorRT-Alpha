@@ -1,0 +1,2 @@
+add_executable(test_batch_result test_batch_result.cpp)
+target_link_libraries(test_batch_result PRIVATE trt_alpha_core)

@@ -1,0 +1,2 @@
+add_executable(test_task_types test_task_types.cpp)
+target_link_libraries(test_task_types PRIVATE trt_alpha_core)

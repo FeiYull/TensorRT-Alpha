@@ -1,0 +1,3 @@
+add_executable(test_buffer_view test_buffer_view.cpp)
+
+target_link_libraries(test_buffer_view PRIVATE trt_alpha_core)

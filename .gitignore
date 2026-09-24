@@ -1,0 +1,74 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+
+# VS 2019
+*x64/
+*.idea
+*CUDA_Demo.sln
+*vs
+*.vcxproj
+*.vcxproj.user
+*.user
+*.onnx
+*.trt
+*.vcxproj.filters
+*.sln
+
+#vscode
+*.vscode
+
+# linux
+*build
+
+*.ppm
+*.tgz
+*.prototxt
+*.caffemodel
+*.code-workspace
+
+*__pycache__
+
+# deep learning's file
+
+*onnx
+*trt
+*pt
+*pth
+build/
+*include_legacy
+*src_legacy
+*test_legacy
+*.jpg
+# *FileTree.txt
+# *data/

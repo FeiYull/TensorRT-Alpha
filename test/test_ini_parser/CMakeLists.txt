@@ -1,0 +1,2 @@
+add_executable(test_ini_parser test_ini_parser.cpp)
+target_link_libraries(test_ini_parser PRIVATE trt_alpha_core)
