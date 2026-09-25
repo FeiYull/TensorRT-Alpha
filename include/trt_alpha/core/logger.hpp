@@ -3,25 +3,33 @@
 // -----------------------------------------------------------------------------
 //  应用日志设施 + TensorRT ILogger 桥接。
 //
-//  设计要点：
-//    * 4 级：DEBUG / INFO / WARN / ERROR
-//    * 输出：DEBUG/INFO → stdout；WARN/ERROR → stderr
-//    * 多线程安全：线程本地 ostringstream 拼接 + 全局锁一次输出
-//      （保证"整行原子"，不会撕裂成 [INFO ] [INFO ] ...）
-//    * TRT 的 ILogger 由 TrtLoggerAdapter 桥接到同一套输出
+//  【日志级别】
+//    DEBUG / INFO / WARN / ERROR
+//    编译期通过 TRT_ALPHA_LOG_MIN_LEVEL 控制（CMake 按构建类型自动设）：
+//      * Debug  构建 → DEBUG（全开，冗余日志，崩溃可诊断）
+//      * Release 构建 → INFO（只保留关键信息，DEBUG 零开销）
 //
-//  不做：
+//  【日志格式】
+//    [2026-09-25 15:30:12.345] [DEBUG] [tid=12345] [yolov8.cpp:314 postprocess] message
+//    包含：时间戳(ms) / 级别 / 线程 ID / 文件:行号 / 函数名 / 消息
+//    这样"崩溃时看日志能迅速定位"。
+//
+//  【多线程安全】
+//    * 线程本地 ostringstream 拼接（避免竞争）
+//    * 全局锁保证"整行原子输出"（不撕裂）
+//    * 与 TrtLoggerAdapter 共用同一把锁
+//
+//  【崩溃捕获】（可选，在 main / test 里调用）
+//    installCrashHandler() —— 捕获 SIGSEGV / SIGABRT / 未处理异常，
+//    打 ERROR 日志后退出，Release 下也能"留下遗言"。
+//
+//  【不做】
 //    * 日志轮转、网络日志、结构化日志（YAGNI）
-//    * 时间戳、线程 ID（保持简洁；将来需要再加）
-//
-//  编译期级别过滤：
-//    定义 TRT_ALPHA_LOG_MIN_LEVEL 可关闭低级别日志（见下方宏）。
-//    默认不过滤（全输出）。
 // =============================================================================
 #pragma once
 
-#include "trt_alpha/core/buffer_view.hpp"   // MemorySpace
-#include "trt_alpha/core/data_type.hpp"     // DataType
+#include "trt_alpha/core/buffer_view.hpp"
+#include "trt_alpha/core/data_type.hpp"
 
 #include <NvInfer.h>
 
@@ -60,57 +68,83 @@ inline std::ostringstream& tlsStream()
     return oss;
 }
 
+//! 生成日志前缀："[时间戳] [级别] [tid] [文件:行号 函数名] "
+//! 由 logger.cpp 实现。
+std::string logPrefix(const char* level,
+                      const char* file,
+                      int line,
+                      const char* func);
+
 }  // namespace trt_alpha::core::detail
 
 // -----------------------------------------------------------------------------
 //  应用日志宏
+//
+//  注意：__VA_ARGS__ 外面【不加括号】。
+//  原因：__VA_ARGS__ 展开后形如 `"..." << msg`，它是一个"流插入表达式"。
+//  如果加括号变成 `("..." << msg)`，左操作数就成了字符串字面量，
+//  而 C++ 没有 `const char* << T` 这个重载，会报 C2296 / C2297。
+//
+//  如果调用点含逗号（例如 `duration<double, std::milli>`），
+//  预处理器会把逗号当参数分隔符，报 C4002。
+//  解法：在【调用点】给含逗号的子表达式额外加一层圆括号：
+//      TRT_LOG_DEBUG("... " << (std::chrono::duration<double, std::milli>(a-b).count())
+//                   << " ms");
 // -----------------------------------------------------------------------------
 #if TRT_ALPHA_LOG_MIN_LEVEL <= TRT_ALPHA_LOG_LEVEL_DEBUG
-#    define TRT_LOG_DEBUG(msg)                                                    \
+#    define TRT_LOG_DEBUG(...)                                                    \
         do {                                                                      \
             auto& _oss = ::trt_alpha::core::detail::tlsStream();                  \
-            _oss << "[DEBUG] " << msg << '\n';                                    \
+            _oss << ::trt_alpha::core::detail::logPrefix("DEBUG", __FILE__,       \
+                        __LINE__, __func__)                                       \
+                 << __VA_ARGS__ << '\n';                                          \
             std::lock_guard<std::mutex> _lk(::trt_alpha::core::detail::logMutex());\
             std::cout << _oss.str();                                              \
         } while (0)
 #else
-#    define TRT_LOG_DEBUG(msg) do { } while (0)
+#    define TRT_LOG_DEBUG(...) do { } while (0)
 #endif
 
 #if TRT_ALPHA_LOG_MIN_LEVEL <= TRT_ALPHA_LOG_LEVEL_INFO
-#    define TRT_LOG_INFO(msg)                                                     \
+#    define TRT_LOG_INFO(...)                                                     \
         do {                                                                      \
             auto& _oss = ::trt_alpha::core::detail::tlsStream();                  \
-            _oss << "[INFO ] " << msg << '\n';                                    \
+            _oss << ::trt_alpha::core::detail::logPrefix("INFO ", __FILE__,       \
+                        __LINE__, __func__)                                       \
+                 << __VA_ARGS__ << '\n';                                          \
             std::lock_guard<std::mutex> _lk(::trt_alpha::core::detail::logMutex());\
             std::cout << _oss.str();                                              \
         } while (0)
 #else
-#    define TRT_LOG_INFO(msg) do { } while (0)
+#    define TRT_LOG_INFO(...) do { } while (0)
 #endif
 
 #if TRT_ALPHA_LOG_MIN_LEVEL <= TRT_ALPHA_LOG_LEVEL_WARN
-#    define TRT_LOG_WARN(msg)                                                     \
+#    define TRT_LOG_WARN(...)                                                     \
         do {                                                                      \
             auto& _oss = ::trt_alpha::core::detail::tlsStream();                  \
-            _oss << "[WARN ] " << msg << '\n';                                    \
+            _oss << ::trt_alpha::core::detail::logPrefix("WARN ", __FILE__,       \
+                        __LINE__, __func__)                                       \
+                 << __VA_ARGS__ << '\n';                                          \
             std::lock_guard<std::mutex> _lk(::trt_alpha::core::detail::logMutex());\
             std::cerr << _oss.str();                                              \
         } while (0)
 #else
-#    define TRT_LOG_WARN(msg) do {  } while (0)
+#    define TRT_LOG_WARN(...) do { } while (0)
 #endif
 
 #if TRT_ALPHA_LOG_MIN_LEVEL <= TRT_ALPHA_LOG_LEVEL_ERROR
-#    define TRT_LOG_ERROR(msg)                                                    \
+#    define TRT_LOG_ERROR(...)                                                    \
         do {                                                                      \
             auto& _oss = ::trt_alpha::core::detail::tlsStream();                  \
-            _oss << "[ERROR] " << msg << '\n';                                    \
+            _oss << ::trt_alpha::core::detail::logPrefix("ERROR", __FILE__,       \
+                        __LINE__, __func__)                                       \
+                 << __VA_ARGS__ << '\n';                                          \
             std::lock_guard<std::mutex> _lk(::trt_alpha::core::detail::logMutex());\
             std::cerr << _oss.str();                                              \
         } while (0)
 #else
-#    define TRT_LOG_ERROR(msg) do {  } while (0)
+#    define TRT_LOG_ERROR(...) do { } while (0)
 #endif
 
 // -----------------------------------------------------------------------------
@@ -119,8 +153,6 @@ inline std::ostringstream& tlsStream()
 namespace trt_alpha::core {
 
 //! 把 TensorRT 内部日志转发到应用日志。
-//! 不直接用 TRT_LOG_* 宏（TRT 的 severity 参数是运行时值，宏是编译期）；
-//! 内部直接走 detail::tlsStream + logMutex，与宏共享同一把锁，保证不撕裂。
 class TrtLoggerAdapter final : public nvinfer1::ILogger
 {
 public:
@@ -129,7 +161,6 @@ public:
     {
     }
 
-    //! 给 createInferRuntime() / createInferBuilder() 用。
     nvinfer1::ILogger& trtLogger() noexcept { return *this; }
 
     void log(Severity severity, char const* msg) noexcept override
@@ -139,7 +170,6 @@ public:
             return;
         }
 
-        // 级别映射：TRT -> 应用
         const char* tag = "INFO ";
         bool toStderr = false;
         switch (severity)
@@ -171,28 +201,26 @@ inline TrtLoggerAdapter& trtLogger() noexcept
     return instance;
 }
 
+// -----------------------------------------------------------------------------
+//  崩溃捕获（可选，在 main / test 里调用）
+// -----------------------------------------------------------------------------
+//! 安装崩溃处理器：
+//!   * Linux: SIGSEGV / SIGABRT / SIGFPE / SIGILL
+//!   * Windows: SetUnhandledExceptionFilter
+//! 崩溃时打 ERROR 日志并 flush，然后退出。
+//! 幂等（重复调用只生效一次）。
+void installCrashHandler() noexcept;
+
 }  // namespace trt_alpha::core
 
-
-
-// =============================================================================
+// -----------------------------------------------------------------------------
 //  内存分配框图 log
 // -----------------------------------------------------------------------------
-//  用途：模型 / 数据源在"分配关键缓冲"时调用，把
-//    batch × 高 × 宽 × 通道 × 数据类型 → 字节数 → MB 用框图打出。
-//
-//  为什么在 logger 里：
-//    * 它和日志共用同一把锁（不撕裂）
-//    * 使用者只要 include logger.hpp 就能用
-//    * 池内部只打 DEBUG（它不知道语义），框图由"知道语义的人"打
-//
-//  走 INFO 级别（Release 也打）。
-// =============================================================================
 namespace trt_alpha::core::detail {
 
 struct AllocInfo
 {
-    const char* name = "";       //!< "input_nchw" / "output0" / "mask_proto"
+    const char* name = "";
     int batch = 0;
     int channels = 0;
     int height = 0;

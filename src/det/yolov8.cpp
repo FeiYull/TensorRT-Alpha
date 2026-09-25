@@ -194,12 +194,16 @@ void YoloV8::allocateBuffers()
 
 void YoloV8::init(const core::ModelConfig& cfg)
 {
+    TRT_LOG_DEBUG("YoloV8::init: entering");
     loadConfig(cfg);
-
+    TRT_LOG_DEBUG("YoloV8::init: config loaded");
     m_engine = std::make_unique<core::TrtEngine>(cfg.engine);
+    TRT_LOG_DEBUG("YoloV8::init: engine loaded");
     discoverEngineIo();
+    TRT_LOG_DEBUG("YoloV8::init: io discovered (srcRow=" << m_srcRow
+                 << ", anchors=" << m_anchors << ")");
     allocateBuffers();
-
+    TRT_LOG_DEBUG("YoloV8::init: buffers allocated");
     m_detections.assign(static_cast<std::size_t>(m_cfg.batchSize), {});
 
     TRT_LOG_INFO("YoloV8: initialized (batch=" << m_cfg.batchSize
@@ -209,6 +213,8 @@ void YoloV8::init(const core::ModelConfig& cfg)
 
 void YoloV8::setBatch(const core::Batch& batch)
 {
+    TRT_LOG_DEBUG("YoloV8::setBatch: entering, views=" << batch.views.size()
+                 << ", validCount=" << batch.validCount);
     if (batch.views.empty())
     {
         throw std::runtime_error("yolov8: empty batch");
@@ -221,6 +227,10 @@ void YoloV8::setBatch(const core::Batch& batch)
     m_batch = static_cast<int>(batch.views.size());
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
+
+    TRT_LOG_DEBUG("YoloV8::setBatch: batch=" << m_batch
+                 << ", srcSize=" << m_srcW << "x" << m_srcH
+                 << ", dstSize=" << m_cfg.dstW << "x" << m_cfg.dstH);
 
     // 构造 letterbox 几何
     buildLetterboxAffine(m_srcW, m_srcH, m_cfg.dstW, m_cfg.dstH, m_dst2src);
@@ -245,10 +255,15 @@ void YoloV8::setBatch(const core::Batch& batch)
     cudaMemcpyAsync(m_inputSrc.data(), batch.buffer->data(), total,
                     cudaMemcpyHostToDevice, m_stream.get());
     m_stream.synchronize();
+
+    TRT_LOG_DEBUG("YoloV8::setBatch: H2D done, " << total << " bytes");
 }
 
 void YoloV8::preprocess()
 {
+    TRT_LOG_DEBUG("YoloV8::preprocess: entering (batch=" << m_batch
+                 << ", src=" << m_srcW << "x" << m_srcH
+                 << ", dst=" << m_cfg.dstW << "x" << m_cfg.dstH << ")");
     kernels::resizeLetterbox(m_stream.get(), m_batch,
                              static_cast<const std::uint8_t*>(m_inputSrc.data()),
                              m_srcW, m_srcH,
@@ -262,10 +277,12 @@ void YoloV8::preprocess()
                                  m_cfg.dstW, m_cfg.dstH,
                                  m_normScale,
                                  m_normMean, m_normStd);
+    TRT_LOG_DEBUG("YoloV8::preprocess: done");
 }
 
 void YoloV8::infer()
 {
+    TRT_LOG_DEBUG("YoloV8::infer: entering (batch=" << m_batch << ")");
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
         !ctx->setTensorAddress(m_outputName.c_str(), m_outputSrc.data()))
@@ -276,14 +293,16 @@ void YoloV8::infer()
     {
         throw std::runtime_error("yolov8: enqueueV3 failed");
     }
+    TRT_LOG_DEBUG("YoloV8::infer: enqueueV3 done");
 }
 
 void YoloV8::postprocess()
 {
+    TRT_LOG_DEBUG("YoloV8::postprocess: entering (batch=" << m_batch << ")");
     // 确保 m_detections 有 m_batch 个元素
     // （commitResult 会 move 走 m_detections，下一轮需要重新分配）
     m_detections.assign(static_cast<std::size_t>(m_batch), {});
-    
+
     kernels::YoloDecodeParams p;
     p.batch = m_batch;
     p.numClasses = m_numClass;
@@ -335,10 +354,19 @@ void YoloV8::postprocess()
             m_detections[static_cast<std::size_t>(b)].push_back(d);
         }
     }
+    // 加"统计日志"
+    for (int b = 0; b < m_batch; ++b)
+    {
+        TRT_LOG_DEBUG("YoloV8::postprocess: batch[" << b << "] detections="
+                     << m_detections[static_cast<std::size_t>(b)].size());
+    }
+    TRT_LOG_DEBUG("YoloV8::postprocess: done");
 }
 
 void YoloV8::reset()
 {
+    TRT_LOG_DEBUG("YoloV8::reset: clearing " << m_detections.size()
+                 << " image result(s)");
     for (auto& v : m_detections)
     {
         v.clear();
