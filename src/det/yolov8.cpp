@@ -280,6 +280,10 @@ void YoloV8::infer()
 
 void YoloV8::postprocess()
 {
+    // 确保 m_detections 有 m_batch 个元素
+    // （commitResult 会 move 走 m_detections，下一轮需要重新分配）
+    m_detections.assign(static_cast<std::size_t>(m_batch), {});
+    
     kernels::YoloDecodeParams p;
     p.batch = m_batch;
     p.numClasses = m_numClass;
