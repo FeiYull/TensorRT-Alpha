@@ -101,10 +101,24 @@ int runCommand(const std::vector<std::string>& args)
         srcCfg.type = trt_alpha::datasource::SourceType::Image;
         srcCfg.path = opt.image;
     }
+    else if (!opt.images.empty())
+    {
+        srcCfg.type = trt_alpha::datasource::SourceType::Images;
+        srcCfg.path = opt.images;
+    }
+    else if (!opt.video.empty())
+    {
+        srcCfg.type = trt_alpha::datasource::SourceType::Video;
+        srcCfg.path = opt.video;
+    }
+    else if (opt.cameraId >= 0)
+    {
+        srcCfg.type = trt_alpha::datasource::SourceType::Camera;
+        srcCfg.cameraId = opt.cameraId;
+    }
     else
     {
-        TRT_LOG_ERROR("trt_alpha run: only --image is implemented in v1.0 A/B step");
-        return 1;
+        throw std::runtime_error("run: no source (should not happen)");
     }
 
     std::vector<std::unique_ptr<trt_alpha::datasource::IDataSource>> sources;

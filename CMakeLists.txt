@@ -155,3 +155,4 @@ target_link_libraries(trt_alpha_core
 # =============================================================================
 add_subdirectory(test)
 add_subdirectory(app)
+add_subdirectory(samples)

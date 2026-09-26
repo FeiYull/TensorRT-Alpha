@@ -77,3 +77,4 @@ build/
 *.github
 *test_pipeline_out
 *.txt
+*.github

@@ -114,6 +114,7 @@ std::string formatDouble(double v, int precision)
 
 void logAllocBox(const AllocInfo& info)
 {
+#if TRT_ALPHA_LOG_MIN_LEVEL <= TRT_ALPHA_LOG_LEVEL_DEBUG
     const std::size_t elemSize = sizeOf(info.dtype);
     const double mb = static_cast<double>(info.bytes) / (1024.0 * 1024.0);
 
@@ -140,6 +141,9 @@ void logAllocBox(const AllocInfo& info)
 
     std::lock_guard<std::mutex> lk(logMutex());
     std::cout << oss.str();
+#else
+    (void)info;   // Release / MinSizeRel: 不编译，零开销
+#endif
 }
 
 }  // namespace trt_alpha::core::detail
