@@ -1,6 +1,19 @@
 // =============================================================================
 //  trt_alpha :: app :: commands（实现）
 // =============================================================================
+#include "options.hpp"
+
+#include "trt_alpha/core/config.hpp"
+#include "trt_alpha/core/inference_pool.hpp"
+#include "trt_alpha/core/model.hpp"
+#include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/core/paths.hpp"
+#include "trt_alpha/datasource/i_data_source.hpp"
+#include "trt_alpha/datasource/opencv_source.hpp"
+#include "trt_alpha/datasource/source_config.hpp"
+#include "trt_alpha/pipeline/pipeline.hpp"
+#include "trt_alpha/pipeline/pipeline_config.hpp"
+#include "trt_alpha/renderer/opencv_renderer.hpp"
 #include "commands.hpp"
 
 #include "trt_alpha/core/logger.hpp"
@@ -47,10 +60,75 @@ int listCommand(const std::vector<std::string>& /*args*/)
     return 0;
 }
 
-int runCommand(const std::vector<std::string>& /*args*/)
+int runCommand(const std::vector<std::string>& args)
 {
-    TRT_LOG_WARN("trt_alpha run: not implemented yet");
-    return 1;
+    const RunOptions opt = parseRunOptions(args);
+    opt.validate();
+
+    // 1. 工程根覆盖（必须在首次 Paths::root() 之前）
+    if (!opt.root.empty())
+    {
+        trt_alpha::core::Paths::setOverride(opt.root);
+    }
+
+    // 2. 读 INI
+    const std::string iniPath =
+        opt.config.empty() ? "configs/yolov8.ini" : opt.config;
+    trt_alpha::core::ModelConfig modelCfg = trt_alpha::core::loadModelConfig(iniPath);
+
+    // 3. 命令行覆盖
+    if (!opt.engine.empty()) { modelCfg.engine = opt.engine; }
+    if (opt.batch > 0)       { modelCfg.batchSize = opt.batch; }
+
+    // 4. 类别
+    modelCfg.classNames = trt_alpha::core::loadClassNamesFile(modelCfg.classNamesFile);
+
+    // 5. 推理池
+    trt_alpha::core::InferencePool pool(
+        modelCfg,
+        [name = opt.model]() -> std::unique_ptr<trt_alpha::IModel> {
+            return trt_alpha::ModelRegistry::instance().create(name);
+        },
+        opt.workers);
+
+    // 6. 数据源（v1.0 先只做 --image）
+    trt_alpha::datasource::SourceConfig srcCfg;
+    srcCfg.batchSize = modelCfg.batchSize;
+    srcCfg.sourceId = 0;
+
+    if (!opt.image.empty())
+    {
+        srcCfg.type = trt_alpha::datasource::SourceType::Image;
+        srcCfg.path = opt.image;
+    }
+    else
+    {
+        TRT_LOG_ERROR("trt_alpha run: only --image is implemented in v1.0 A/B step");
+        return 1;
+    }
+
+    std::vector<std::unique_ptr<trt_alpha::datasource::IDataSource>> sources;
+    sources.push_back(
+        std::make_unique<trt_alpha::datasource::OpenCVSource>(srcCfg));
+
+    // 7. 渲染
+    trt_alpha::renderer::OpenCVRenderer renderer;
+
+    // 8. Pipeline
+    trt_alpha::pipeline::PipelineConfig cfg;
+    cfg.sources = std::move(sources);
+    cfg.pools = { &pool };
+    cfg.renderer = &renderer;
+    cfg.classNames = modelCfg.classNames;
+    cfg.saveEnabled = opt.save;
+    cfg.saveDir = opt.saveDir;
+    cfg.showEnabled = opt.show;
+
+    trt_alpha::pipeline::Pipeline p(std::move(cfg));
+    p.start();
+    p.waitForCompletion();
+
+    return 0;
 }
 
 int benchCommand(const std::vector<std::string>& /*args*/)
