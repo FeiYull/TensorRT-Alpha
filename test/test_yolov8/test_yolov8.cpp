@@ -203,11 +203,15 @@ int main(int argc, char** argv)
             auto m = ModelRegistry::instance().create("yolov8");
             m->init(cfg);
         }
-        catch (const std::runtime_error&) { threw = true; }
+        catch (const std::runtime_error& e)
+        {
+            threw = true;
+            std::cout << "       expected exception: " << e.what() << "\n";
+        }
         check(threw, "[2] init with missing engine throws");
     }
 
-    // [3] 真推理
+    // [3] 真推理 
     if (argc >= 3)
     {
         std::cout << "\n--- real inference ---\n";

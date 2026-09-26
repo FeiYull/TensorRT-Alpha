@@ -145,6 +145,10 @@ int main(int argc, char** argv)
         const std::string outDir = "test_pipeline_out";
         std::error_code ec;
         fs::remove_all(outDir, ec);
+        if (ec)
+        {
+            std::cout << "[WARN] cannot clean " << outDir << ": " << ec.message() << "\n";
+        }
 
         Pipeline pipeline(std::move(cfg));
         std::cout << "       pipeline constructed\n";

@@ -148,9 +148,12 @@ void OpenCVSource::requestStop()
 
 void OpenCVSource::copyIntoBatch(core::Batch& batch, int index, const cv::Mat& img)
 {
-    // batch.buffer 的布局：连续内存 [batchSize 张图]
-    const std::size_t oneFrame = static_cast<std::size_t>(img.cols) * img.rows * 3;
-    std::uint8_t* dst = batch.buffer->mutableData() + static_cast<std::size_t>(index) * oneFrame;
+    // 用 views[index] 的 stride 算偏移（避免硬编码 3 通道/紧凑布局）
+    const core::BufferView& v = batch.views[static_cast<std::size_t>(index)];
+    const std::size_t oneFrame =
+        static_cast<std::size_t>(v.stride) * static_cast<std::size_t>(v.height);
+    std::uint8_t* dst = batch.buffer->mutableData() +
+                        static_cast<std::size_t>(index) * oneFrame;
 
     // 逐行拷贝（cv::Mat 可能有 padding）
     const int rowBytes = img.cols * 3;

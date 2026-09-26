@@ -71,4 +71,9 @@ build/
 *test_legacy
 *.jpg
 # *FileTree.txt
-# *data/
+*data/
+*save/
+*FileTree.txt
+*.github
+*test_pipeline_out
+*.txt

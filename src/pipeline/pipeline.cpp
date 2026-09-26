@@ -251,24 +251,24 @@ void Pipeline::renderLoop()
             continue;
         }
 
-        // ---- 诊断日志 ----
-        TRT_LOG_INFO("Pipeline: got result  views=" << result.views.size()
+                // ---- 诊断日志 ----
+        TRT_LOG_DEBUG("Pipeline: got result  views=" << result.views.size()
                      << " validCount=" << result.validCount
                      << " detections=" << result.detections.size()
                      << " segmentations=" << result.segmentations.size()
                      << " classifications=" << result.classifications.size()
-                     << " buffer=" << (result.buffer ? "ok" : "null"));  // ← 加
+                     << " buffer=" << (result.buffer ? "ok" : "null"));
 
         const std::size_t n =
             std::min<std::size_t>(result.views.size(),
                 static_cast<std::size_t>(std::max(0, result.validCount)));
         for (std::size_t i = 0; i < n; ++i)
         {
-            TRT_LOG_INFO("Pipeline: view[" << i << "] data="
+            TRT_LOG_DEBUG("Pipeline: view[" << i << "] data="
                          << static_cast<const void*>(result.views[i].data)
                          << " w=" << result.views[i].width
                          << " h=" << result.views[i].height
-                         << " stride=" << result.views[i].stride);        // ← 加
+                         << " stride=" << result.views[i].stride);
         }
         // ---- 诊断日志结束 ----
 
@@ -297,7 +297,18 @@ void Pipeline::renderLoop()
                 TRT_LOG_ERROR("Pipeline: save failed: " << e.what());
             }
         }
-        // ... show 部分不变
+        if (m_cfg.showEnabled)
+        {
+            TRT_LOG_DEBUG("Pipeline: calling show");
+            try
+            {
+                m_cfg.renderer->show(result, m_cfg.showWindow);
+            }
+            catch (const std::exception& e)
+            {
+                TRT_LOG_ERROR("Pipeline: show failed: " << e.what());
+            }
+        }
     }
 
     TRT_LOG_INFO("Pipeline: render loop exiting");
