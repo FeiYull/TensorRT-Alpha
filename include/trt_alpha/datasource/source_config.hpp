@@ -24,6 +24,8 @@ struct SourceConfig
 
     //! 图片 / 目录 / 视频路径（相对工程根或绝对路径）。
     //! type == Camera 时忽略。
+    //! TODO(v1.1): Video 支持 RTSP/HTTP 流 URL（OpenCV VideoCapture 原生支持）；
+    //!             Image 不支持 URL（cv::imread 只认本地路径）。
     std::string path;
 
     //! 摄像头 ID（type == Camera 时有效）。

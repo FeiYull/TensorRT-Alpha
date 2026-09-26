@@ -116,6 +116,20 @@ target_compile_definitions(trt_alpha_core PRIVATE
     TRT_ALPHA_ROOT_DIR="${CMAKE_SOURCE_DIR}"
 )
 
+# =============================================================================
+# 日志级别（按构建类型自动设）
+# -----------------------------------------------------------------------------
+#   Debug / RelWithDebInfo  →  DEBUG（全开，冗余日志，崩溃可诊断）
+#   Release / MinSizeRel    →  INFO （只保留关键信息，DEBUG 零开销）
+#   PUBLIC 让所有依赖 trt_alpha_core 的 target 继承。
+# =============================================================================
+target_compile_definitions(trt_alpha_core PUBLIC
+    $<$<CONFIG:Debug>:TRT_ALPHA_LOG_MIN_LEVEL=0>
+    $<$<CONFIG:RelWithDebInfo>:TRT_ALPHA_LOG_MIN_LEVEL=0>
+    $<$<CONFIG:Release>:TRT_ALPHA_LOG_MIN_LEVEL=1>
+    $<$<CONFIG:MinSizeRel>:TRT_ALPHA_LOG_MIN_LEVEL=2>
+)
+
 # Release 构建：TRT_LOG_DEBUG 变成 do {} while(0)，零开销
 # Debug 构建：全开（调试方便）
 target_compile_definitions(trt_alpha_core PRIVATE
@@ -140,3 +154,4 @@ target_link_libraries(trt_alpha_core
 # 测试
 # =============================================================================
 add_subdirectory(test)
+add_subdirectory(app)
