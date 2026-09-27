@@ -7,10 +7,6 @@
 //    [3] requireFile()：存在 OK；不存在抛异常
 //    [4] setOverride 时序规则（必须在首次 root() 前）
 //    [5] toPath / toDisplay 基本行为
-//
-//  注意：setOverride 一旦调用，进程生命周期内有效；所以它的测试必须
-//        放在其他测试之前，且之后不能再调 root()。本测试把 setOverride
-//        单独放到最前，通过临时目录验证。
 // =============================================================================
 #include "trt_alpha/core/paths.hpp"
 
@@ -62,16 +58,7 @@ int main()
 
     // [3] requireFile()
     {
-        // 找一个确定存在的文件——用 test_paths.exe 自身
-        // 但 requireFile 按 root 解析相对路径，而 exe 是绝对路径，所以传绝对路径
-        // 这里用一个"肯定存在的文件"验证 OK 路径：
-        const fs::path selfExe =
-#ifdef _WIN32
-            "D:/VS2022_Project/TensorRT-Alpha/build/bin/Debug/test_paths.exe";
-#else
-            "./test_paths";
-#endif
-        // 直接测"不存在的文件抛异常"
+        // 不存在的文件抛异常
         bool threw = false;
         try
         {
@@ -84,12 +71,24 @@ int main()
         }
         check(threw, "[3] requireFile throws for missing file");
 
-        // 如果 selfExe 存在，验证 OK 路径
-        if (fs::exists(selfExe))
+        // 用临时文件验证 OK 路径（不依赖本机绝对路径）
+        const fs::path tmp = fs::temp_directory_path() / "test_paths_ok.txt";
         {
-            const fs::path ok = Paths::requireFile(selfExe.string(), "self exe");
-            check(fs::exists(ok), "[3] requireFile OK for existing absolute path");
+            std::ofstream out(tmp);
+            out << "ok";
         }
+        try
+        {
+            const fs::path ok = Paths::requireFile(tmp.string(), "temp file");
+            check(fs::exists(ok), "[3] requireFile OK for existing file");
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "[FAIL] [3] threw: " << e.what() << "\n";
+            ++g_failures;
+        }
+        std::error_code ec;
+        fs::remove(tmp, ec);
     }
 
     // [4] setOverride 时序规则

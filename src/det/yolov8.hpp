@@ -76,7 +76,6 @@ private:
     // ---- Device / Host 缓冲 ----
     core::CudaStream m_stream;
     core::DeviceBuffer m_inputSrc;        // 原图上传（uint8 BGR HWC）
-    core::PinnedBuffer m_inputStaging;    // 页锁定上传暂存
     core::DeviceBuffer m_resizeOut;       // letterbox 输出（float BGR HWC）
     core::DeviceBuffer m_inputNchw;       // NCHW 归一化后（网络输入）
     core::DeviceBuffer m_outputSrc;       // 引擎原始输出（[B, 4+nc, anchors]）

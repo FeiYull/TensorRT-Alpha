@@ -161,10 +161,6 @@ void YoloV8::allocateBuffers()
     logBox("yolov8.input_src", B, 3, H, W, core::DataType::UInt8,
            m_inputSrc.bytes(), core::MemorySpace::Device);
 
-    m_inputStaging.allocate(static_cast<std::size_t>(B) * 3 * W * H);
-    logBox("yolov8.input_staging", B, 3, H, W, core::DataType::UInt8,
-           m_inputStaging.bytes(), core::MemorySpace::Host);
-
     m_resizeOut.allocate(static_cast<std::size_t>(B) * oneImageF32);
     logBox("yolov8.resize_out", B, 3, H, W, core::DataType::Float32,
            m_resizeOut.bytes(), core::MemorySpace::Device);
@@ -190,6 +186,14 @@ void YoloV8::allocateBuffers()
     m_objectsHost.allocate(static_cast<std::size_t>(B) * m_objectsPerImage * sizeof(float));
     logBox("yolov8.objects_host", B, m_objectsPerImage, 1, 1,
            core::DataType::Float32, m_objectsHost.bytes(), core::MemorySpace::Host);
+
+    // ---- 绑定 I/O 张量地址（buffer 指针不变，一次即可）----
+    nvinfer1::IExecutionContext* ctx = m_engine->context();
+    if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
+        !ctx->setTensorAddress(m_outputName.c_str(), m_outputSrc.data()))
+    {
+        throw std::runtime_error("yolov8: setTensorAddress failed");
+    }
 }
 
 void YoloV8::init(const core::ModelConfig& cfg)
@@ -249,7 +253,6 @@ void YoloV8::setBatch(const core::Batch& batch)
     {
         // 尺寸变化触发扩容（少见）
         m_inputSrc.allocate(total);
-        m_inputStaging.allocate(total);
     }
 
     cudaMemcpyAsync(m_inputSrc.data(), batch.buffer->data(), total,
@@ -284,11 +287,7 @@ void YoloV8::infer()
 {
     TRT_LOG_DEBUG("YoloV8::infer: entering (batch=" << m_batch << ")");
     nvinfer1::IExecutionContext* ctx = m_engine->context();
-    if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
-        !ctx->setTensorAddress(m_outputName.c_str(), m_outputSrc.data()))
-    {
-        throw std::runtime_error("yolov8: setTensorAddress failed");
-    }
+    // 地址已在 allocateBuffers() 绑定
     if (!ctx->enqueueV3(m_stream.get()))
     {
         throw std::runtime_error("yolov8: enqueueV3 failed");

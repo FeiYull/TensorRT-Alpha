@@ -144,23 +144,29 @@ void OpenCVSource::requestStop()
     m_stopRequested.store(true);
 }
 
-
-
 void OpenCVSource::copyIntoBatch(core::Batch& batch, int index, const cv::Mat& img)
 {
-    // 用 views[index] 的 stride 算偏移（避免硬编码 3 通道/紧凑布局）
     const core::BufferView& v = batch.views[static_cast<std::size_t>(index)];
     const std::size_t oneFrame =
         static_cast<std::size_t>(v.stride) * static_cast<std::size_t>(v.height);
     std::uint8_t* dst = batch.buffer->mutableData() +
                         static_cast<std::size_t>(index) * oneFrame;
 
-    // 逐行拷贝（cv::Mat 可能有 padding）
     const int rowBytes = img.cols * 3;
-    for (int y = 0; y < img.rows; ++y)
+
+    // 连续 + 紧凑：一句话拷贝；否则逐行
+    if (img.isContinuous() && v.stride == rowBytes)
     {
-        std::memcpy(dst + static_cast<std::size_t>(y) * rowBytes,
-                    img.ptr(y), rowBytes);
+        std::memcpy(dst, img.data,
+                    static_cast<std::size_t>(rowBytes) * img.rows);
+    }
+    else
+    {
+        for (int y = 0; y < img.rows; ++y)
+        {
+            std::memcpy(dst + static_cast<std::size_t>(y) * v.stride,
+                        img.ptr(y), rowBytes);
+        }
     }
 }
 

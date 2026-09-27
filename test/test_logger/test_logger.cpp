@@ -25,6 +25,15 @@ void check(bool cond, const char* what)
     else      { std::cout << "[FAIL] " << what << "\n"; ++g_failures; }
 }
 
+//! 线程体（独立函数，让 __func__ 显示 "logThread" 而不是 "operator ()"）。
+void logThread(int t, int lines)
+{
+    for (int i = 0; i < lines; ++i)
+    {
+        TRT_LOG_INFO("thread " << t << " line " << i);
+    }
+}
+
 }  // namespace
 
 int main()
@@ -44,18 +53,8 @@ int main()
 
     // ---------------------------------------------------------------
     // [2] 多线程不撕裂
-    //   4 线程 × 500 行，检查每行都以 [INFO ] 开头、以 '\n' 结尾
     // ---------------------------------------------------------------
     {
-        // 把 stdout 重定向到一个 stringstream 捕获输出
-        // 注意：本测试需要 stdout 是"管道/文件"才能重定向；
-        // 这里简化做法：直接让线程输出到 stdout（人眼看），
-        // 同时用一个计数验证"没有崩溃"。
-        //
-        // 更严格的撕裂验证需要进程级捕获 stdout，超出本测试范围。
-        // 这里先做"压力测试"——如果多线程下程序不崩、不丢日志行，
-        // 就说明锁机制基本工作。
-
         constexpr static int kThreads = 4;
         constexpr static int kLinesPerThread = 500;
         std::atomic<int> doneCount{0};
@@ -65,10 +64,7 @@ int main()
         for (int t = 0; t < kThreads; ++t)
         {
             threads.emplace_back([t, &doneCount] {
-                for (int i = 0; i < kLinesPerThread; ++i)
-                {
-                    TRT_LOG_INFO("thread " << t << " line " << i);
-                }
+                logThread(t, kLinesPerThread);
                 doneCount.fetch_add(1);
             });
         }

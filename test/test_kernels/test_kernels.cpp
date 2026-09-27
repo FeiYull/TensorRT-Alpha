@@ -45,14 +45,13 @@ int main()
     CudaStream stream;
 
     // ---------------------------------------------------------------
-    // [1] resizeLetterbox：1x1 -> 2x2
+    // [1] resizeLetterbox：2x2 -> 4x4，4 个角对齐
     // ---------------------------------------------------------------
     {
-        // src: 1x1 uint8 BGR = [10, 20, 30]
-        // dst: 2x2 float BGR，仿射为恒等（放大 1:1，无 padding）
         constexpr int SRC_W = 2, SRC_H = 2;
         constexpr int DST_W = 4, DST_H = 4;
 
+        // src 4 个像素： [0,1,2] [3,4,5] [6,7,8] [9,10,11]
         std::vector<std::uint8_t> srcHost(SRC_W * SRC_H * 3);
         for (int i = 0; i < SRC_W * SRC_H * 3; ++i)
         {
@@ -65,10 +64,19 @@ int main()
         cudaMemcpy(srcDev.data(), srcHost.data(), srcHost.size(),
                    cudaMemcpyHostToDevice);
 
-        // 仿射：dst(4x4) -> src(2x2)，scale = 0.5
+        // 仿射：dst(4x4) -> src(2x2)，让 4 个角对齐：
+        //   dst(0,0) -> src(0,0)
+        //   dst(3,0) -> src(1,0)
+        //   dst(0,3) -> src(0,1)
+        //   dst(3,3) -> src(1,1)
+        // 即 scale = (SRC_W-1)/(DST_W-1) = 1/3
+        const float sx = static_cast<float>(SRC_W - 1) /
+                         static_cast<float>(DST_W - 1);
+        const float sy = static_cast<float>(SRC_H - 1) /
+                         static_cast<float>(DST_H - 1);
         AffineMat m;
-        m.v0 = 0.5f; m.v1 = 0.f; m.v2 = 0.f;
-        m.v3 = 0.f;  m.v4 = 0.5f; m.v5 = 0.f;
+        m.v0 = sx;  m.v1 = 0.f; m.v2 = 0.f;
+        m.v3 = 0.f; m.v4 = sy;  m.v5 = 0.f;
 
         trt_alpha::kernels::resizeLetterbox(
             stream.get(), 1,
@@ -81,9 +89,19 @@ int main()
         cudaMemcpy(dstHost.data(), dstDev.data(), dstHost.size() * sizeof(float),
                    cudaMemcpyDeviceToHost);
 
-        // 左上角 (0,0) 采样 src(0,0) = [0,1,2]
-        check(dstHost[0] == 0.f && dstHost[1] == 1.f && dstHost[2] == 2.f,
-              "[1] top-left pixel sampled correctly");
+        const auto at = [&](int x, int y, int c) -> float {
+            return dstHost[(static_cast<std::size_t>(y) * DST_W + x) * 3 + c];
+        };
+
+        // 4 个角的 R 通道
+        check(at(0, 0, 0) == 0.f, "[1] top-left    R == 0");
+        check(at(3, 0, 0) == 3.f, "[1] top-right   R == 3");
+        check(at(0, 3, 0) == 6.f, "[1] bottom-left R == 6");
+        check(at(3, 3, 0) == 9.f, "[1] bottom-right R == 9");
+
+        // 4 个角的 G 通道（src G = R+1）
+        check(at(0, 0, 1) == 1.f, "[1] top-left    G == 1");
+        check(at(3, 3, 1) == 10.f, "[1] bottom-right G == 10");
     }
 
     // ---------------------------------------------------------------
