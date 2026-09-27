@@ -34,6 +34,15 @@ void transposeAnchors(cudaStream_t stream, int batch,
                       const float* src, int srcRow, int anchors,
                       float* dst);
 
+//! 解码 anchor-based + objectness 的 YOLO 头（v5 / v7 / v3 / v4 / yolor 通用）：
+//! 输入 [B, anchors, 5 + numClasses]（layout 已是 anchor-major，无需 transpose），
+//! confidence = objectness × max(cls_score)。
+//! 解码 YOLOv5 检测头（anchor-based，含 objectness）：
+//! 输入 [B, anchors, 5 + numClasses]（layout 已是 anchor-major，无需 transpose），
+//! 输出与 decodeYoloV8Head 相同布局（left top right bottom conf label keep）。
+void decodeYoloV5Head(cudaStream_t stream, const YoloDecodeParams& p,
+                      const float* src, int anchors, float* objects);
+
 //! 解码 YOLOv8 检测头（anchor-free，xywh -> xyxy，取类别最大分）
 void decodeYoloV8Head(cudaStream_t stream, const YoloDecodeParams& p,
                       const float* src, int anchors, float* objects);

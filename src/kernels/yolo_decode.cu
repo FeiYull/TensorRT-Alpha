@@ -157,6 +157,63 @@ __global__ void nmsFastKernel(int topK, int batchSize, float iouThresh,
     }
 }
 
+__global__ void decodeV5HeadKernel(int batchSize, int numClasses, int topK,
+                                   float confThresh, const float* __restrict__ src,
+                                   int srcRow, int anchors,
+                                   float* __restrict__ dst, int dstRow)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // anchor 序号
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+    if (dx >= anchors || dy >= batchSize)
+    {
+        return;
+    }
+    const int srcArea = anchors * srcRow;
+    const int dstArea = 1 + dstRow * topK;
+
+    const float* item = src + dy * srcArea + dx * srcRow;
+    const float objectness = item[4];
+    if (objectness < confThresh)
+    {
+        return;
+    }
+    const float* clsScore = item + 5;
+    float confidence = clsScore[0];
+    int label = 0;
+    for (int i = 1; i < numClasses; ++i)
+    {
+        if (clsScore[i] > confidence)
+        {
+            confidence = clsScore[i];
+            label = i;
+        }
+    }
+    confidence *= objectness;
+    if (confidence < confThresh)
+    {
+        return;
+    }
+
+    const int index = atomicAdd(dst + dy * dstArea, 1);
+    if (index >= topK)
+    {
+        return;
+    }
+
+    const float cx = item[0];
+    const float cy = item[1];
+    const float w = item[2];
+    const float h = item[3];
+    float* out = dst + dy * dstArea + 1 + index * dstRow;
+    out[0] = cx - w * 0.5f;
+    out[1] = cy - h * 0.5f;
+    out[2] = cx + w * 0.5f;
+    out[3] = cy + h * 0.5f;
+    out[4] = confidence;
+    out[5] = static_cast<float>(label);
+    out[6] = 1.f;
+}
+
 }  // namespace detail
 
 void transposeAnchors(cudaStream_t stream, int batch,
@@ -189,6 +246,21 @@ void decodeYoloV8SegHead(cudaStream_t stream, const YoloDecodeParams& p,
         p.batch, p.numClasses, p.topK, p.confThreshold,
         src, srcRow, anchors, objects, dstRow, numMaskCoeffs);
     checkCuda(cudaGetLastError(), "decodeYoloV8SegHead launch");
+}
+
+void decodeYoloV5Head(cudaStream_t stream, const YoloDecodeParams& p,
+                      const float* src, int anchors, float* objects)
+{
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((anchors + kBlockSize - 1) / kBlockSize,
+                    (p.batch + kBlockSize - 1) / kBlockSize);
+    const int srcRow = 5 + p.numClasses;
+    const int dstRow = kObjectWidth;
+
+    detail::decodeV5HeadKernel<<<grid, block, 0, stream>>>(
+        p.batch, p.numClasses, p.topK, p.confThreshold,
+        src, srcRow, anchors, objects, dstRow);
+    checkCuda(cudaGetLastError(), "decodeYoloV5Head launch");
 }
 
 void nmsFast(cudaStream_t stream, const YoloDecodeParams& p,

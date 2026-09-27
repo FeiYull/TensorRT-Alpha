@@ -28,6 +28,9 @@ void checkCuda(cudaError_t err, const char* op)
 
 namespace detail {
 
+
+
+    
 //! 2x3 仿射投影：输出坐标 -> 源图坐标。
 __device__ inline void affineProject(const AffineMat& m, int x, int y,
                                      float* px, float* py)
@@ -101,7 +104,8 @@ __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
                                     float* __restrict__ dst,
                                     int batchSize, int width, int height,
                                     float scale, float m0, float m1, float m2,
-                                    float s0, float s1, float s2)
+                                    float s0, float s1, float s2,
+                                    int swapRB)
 {
     const int dx = blockDim.x * blockIdx.x + threadIdx.x;
     const int dy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -112,7 +116,8 @@ __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
     }
     const int spatial = dx / 3;
     const int chIn = dx % 3;
-    const int chOut = 2 - chIn;   // BGR -> RGB
+    // swapRB: BGR -> RGB；不 swap: 保持 BGR
+    const int chOut = swapRB ? (2 - chIn) : chIn;
     const int y = spatial / width;
     const int x = spatial % width;
 
@@ -120,7 +125,8 @@ __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
     const float stdv = (chOut == 0) ? s0 : (chOut == 1) ? s1 : s2;
     const float v = src[dy * volume + dx];
 
-    dst[dy * volume + chOut * (width * height) + y * width + x] = (v / scale - mean) / stdv;
+    dst[dy * volume + chOut * (width * height) + y * width + x] =
+        (v / scale - mean) / stdv;
 }
 
 }  // namespace detail
@@ -141,14 +147,16 @@ void resizeLetterbox(cudaStream_t stream, int batch,
 void bgrToNchwNormalized(cudaStream_t stream, int batch,
                          const float* src, float* dst,
                          int width, int height,
-                         float scale, const float mean[3], const float std_[3])
+                         float scale, const float mean[3], const float std_[3],
+                         bool swapRB)
 {
     const dim3 block(kBlockSize, kBlockSize);
     const dim3 grid((width * height * 3 + kBlockSize - 1) / kBlockSize,
                     (batch + kBlockSize - 1) / kBlockSize);
     detail::bgrToNchwNormKernel<<<grid, block, 0, stream>>>(
         src, dst, batch, width, height, scale,
-        mean[0], mean[1], mean[2], std_[0], std_[1], std_[2]);
+        mean[0], mean[1], mean[2], std_[0], std_[1], std_[2],
+        swapRB ? 1 : 0);
     checkCuda(cudaGetLastError(), "bgrToNchwNormalized launch");
 }
 

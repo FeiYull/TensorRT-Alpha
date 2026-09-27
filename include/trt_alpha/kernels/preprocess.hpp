@@ -21,6 +21,16 @@ struct AffineMat
     float v3, v4, v5;
 };
 
+//! 融合 kernel：float BGR HWC (Device) -> 归一化 + (可选 BGR→RGB) + NCHW (Device)
+//! 数值语义：out = (src / scale - mean) / std
+//! swapRB = true 时 BGR→RGB（YOLOv5/v6/v7/v8 用）；
+//! swapRB = false 时不转通道（YOLOX 用）。
+void bgrToNchwNormalized(cudaStream_t stream, int batch,
+                         const float* src, float* dst,
+                         int width, int height,
+                         float scale, const float mean[3], const float std_[3],
+                         bool swapRB = true);
+
 //! letterbox 双线性 resize：uint8 BGR HWC (Device) -> float BGR HWC (Device)
 //! padValue 通常取 114（与 ultralytics 一致）。
 //! dst2src：网络输入坐标 → 源图坐标的仿射矩阵。
@@ -28,12 +38,5 @@ void resizeLetterbox(cudaStream_t stream, int batch,
                      const std::uint8_t* src, int srcW, int srcH,
                      float* dst, int dstW, int dstH,
                      float padValue, AffineMat dst2src);
-
-//! 融合 kernel：float BGR HWC (Device) -> 归一化 + BGR→RGB + NCHW (Device)
-//! 数值语义：out = (src / scale - mean) / std
-void bgrToNchwNormalized(cudaStream_t stream, int batch,
-                         const float* src, float* dst,
-                         int width, int height,
-                         float scale, const float mean[3], const float std_[3]);
 
 }  // namespace trt_alpha::kernels
