@@ -43,6 +43,10 @@ int parseInt(const std::string& text, const std::string& flag)
 
 }  // namespace
 
+// =============================================================================
+//  RunOptions
+// =============================================================================
+
 bool RunOptions::hasSource() const noexcept
 {
     return !image.empty() || !images.empty() || !video.empty() || cameraId >= 0;
@@ -71,6 +75,10 @@ void RunOptions::validate() const
         throw std::runtime_error("run: --batch must be > 0 (got " +
                                  std::to_string(batch) + ")");
     }
+    if (workers == 0)
+    {
+        throw std::runtime_error("run: --workers must be > 0");
+    }
 }
 
 RunOptions parseRunOptions(const std::vector<std::string>& args)
@@ -98,6 +106,58 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
         else
         {
             throw std::runtime_error("run: unknown option '" + a + "'");
+        }
+    }
+
+    return opt;
+}
+
+// =============================================================================
+//  BenchOptions
+// =============================================================================
+
+void BenchOptions::validate() const
+{
+    if (engine.empty() && config.empty())
+    {
+        throw std::runtime_error("bench: need --engine or --config");
+    }
+    if (iters <= 0)
+    {
+        throw std::runtime_error("bench: --iters must be > 0 (got " +
+                                 std::to_string(iters) + ")");
+    }
+    if (warmup < 0)
+    {
+        throw std::runtime_error("bench: --warmup must be >= 0 (got " +
+                                 std::to_string(warmup) + ")");
+    }
+    if (batch == 0 || batch < -1)
+    {
+        throw std::runtime_error("bench: --batch must be > 0 (got " +
+                                 std::to_string(batch) + ")");
+    }
+}
+
+BenchOptions parseBenchOptions(const std::vector<std::string>& args)
+{
+    BenchOptions opt;
+
+    // args[0] == "bench"，从 1 开始
+    for (std::size_t i = 1; i < args.size(); ++i)
+    {
+        const std::string& a = args[i];
+
+        if      (a == "--engine") { opt.engine = nextArg(args, i, a); }
+        else if (a == "--config") { opt.config = nextArg(args, i, a); }
+        else if (a == "--model")  { opt.model = nextArg(args, i, a); }
+        else if (a == "--batch")  { opt.batch = parseInt(nextArg(args, i, a), a); }
+        else if (a == "--iters")  { opt.iters = parseInt(nextArg(args, i, a), a); }
+        else if (a == "--warmup") { opt.warmup = parseInt(nextArg(args, i, a), a); }
+        else if (a == "--root")   { opt.root = nextArg(args, i, a); }
+        else
+        {
+            throw std::runtime_error("bench: unknown option '" + a + "'");
         }
     }
 
