@@ -79,3 +79,4 @@ build/
 *.txt
 *.github
 *z_cmd.txt
+*.ps1

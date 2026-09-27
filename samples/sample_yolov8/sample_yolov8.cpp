@@ -39,12 +39,12 @@ int main(int argc, char** argv)
     {
         std::cout << "usage: sample_yolov8 <engine.trt> <input> [--save]\n"
                   << "  input : image / video path\n"
-                  << "  --save: 存盘结果图（save/）\n";
+                  << "  --save: save result images to save/\n";
         return 1;
     }
 
     const std::string enginePath = argv[1];
-    const std::string inputPath = argv[2];
+    const std::string inputPath  = argv[2];
     const bool saveEnabled = (argc >= 4 && std::string(argv[3]) == "--save");
 
     try
