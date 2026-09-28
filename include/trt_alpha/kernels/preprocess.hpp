@@ -13,6 +13,11 @@
 
 namespace trt_alpha::kernels {
 
+//! BGR HWC float (Device) -> RGB HWC float (Device)，in-place。
+//! 不归一化、不转 layout。用于 EfficientDet（输入 NHWC）。
+void bgrToRgbHwc(cudaStream_t stream, int batch,
+                 float* data, int width, int height);
+
 //! 把 float BGR HWC (Device) 原样拷到 dst 的 (padTop, padLeft) 位置，
 //! 其他区域填 padValue。不做缩放。
 //! src 尺寸 = srcW × srcH，dst 尺寸 = dstW × dstH。
@@ -45,6 +50,14 @@ void bgrToNchwNormalized(cudaStream_t stream, int batch,
 //! dst2src：网络输入坐标 → 源图坐标的仿射矩阵。
 void resizeLetterbox(cudaStream_t stream, int batch,
                      const std::uint8_t* src, int srcW, int srcH,
+                     float* dst, int dstW, int dstH,
+                     float padValue, AffineMat dst2src);
+
+//! letterbox 双线性 resize 的 float 输入版：
+//! float BGR HWC (Device) -> float BGR HWC (Device)。
+//! 用于 EfficientDet（H2D 时已经转成 float）。
+void resizeLetterbox(cudaStream_t stream, int batch,
+                     const float* src, int srcW, int srcH,
                      float* dst, int dstW, int dstH,
                      float padValue, AffineMat dst2src);
 

@@ -11,6 +11,9 @@
 
 namespace trt_alpha::kernels::detail {
 
+__global__ void bgrToRgbHwcKernel(float* __restrict__ data,
+                                  int batchSize, int width, int height);
+
 __global__ void copyWithPaddingKernel(int batchSize,
                                       const float* __restrict__ src,
                                       int srcWidth, int srcHeight,
@@ -31,5 +34,11 @@ __global__ void resizeLetterboxKernel(const std::uint8_t* __restrict__ src,
                                       int srcW, int srcH,
                                       float* __restrict__ dst, int dstW, int dstH,
                                       int batchSize, float padValue, AffineMat m);
+
+//! float 输入版（逻辑同上，只是 src 是 float）。
+__global__ void resizeLetterboxF32Kernel(const float* __restrict__ src,
+                                         int srcW, int srcH,
+                                         float* __restrict__ dst, int dstW, int dstH,
+                                         int batchSize, float padValue, AffineMat m);
 
 }  // namespace trt_alpha::kernels::detail

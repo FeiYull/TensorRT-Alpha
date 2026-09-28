@@ -6,6 +6,8 @@
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/paths.hpp"
 
+#include <NvInferPlugin.h> 
+
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -118,6 +120,10 @@ TrtEngine::TrtEngine(const std::string& engineFile)
 
 void TrtEngine::loadSerialized(const void* data, std::size_t size)
 {
+    // 注册 TensorRT 官方插件（EfficientNMS_TRT 等）。
+    // 幂等：重复调用只生效一次。
+    initLibNvInferPlugins(&trtLogger().trtLogger(), "");
+
     std::unique_ptr<nvinfer1::IRuntime> runtime(
         nvinfer1::createInferRuntime(trtLogger().trtLogger()));
     if (runtime == nullptr)
