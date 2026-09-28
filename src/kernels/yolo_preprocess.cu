@@ -129,7 +129,59 @@ __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
         (v / scale - mean) / stdv;
 }
 
+__global__ void copyWithPaddingKernel(int batchSize,
+                                      const float* __restrict__ src,
+                                      int srcWidth, int srcHeight,
+                                      float* __restrict__ dst,
+                                      int dstWidth, int dstHeight,
+                                      float paddingValue,
+                                      int padTop, int padLeft)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
+    const int dstArea = dstWidth * dstHeight;
+    if (dx >= dstArea || dy >= batchSize)
+    {
+        return;
+    }
+    const int dstY = dx / dstWidth;
+    const int dstX = dx % dstWidth;
+    const int srcVolume = 3 * srcHeight * srcWidth;
+    const int dstVolume = 3 * dstHeight * dstWidth;
+    float* pdst = dst + dy * dstVolume + dstY * dstWidth * 3 + dstX * 3;
+
+    if (dstY < (srcHeight + padTop) && dstY >= padTop &&
+        dstX < (srcWidth + padLeft) && dstX >= padLeft)
+    {
+        const int sy = dstY - padTop;
+        const int sx = dstX - padLeft;
+        const float* psrc = src + dy * srcVolume + sy * srcWidth * 3 + sx * 3;
+        pdst[0] = psrc[0];
+        pdst[1] = psrc[1];
+        pdst[2] = psrc[2];
+    }
+    else
+    {
+        pdst[0] = paddingValue;
+        pdst[1] = paddingValue;
+        pdst[2] = paddingValue;
+    }
+}
+
 }  // namespace detail
+
+void copyWithPadding(cudaStream_t stream, int batch,
+                     const float* src, int srcW, int srcH,
+                     float* dst, int dstW, int dstH,
+                     float padValue, int padTop, int padLeft)
+{
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((dstW * dstH + kBlockSize - 1) / kBlockSize,
+                    (batch + kBlockSize - 1) / kBlockSize);
+    detail::copyWithPaddingKernel<<<grid, block, 0, stream>>>(
+        batch, src, srcW, srcH, dst, dstW, dstH, padValue, padTop, padLeft);
+    checkCuda(cudaGetLastError(), "copyWithPadding launch");
+}
 
 void resizeLetterbox(cudaStream_t stream, int batch,
                      const std::uint8_t* src, int srcW, int srcH,

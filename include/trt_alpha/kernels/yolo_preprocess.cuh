@@ -11,6 +11,14 @@
 
 namespace trt_alpha::kernels::detail {
 
+__global__ void copyWithPaddingKernel(int batchSize,
+                                      const float* __restrict__ src,
+                                      int srcWidth, int srcHeight,
+                                      float* __restrict__ dst,
+                                      int dstWidth, int dstHeight,
+                                      float paddingValue,
+                                      int padTop, int padLeft);
+
 __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
                                     float* __restrict__ dst,
                                     int batchSize, int width, int height,

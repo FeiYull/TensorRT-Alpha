@@ -13,6 +13,15 @@
 
 namespace trt_alpha::kernels {
 
+//! 把 float BGR HWC (Device) 原样拷到 dst 的 (padTop, padLeft) 位置，
+//! 其他区域填 padValue。不做缩放。
+//! src 尺寸 = srcW × srcH，dst 尺寸 = dstW × dstH。
+//! 用于 YOLO-NAS 的"先缩放到 636×636，再 pad 到 640×640"。
+void copyWithPadding(cudaStream_t stream, int batch,
+                     const float* src, int srcW, int srcH,
+                     float* dst, int dstW, int dstH,
+                     float padValue, int padTop, int padLeft);
+
 //! 2x3 仿射矩阵（网络输入坐标 → 源图坐标）。
 //! letterbox 只做等比缩放 + 平移，故 v1 == v3 == 0。
 struct AffineMat

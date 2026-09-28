@@ -29,6 +29,13 @@ struct YoloDecodeParams
 //! left / top / right / bottom / conf / label / keep
 constexpr int kObjectWidth = 7;
 
+//! 解码 YOLO-NAS 检测头：
+//! 输入 [B, anchors, 4 + numClasses]（3 维，无 objectness，
+//! item[0..3] 直接是 left/top/right/bottom，像素坐标）。
+//! 输出布局与 decodeYoloV5Head 相同。
+void decodeYoloNasHead(cudaStream_t stream, const YoloDecodeParams& p,
+                       const float* src, int anchors, float* objects);
+
 //! 转置 [batch, srcRow, anchors] -> [batch, anchors, srcRow]（Device -> Device）
 void transposeAnchors(cudaStream_t stream, int batch,
                       const float* src, int srcRow, int anchors,

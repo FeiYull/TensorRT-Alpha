@@ -326,7 +326,70 @@ __global__ void decodeV5HeadKernel(int batchSize, int numClasses, int topK,
     out[6] = 1.f;
 }
 
+__global__ void decodeNasHeadKernel(int batchSize, int numClasses, int topK,
+                                    float confThresh, const float* __restrict__ src,
+                                    int srcRow, int anchors,
+                                    float* __restrict__ dst, int dstRow)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // anchor 序号
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+    if (dx >= anchors || dy >= batchSize)
+    {
+        return;
+    }
+    const int srcArea = anchors * srcRow;
+    const int dstArea = 1 + dstRow * topK;
+
+    const float* item = src + dy * srcArea + dx * srcRow;
+    const float* clsScore = item + 4;
+    float confidence = clsScore[0];
+    int label = 0;
+    for (int i = 1; i < numClasses; ++i)
+    {
+        if (clsScore[i] > confidence)
+        {
+            confidence = clsScore[i];
+            label = i;
+        }
+    }
+    if (confidence < confThresh)
+    {
+        return;
+    }
+
+    const int index = atomicAdd(dst + dy * dstArea, 1);
+    if (index >= topK)
+    {
+        return;
+    }
+
+    // YOLO-NAS: item[0..3] 直接是 left/top/right/bottom
+    float* out = dst + dy * dstArea + 1 + index * dstRow;
+    out[0] = item[0];
+    out[1] = item[1];
+    out[2] = item[2];
+    out[3] = item[3];
+    out[4] = confidence;
+    out[5] = static_cast<float>(label);
+    out[6] = 1.f;
+}
+
 }  // namespace detail
+
+void decodeYoloNasHead(cudaStream_t stream, const YoloDecodeParams& p,
+                       const float* src, int anchors, float* objects)
+{
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((anchors + kBlockSize - 1) / kBlockSize,
+                    (p.batch + kBlockSize - 1) / kBlockSize);
+    const int srcRow = 4 + p.numClasses;
+    const int dstRow = kObjectWidth;
+
+    detail::decodeNasHeadKernel<<<grid, block, 0, stream>>>(
+        p.batch, p.numClasses, p.topK, p.confThreshold,
+        src, srcRow, anchors, objects, dstRow);
+    checkCuda(cudaGetLastError(), "decodeYoloNasHead launch");
+}
 
 void transposeAnchors(cudaStream_t stream, int batch,
                       const float* src, int srcRow, int anchors, float* dst)
