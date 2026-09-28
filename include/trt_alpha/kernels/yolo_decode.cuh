@@ -12,6 +12,11 @@ namespace trt_alpha::kernels::detail {
 __global__ void transposeKernel(int batchSize, const float* __restrict__ src,
                                 int srcRow, int anchors, float* __restrict__ dst);
 
+__global__ void decodeV4HeadKernel(int batchSize, int numClasses, int topK,
+                                   float confThresh, const float* __restrict__ src,
+                                   int anchors, int dstW, int dstH,
+                                   float* __restrict__ dst, int dstRow);
+
 __global__ void decodeV5HeadKernel(int batchSize, int numClasses, int topK,
                                 float confThresh, const float* __restrict__ src,
                                 int srcRow, int anchors,

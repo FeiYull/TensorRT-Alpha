@@ -1,3 +1,4 @@
+add_subdirectory(sample_yolov4)
 add_subdirectory(sample_yolov5)
 add_subdirectory(sample_yolov6)
 add_subdirectory(sample_yolov7)

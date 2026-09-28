@@ -157,6 +157,118 @@ __global__ void nmsFastKernel(int topK, int batchSize, float iouThresh,
     }
 }
 
+// __global__ void decodeV4HeadKernel(int batchSize, int numClasses, int topK,
+//                                    float confThresh, const float* __restrict__ src,
+//                                    int anchors, int dstW, int dstH,
+//                                    float* __restrict__ dst, int dstRow)
+// {
+//     const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // anchor 序号
+//     const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+//     if (dx >= anchors || dy >= batchSize)
+//     {
+//         return;
+//     }
+//     // src 布局：[B, anchors, 1, 4+nc] -> 每行 4+nc 个 float
+//     const int srcRow = 4 + numClasses;
+//     const int srcArea = anchors * srcRow;
+//     const int dstArea = 1 + dstRow * topK;
+
+//     const float* item = src + dy * srcArea + dx * srcRow;
+//     const float* clsScore = item + 4;
+//     float confidence = clsScore[0];
+//     int label = 0;
+//     for (int i = 1; i < numClasses; ++i)
+//     {
+//         if (clsScore[i] > confidence)
+//         {
+//             confidence = clsScore[i];
+//             label = i;
+//         }
+//     }
+//     if (confidence < confThresh)
+//     {
+//         return;
+//     }
+
+//     const int index = atomicAdd(dst + dy * dstArea, 1);
+//     if (index >= topK)
+//     {
+//         return;
+//     }
+
+//     // YOLOv4: cx/cy/w/h 归一化（0~1），中心点 + 宽高 -> xyxy
+//     const float cx = item[0] * static_cast<float>(dstW);
+//     const float cy = item[1] * static_cast<float>(dstH);
+//     const float w  = item[2] * static_cast<float>(dstW);
+//     const float h  = item[3] * static_cast<float>(dstH);
+
+//     float* out = dst + dy * dstArea + 1 + index * dstRow;
+//     out[0] = cx - w * 0.5f;
+//     out[1] = cy - h * 0.5f;
+//     out[2] = cx + w * 0.5f;
+//     out[3] = cy + h * 0.5f;
+//     out[4] = confidence;
+//     out[5] = static_cast<float>(label);
+//     out[6] = 1.f;
+// }
+
+
+__global__ void decodeV4HeadKernel(int batchSize, int numClasses, int topK,
+                                   float confThresh, const float* __restrict__ src,
+                                   int anchors, int dstW, int dstH,
+                                   float* __restrict__ dst, int dstRow)
+{
+    (void)dstW;
+    (void)dstH;   // 不用：归一化坐标原样输出，转像素在 postprocess 做
+
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // anchor 序号
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+    if (dx >= anchors || dy >= batchSize)
+    {
+        return;
+    }
+    // src 布局：[B, anchors, 1, 4+nc] -> 每行 4+nc 个 float
+    const int srcRow = 4 + numClasses;
+    const int srcArea = anchors * srcRow;
+    const int dstArea = 1 + dstRow * topK;
+
+    const float* item = src + dy * srcArea + dx * srcRow;
+    const float* clsScore = item + 4;
+    float confidence = clsScore[0];
+    int label = 0;
+    for (int i = 1; i < numClasses; ++i)
+    {
+        if (clsScore[i] > confidence)
+        {
+            confidence = clsScore[i];
+            label = i;
+        }
+    }
+    if (confidence < confThresh)
+    {
+        return;
+    }
+
+    const int index = atomicAdd(dst + dy * dstArea, 1);
+    if (index >= topK)
+    {
+        return;
+    }
+
+    // YOLOv4: ONNX 输出的 4 个值 = (left, top, right, bottom)，归一化 0~1。
+    // 原样存进 objects（不转 xyxy、不乘 dstW/dstH），
+    // 像素转换 + 仿射逆变换在 postprocess 做（和 legacy 一致）。
+    float* out = dst + dy * dstArea + 1 + index * dstRow;
+    out[0] = item[0];   // left
+    out[1] = item[1];   // top
+    out[2] = item[2];   // right
+    out[3] = item[3];   // bottom
+    out[4] = confidence;
+    out[5] = static_cast<float>(label);
+    out[6] = 1.f;
+}
+
+
 __global__ void decodeV5HeadKernel(int batchSize, int numClasses, int topK,
                                    float confThresh, const float* __restrict__ src,
                                    int srcRow, int anchors,
@@ -246,6 +358,22 @@ void decodeYoloV8SegHead(cudaStream_t stream, const YoloDecodeParams& p,
         p.batch, p.numClasses, p.topK, p.confThreshold,
         src, srcRow, anchors, objects, dstRow, numMaskCoeffs);
     checkCuda(cudaGetLastError(), "decodeYoloV8SegHead launch");
+}
+
+void decodeYoloV4Head(cudaStream_t stream, const YoloDecodeParams& p,
+                      const float* src, int anchors,
+                      int dstW, int dstH,
+                      float* objects)
+{
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((anchors + kBlockSize - 1) / kBlockSize,
+                    (p.batch + kBlockSize - 1) / kBlockSize);
+    const int dstRow = kObjectWidth;
+
+    detail::decodeV4HeadKernel<<<grid, block, 0, stream>>>(
+        p.batch, p.numClasses, p.topK, p.confThreshold,
+        src, anchors, dstW, dstH, objects, dstRow);
+    checkCuda(cudaGetLastError(), "decodeYoloV4Head launch");
 }
 
 void decodeYoloV5Head(cudaStream_t stream, const YoloDecodeParams& p,
