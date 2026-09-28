@@ -14,6 +14,16 @@ __global__ void decodeNasHeadKernel(int batchSize, int numClasses, int topK,
                                     int srcRow, int anchors,
                                     float* __restrict__ dst, int dstRow);
 
+__global__ void decodeYuNetKernel(
+    int batchSize, int numCandidates, int topK, float confThreshold,
+    int srcImgW, int srcImgH,
+    const float* __restrict__ loc,  int locRow,
+    const float* __restrict__ conf, int confRow,
+    const float* __restrict__ iou,  int iouRow,
+    const float* __restrict__ priorBoxes,
+    const float* __restrict__ variances,
+    float* __restrict__ dst, int dstRow);
+
 __global__ void transposeKernel(int batchSize, const float* __restrict__ src,
                                 int srcRow, int anchors, float* __restrict__ dst);
 

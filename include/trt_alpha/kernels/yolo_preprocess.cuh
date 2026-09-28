@@ -29,6 +29,14 @@ __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
                                     float s0, float s1, float s2,
                                     int swapRB);
 
+__global__ void hwcToChwKernel(const float* __restrict__ src,
+                               float* __restrict__ dst,
+                               int batchSize, int width, int height);
+
+__global__ void hwcToChwKernel(const float* __restrict__ src,
+                               float* __restrict__ dst,
+                               int batchSize, int width, int height);
+
 //! letterbox 双线性 resize kernel。
 __global__ void resizeLetterboxKernel(const std::uint8_t* __restrict__ src,
                                       int srcW, int srcH,

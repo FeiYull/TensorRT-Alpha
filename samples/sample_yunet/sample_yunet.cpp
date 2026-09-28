@@ -1,9 +1,9 @@
 // =============================================================================
-//  sample_yolonas —— trt_alpha 使用示例
+//  sample_yunet —— trt_alpha 使用示例
 // -----------------------------------------------------------------------------
 //  用法：
-//    sample_yolonas <engine.trt> <input>          # input = 图片 / 视频
-//    sample_yolonas <engine.trt> <input> --save   # 存盘
+//    sample_yunet <engine.trt> <input>          # input = 图片 / 视频
+//    sample_yunet <engine.trt> <input> --save   # 存盘
 // =============================================================================
 #include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/inference_pool.hpp"
@@ -30,9 +30,7 @@ int main(int argc, char** argv)
 
     if (argc < 3)
     {
-        std::cout << "usage: sample_yolonas <engine.trt> <input> [--save]\n"
-                  << "  input : image / video path\n"
-                  << "  --save: save result images to save/\n";
+        std::cout << "usage: sample_yunet <engine.trt> <input> [--save]\n";
         return 1;
     }
 
@@ -45,21 +43,22 @@ int main(int argc, char** argv)
         trt_alpha::core::ModelConfig cfg;
         cfg.engine = enginePath;
         cfg.batchSize = 1;
-        cfg.dstH = 640;
-        cfg.dstW = 640;
-        cfg.classNamesFile = "data/classes/coco80.txt";
+        // YuNet 不 resize，dstH/dstW 只占位；实际用原图尺寸
+        cfg.dstH = 320;
+        cfg.dstW = 320;
+        cfg.classNamesFile = "data/classes/face.txt";
 
-        cfg.extras["num_class"] = "80";
-        cfg.extras["conf_thresh"] = "0.25";
+        cfg.extras["num_class"] = "2";
+        cfg.extras["conf_thresh"] = "0.3";
         cfg.extras["iou_thresh"] = "0.45";
-        cfg.extras["top_k"] = "300";
+        cfg.extras["top_k"] = "1000";
 
         cfg.classNames = trt_alpha::core::loadClassNamesFile(cfg.classNamesFile);
 
         trt_alpha::core::InferencePool pool(
             cfg,
             []() -> std::unique_ptr<trt_alpha::IModel> {
-                return trt_alpha::ModelRegistry::instance().create("yolo_nas");
+                return trt_alpha::ModelRegistry::instance().create("yunet");
             },
             /*workers=*/1);
 
@@ -99,16 +98,16 @@ int main(int argc, char** argv)
 
         trt_alpha::pipeline::Pipeline pipeline(std::move(pcfg));
 
-        TRT_LOG_INFO("sample_yolonas: starting pipeline");
+        TRT_LOG_INFO("sample_yunet: starting pipeline");
         pipeline.start();
         pipeline.waitForCompletion();
-        TRT_LOG_INFO("sample_yolonas: done");
+        TRT_LOG_INFO("sample_yunet: done");
 
         return 0;
     }
     catch (const std::exception& e)
     {
-        TRT_LOG_ERROR("sample_yolonas: " << e.what());
+        TRT_LOG_ERROR("sample_yunet: " << e.what());
         return 1;
     }
 }

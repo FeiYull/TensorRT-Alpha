@@ -36,6 +36,21 @@ constexpr int kObjectWidth = 7;
 void decodeYoloNasHead(cudaStream_t stream, const YoloDecodeParams& p,
                        const float* src, int anchors, float* objects);
 
+//! 解码 YuNet（libfacedetection）检测头。
+//! 输入 3 个张量：loc [B, N, 14] / conf [B, N, 2] / iou [B, N, 1]。
+//! 输出每行 17 个 float：
+//!   [left top right bottom conf label keep] + 5 个关键点 (x, y) 对（10 个）
+//! priorBoxes: [N, 4]（Device，Host 算好后上传）
+//! variances:  [2]（Device）
+void decodeYuNetHead(cudaStream_t stream,
+                     const float* loc, const float* conf, const float* iou,
+                     int batch, int numCandidates,
+                     int srcImgW, int srcImgH,
+                     float confThreshold, int topK,
+                     const float* priorBoxes,
+                     const float* variances,
+                     float* objects);
+
 //! 转置 [batch, srcRow, anchors] -> [batch, anchors, srcRow]（Device -> Device）
 void transposeAnchors(cudaStream_t stream, int batch,
                       const float* src, int srcRow, int anchors,

@@ -109,6 +109,14 @@ void drawBox(cv::Mat& image, const det::Detection& det,
                 cv::Point(badgeX + 2, badgeY + textSize.height),
                 kFontFace, kFontScale, cv::Scalar(255, 255, 255),
                 kFontThickness, cv::LINE_AA);
+    // 画关键点（如果有）——人脸 5 点等（实心点，白点半径 1）
+    for (const auto& pt : det.land_marks)
+    {
+        cv::circle(image,
+                   cv::Point(static_cast<int>(std::lround(pt.x)),
+                             static_cast<int>(std::lround(pt.y))),
+                   1, cv::Scalar(255, 255, 255), cv::FILLED, cv::LINE_AA, 0);
+    }
 }
 
 //! 掩码半透明叠加。

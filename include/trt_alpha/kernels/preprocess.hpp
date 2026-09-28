@@ -45,6 +45,12 @@ void bgrToNchwNormalized(cudaStream_t stream, int batch,
                          float scale, const float mean[3], const float std_[3],
                          bool swapRB = true);
 
+//! HWC float (Device) -> CHW float (Device)。不归一化、不转通道、不换色。
+//! 用于 YuNet（输入 HWC uint8→float 后，需要重排成 NCHW）。
+void hwcToChw(cudaStream_t stream, int batch,
+              const float* src, float* dst,
+              int width, int height);
+
 //! letterbox 双线性 resize：uint8 BGR HWC (Device) -> float BGR HWC (Device)
 //! padValue 通常取 114（与 ultralytics 一致）。
 //! dst2src：网络输入坐标 → 源图坐标的仿射矩阵。

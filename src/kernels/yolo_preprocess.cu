@@ -244,6 +244,28 @@ __global__ void bgrToRgbHwcKernel(float* __restrict__ data,
     pixel[2] = b;
 }
 
+__global__ void hwcToChwKernel(const float* __restrict__ src,
+                               float* __restrict__ dst,
+                               int batchSize, int width, int height)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
+    const int imgArea = width * height;
+    const int volume = imgArea * 3;
+    if (dx >= volume || dy >= batchSize)
+    {
+        return;
+    }
+    const int ch = dx / imgArea;
+    const int spatial = dx % imgArea;
+    const int row = spatial / width;
+    const int col = spatial % width;
+    // dst: NCHW -> [dy][ch][row][col]
+    // src: HWC  -> [dy][row][col][ch]
+    const int srcIdx = dy * volume + (row * width + col) * 3 + ch;
+    dst[dy * volume + dx] = src[srcIdx];
+}
+
 }  // namespace detail
 
 
@@ -311,6 +333,17 @@ void bgrToNchwNormalized(cudaStream_t stream, int batch,
         mean[0], mean[1], mean[2], std_[0], std_[1], std_[2],
         swapRB ? 1 : 0);
     checkCuda(cudaGetLastError(), "bgrToNchwNormalized launch");
+}
+
+void hwcToChw(cudaStream_t stream, int batch,
+              const float* src, float* dst,
+              int width, int height)
+{
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((width * height * 3 + kBlockSize - 1) / kBlockSize,
+                    (batch + kBlockSize - 1) / kBlockSize);
+    detail::hwcToChwKernel<<<grid, block, 0, stream>>>(src, dst, batch, width, height);
+    checkCuda(cudaGetLastError(), "hwcToChw launch");
 }
 
 }  // namespace trt_alpha::kernels
