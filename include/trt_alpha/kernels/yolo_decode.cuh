@@ -43,6 +43,14 @@ __global__ void decodeHeadKernel(int batchSize, int numClasses, int topK,
                                  float* __restrict__ dst, int dstRow,
                                  int numMaskCoeffs);
 
+//! 解码 YOLOv8-seg 头：和 decodeHeadKernel 一样，但额外把 numMaskCoeffs 个 mask 系数
+//! 写进行尾。src 的每行布局 = [4 + numClasses + numMaskCoeffs]。
+__global__ void decodeSegHeadKernel(int batchSize, int numClasses, int topK,
+                                    float confThresh, const float* __restrict__ src,
+                                    int srcRow, int anchors,
+                                    int numMaskCoeffs,
+                                    float* __restrict__ dst, int dstRow);
+
 __global__ void nmsFastKernel(int topK, int batchSize, float iouThresh,
                               float* __restrict__ src, int srcRow);
 

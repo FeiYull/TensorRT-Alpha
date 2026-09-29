@@ -430,6 +430,64 @@ __global__ void decodeNasHeadKernel(int batchSize, int numClasses, int topK,
     out[6] = 1.f;
 }
 
+__global__ void decodeSegHeadKernel(int batchSize, int numClasses, int topK,
+                                    float confThresh, const float* __restrict__ src,
+                                    int srcRow, int anchors,
+                                    int numMaskCoeffs,
+                                    float* __restrict__ dst, int dstRow)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // anchor 序号
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+    if (dx >= anchors || dy >= batchSize)
+    {
+        return;
+    }
+    const int srcArea = anchors * srcRow;
+    const int dstArea = 1 + dstRow * topK;
+
+    const float* item = src + dy * srcArea + dx * srcRow;
+    const float* clsScore = item + 4;
+    float confidence = clsScore[0];
+    int label = 0;
+    for (int i = 1; i < numClasses; ++i)
+    {
+        if (clsScore[i] > confidence)
+        {
+            confidence = clsScore[i];
+            label = i;
+        }
+    }
+    if (confidence < confThresh)
+    {
+        return;
+    }
+
+    const int index = atomicAdd(dst + dy * dstArea, 1);
+    if (index >= topK)
+    {
+        return;
+    }
+
+    const float cx = item[0];
+    const float cy = item[1];
+    const float w  = item[2];
+    const float h  = item[3];
+    float* out = dst + dy * dstArea + 1 + index * dstRow;
+    out[0] = cx - w * 0.5f;
+    out[1] = cy - h * 0.5f;
+    out[2] = cx + w * 0.5f;
+    out[3] = cy + h * 0.5f;
+    out[4] = confidence;
+    out[5] = static_cast<float>(label);
+    out[6] = 1.f;
+
+    // 后 numMaskCoeffs 个：mask 系数
+    for (int i = 0; i < numMaskCoeffs; ++i)
+    {
+        out[7 + i] = item[4 + numClasses + i];
+    }
+}
+
 }  // namespace detail
 
 void decodeYuNetHead(cudaStream_t stream,
@@ -499,9 +557,9 @@ void decodeYoloV8SegHead(cudaStream_t stream, const YoloDecodeParams& p,
     const int dstRow = kObjectWidth + numMaskCoeffs;
     const int srcRow = 4 + p.numClasses + numMaskCoeffs;
 
-    detail::decodeHeadKernel<<<grid, block, 0, stream>>>(
+    detail::decodeSegHeadKernel<<<grid, block, 0, stream>>>(
         p.batch, p.numClasses, p.topK, p.confThreshold,
-        src, srcRow, anchors, objects, dstRow, numMaskCoeffs);
+        src, srcRow, anchors, numMaskCoeffs, objects, dstRow);
     checkCuda(cudaGetLastError(), "decodeYoloV8SegHead launch");
 }
 
