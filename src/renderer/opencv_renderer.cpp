@@ -168,12 +168,22 @@ void drawDetections(cv::Mat& image, const std::vector<det::Detection>& detection
     }
 }
 
-//! 画分割列表（先掩码，再框 + 标签）。
+//! 画分割列表（整图 mask 叠加 + 可选框）。
 void drawSegmentations(cv::Mat& image, const std::vector<seg::Segmentation>& segs,
                        const std::vector<core::ClassInfo>& classNames)
 {
-    for (const auto& s : segs) { blendMask(image, s); }   // 先铺掩码
-    for (const auto& s : segs) { drawBox(image, s.box, classNames); }  // 再压框
+    for (const auto& s : segs)
+    {
+        blendMask(image, s);
+    }
+    // 只画有框的（label >= 0 表示有效框）
+    for (const auto& s : segs)
+    {
+        if (s.box.label >= 0)
+        {
+            drawBox(image, s.box, classNames);
+        }
+    }
 }
 
 //! 画分类条（左上角逐行）。

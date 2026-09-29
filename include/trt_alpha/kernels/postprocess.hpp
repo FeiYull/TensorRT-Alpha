@@ -83,6 +83,13 @@ void decodeYoloV8SegHead(cudaStream_t stream, const YoloDecodeParams& p,
                           const float* src, int anchors,
                           int numMaskCoeffs, float* objects);
 
+//! u2net 后处理归一化：out = scale * (val - min) / (max - min)
+//! 每张图独立（minVals/maxVals 长度 = batch）。
+void normPred(cudaStream_t stream, int batch,
+              float* data, int width, int height,
+              float scale,
+              const float* minVals, const float* maxVals);
+
 //! NMS（按类别，O(count^2) kernel）。写 keep=0 淘汰。
 //! objectWidth 通常等于 kObjectWidth（seg 版本 = kObjectWidth + numMaskCoeffs）。
 void nmsFast(cudaStream_t stream, const YoloDecodeParams& p,

@@ -137,6 +137,21 @@ __global__ void decodeYuNetKernel(
     pitem_dst[16] = locBuf[13];
 }
 
+__global__ void normPredKernel(int batchSize, float* __restrict__ data,
+                               int area, float scale,
+                               const float* __restrict__ minVals,
+                               const float* __restrict__ maxVals)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
+    if (dx >= area || dy >= batchSize)
+    {
+        return;
+    }
+    const float v = data[dy * area + dx];
+    data[dy * area + dx] = scale * (v - minVals[dy]) / (maxVals[dy] - minVals[dy]);
+}
+
 __global__ void transposeKernel(int batchSize, const float* __restrict__ src,
                                 int srcRow, int anchors, float* __restrict__ dst)
 {
@@ -514,6 +529,20 @@ void decodeYuNetHead(cudaStream_t stream,
         loc, locRow, conf, confRow, iou, iouRow,
         priorBoxes, variances, objects, dstRow);
     checkCuda(cudaGetLastError(), "decodeYuNetHead launch");
+}
+
+void normPred(cudaStream_t stream, int batch,
+              float* data, int width, int height,
+              float scale,
+              const float* minVals, const float* maxVals)
+{
+    const int area = width * height;
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((area + kBlockSize - 1) / kBlockSize,
+                    (batch + kBlockSize - 1) / kBlockSize);
+    detail::normPredKernel<<<grid, block, 0, stream>>>(
+        batch, data, area, scale, minVals, maxVals);
+    checkCuda(cudaGetLastError(), "normPred launch");
 }
 
 void decodeYoloNasHead(cudaStream_t stream, const YoloDecodeParams& p,

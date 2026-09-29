@@ -51,6 +51,12 @@ void hwcToChw(cudaStream_t stream, int batch,
               const float* src, float* dst,
               int width, int height);
 
+//! 每张图除以其 RGB 最大值（u2net 特有）。
+//! maxVals: [batch]（Device，Host 用 thrust 算好上传）
+void divByMax(cudaStream_t stream, int batch,
+              float* data, int width, int height, int channels,
+              const float* maxVals);
+
 //! letterbox 双线性 resize：uint8 BGR HWC (Device) -> float BGR HWC (Device)
 //! padValue 通常取 114（与 ultralytics 一致）。
 //! dst2src：网络输入坐标 → 源图坐标的仿射矩阵。
@@ -66,5 +72,14 @@ void resizeLetterbox(cudaStream_t stream, int batch,
                      const float* src, int srcW, int srcH,
                      float* dst, int dstW, int dstH,
                      float padValue, AffineMat dst2src);
+
+//! 非等比缩放（无 padding）：src -> dst，x/y 独立缩放。
+//! dst2src：dst 坐标 -> src 坐标的仿射矩阵。
+//! mode: RGB（3 通道）/ GRAY（1 通道）。
+//! 用于 u2net（非等比 resize，不保持长宽比）。
+void resizeNoPadding(cudaStream_t stream, int batch,
+                     const float* src, int srcW, int srcH,
+                     float* dst, int dstW, int dstH,
+                     bool isGray, AffineMat dst2src);
 
 }  // namespace trt_alpha::kernels

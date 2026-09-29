@@ -33,9 +33,8 @@ __global__ void hwcToChwKernel(const float* __restrict__ src,
                                float* __restrict__ dst,
                                int batchSize, int width, int height);
 
-__global__ void hwcToChwKernel(const float* __restrict__ src,
-                               float* __restrict__ dst,
-                               int batchSize, int width, int height);
+__global__ void divByMaxKernel(int batchSize, float* __restrict__ data,
+                               int volume, const float* __restrict__ maxVals);
 
 //! letterbox 双线性 resize kernel。
 __global__ void resizeLetterboxKernel(const std::uint8_t* __restrict__ src,
@@ -48,5 +47,17 @@ __global__ void resizeLetterboxF32Kernel(const float* __restrict__ src,
                                          int srcW, int srcH,
                                          float* __restrict__ dst, int dstW, int dstH,
                                          int batchSize, float padValue, AffineMat m);
+
+__global__ void resizeNoPaddingRgbKernel(const float* __restrict__ src,
+                                         int srcW, int srcH,
+                                         float* __restrict__ dst,
+                                         int dstW, int dstH,
+                                         int batchSize, AffineMat m);
+
+__global__ void resizeNoPaddingGrayKernel(const float* __restrict__ src,
+                                          int srcW, int srcH,
+                                          float* __restrict__ dst,
+                                          int dstW, int dstH,
+                                          int batchSize, AffineMat m);
 
 }  // namespace trt_alpha::kernels::detail

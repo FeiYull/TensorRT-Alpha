@@ -158,6 +158,121 @@ __global__ void resizeLetterboxF32Kernel(const float* __restrict__ src,
     out[2] = c2;
 }
 
+__global__ void resizeNoPaddingRgbKernel(const float* __restrict__ src,
+                                         int srcW, int srcH,
+                                         float* __restrict__ dst,
+                                         int dstW, int dstH,
+                                         int batchSize, AffineMat m)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
+    if (dx >= dstW * dstH || dy >= batchSize)
+    {
+        return;
+    }
+    const int dstY = dx / dstW;
+    const int dstX = dx % dstW;
+
+    float srcX = 0.f, srcY = 0.f;
+    affineProject(m, dstX, dstY, &srcX, &srcY);
+
+    const float defaultVal = 114.f;
+    float c0 = defaultVal, c1 = defaultVal, c2 = defaultVal;
+    if (srcX >= -1.f && srcX < srcW && srcY >= -1.f && srcY < srcH)
+    {
+        const int yLow = static_cast<int>(floorf(fmaxf(srcY, 0.f)));
+        const int xLow = static_cast<int>(floorf(fmaxf(srcX, 0.f)));
+        const int yHigh = min(yLow + 1, srcH - 1);
+        const int xHigh = min(xLow + 1, srcW - 1);
+        const float pad[3] = { defaultVal, defaultVal, defaultVal };
+        const float ly = srcY - yLow;
+        const float lx = srcX - xLow;
+        const float w1 = (1.f - ly) * (1.f - lx);
+        const float w2 = (1.f - ly) * lx;
+        const float w3 = ly * (1.f - lx);
+        const float w4 = ly * lx;
+
+        const float* v1 = pad;
+        const float* v2 = pad;
+        const float* v3 = pad;
+        const float* v4 = pad;
+        const int srcVolume = 3 * srcH * srcW;
+        if (yLow >= 0)
+        {
+            if (xLow >= 0)  { v1 = src + dy * srcVolume + (yLow * srcW + xLow) * 3; }
+            if (xHigh < srcW){ v2 = src + dy * srcVolume + (yLow * srcW + xHigh) * 3; }
+        }
+        if (yHigh < srcH)
+        {
+            if (xLow >= 0)  { v3 = src + dy * srcVolume + (yHigh * srcW + xLow) * 3; }
+            if (xHigh < srcW){ v4 = src + dy * srcVolume + (yHigh * srcW + xHigh) * 3; }
+        }
+        c0 = floorf(w1 * v1[0] + w2 * v2[0] + w3 * v3[0] + w4 * v4[0] + 0.5f);
+        c1 = floorf(w1 * v1[1] + w2 * v2[1] + w3 * v3[1] + w4 * v4[1] + 0.5f);
+        c2 = floorf(w1 * v1[2] + w2 * v2[2] + w3 * v3[2] + w4 * v4[2] + 0.5f);
+    }
+
+    float* out = dst + dy * (3 * dstH * dstW) + (dstY * dstW + dstX) * 3;
+    out[0] = c0;
+    out[1] = c1;
+    out[2] = c2;
+}
+
+__global__ void resizeNoPaddingGrayKernel(const float* __restrict__ src,
+                                          int srcW, int srcH,
+                                          float* __restrict__ dst,
+                                          int dstW, int dstH,
+                                          int batchSize, AffineMat m)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
+    if (dx >= dstW * dstH || dy >= batchSize)
+    {
+        return;
+    }
+    const int dstY = dx / dstW;
+    const int dstX = dx % dstW;
+
+    float srcX = 0.f, srcY = 0.f;
+    affineProject(m, dstX, dstY, &srcX, &srcY);
+
+    const float defaultVal = 114.f;
+    float c0 = defaultVal;
+    if (srcX >= -1.f && srcX < srcW && srcY >= -1.f && srcY < srcH)
+    {
+        const int yLow = static_cast<int>(floorf(fmaxf(srcY, 0.f)));
+        const int xLow = static_cast<int>(floorf(fmaxf(srcX, 0.f)));
+        const int yHigh = min(yLow + 1, srcH - 1);
+        const int xHigh = min(xLow + 1, srcW - 1);
+        const float pad[1] = { defaultVal };
+        const float ly = srcY - yLow;
+        const float lx = srcX - xLow;
+        const float w1 = (1.f - ly) * (1.f - lx);
+        const float w2 = (1.f - ly) * lx;
+        const float w3 = ly * (1.f - lx);
+        const float w4 = ly * lx;
+
+        const float* v1 = pad;
+        const float* v2 = pad;
+        const float* v3 = pad;
+        const float* v4 = pad;
+        const int srcArea = srcH * srcW;
+        if (yLow >= 0)
+        {
+            if (xLow >= 0)  { v1 = src + dy * srcArea + (yLow * srcW + xLow); }
+            if (xHigh < srcW){ v2 = src + dy * srcArea + (yLow * srcW + xHigh); }
+        }
+        if (yHigh < srcH)
+        {
+            if (xLow >= 0)  { v3 = src + dy * srcArea + (yHigh * srcW + xLow); }
+            if (xHigh < srcW){ v4 = src + dy * srcArea + (yHigh * srcW + xHigh); }
+        }
+        c0 = floorf(w1 * v1[0] + w2 * v2[0] + w3 * v3[0] + w4 * v4[0] + 0.5f);
+    }
+
+    dst[dy * dstH * dstW + dstY * dstW + dstX] = c0;
+}
+
 __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
                                     float* __restrict__ dst,
                                     int batchSize, int width, int height,
@@ -266,6 +381,18 @@ __global__ void hwcToChwKernel(const float* __restrict__ src,
     dst[dy * volume + dx] = src[srcIdx];
 }
 
+__global__ void divByMaxKernel(int batchSize, float* __restrict__ data,
+                               int volume, const float* __restrict__ maxVals)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
+    if (dx >= volume || dy >= batchSize)
+    {
+        return;
+    }
+    data[dy * volume + dx] /= maxVals[dy];
+}
+
 }  // namespace detail
 
 
@@ -319,6 +446,28 @@ void resizeLetterbox(cudaStream_t stream, int batch,
     checkCuda(cudaGetLastError(), "resizeLetterboxF32 launch");
 }
 
+void resizeNoPadding(cudaStream_t stream, int batch,
+                     const float* src, int srcW, int srcH,
+                     float* dst, int dstW, int dstH,
+                     bool isGray, AffineMat dst2src)
+{
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((dstW * dstH + kBlockSize - 1) / kBlockSize,
+                    (batch + kBlockSize - 1) / kBlockSize);
+    if (isGray)
+    {
+        detail::resizeNoPaddingGrayKernel<<<grid, block, 0, stream>>>(
+            src, srcW, srcH, dst, dstW, dstH, batch, dst2src);
+        checkCuda(cudaGetLastError(), "resizeNoPaddingGray launch");
+    }
+    else
+    {
+        detail::resizeNoPaddingRgbKernel<<<grid, block, 0, stream>>>(
+            src, srcW, srcH, dst, dstW, dstH, batch, dst2src);
+        checkCuda(cudaGetLastError(), "resizeNoPaddingRgb launch");
+    }
+}
+
 void bgrToNchwNormalized(cudaStream_t stream, int batch,
                          const float* src, float* dst,
                          int width, int height,
@@ -344,6 +493,18 @@ void hwcToChw(cudaStream_t stream, int batch,
                     (batch + kBlockSize - 1) / kBlockSize);
     detail::hwcToChwKernel<<<grid, block, 0, stream>>>(src, dst, batch, width, height);
     checkCuda(cudaGetLastError(), "hwcToChw launch");
+}
+
+void divByMax(cudaStream_t stream, int batch,
+              float* data, int width, int height, int channels,
+              const float* maxVals)
+{
+    const int volume = width * height * channels;
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((volume + kBlockSize - 1) / kBlockSize,
+                    (batch + kBlockSize - 1) / kBlockSize);
+    detail::divByMaxKernel<<<grid, block, 0, stream>>>(batch, data, volume, maxVals);
+    checkCuda(cudaGetLastError(), "divByMax launch");
 }
 
 }  // namespace trt_alpha::kernels

@@ -24,6 +24,11 @@ __global__ void decodeYuNetKernel(
     const float* __restrict__ variances,
     float* __restrict__ dst, int dstRow);
 
+__global__ void normPredKernel(int batchSize, float* __restrict__ data,
+                               int area, float scale,
+                               const float* __restrict__ minVals,
+                               const float* __restrict__ maxVals);
+
 __global__ void transposeKernel(int batchSize, const float* __restrict__ src,
                                 int srcRow, int anchors, float* __restrict__ dst);
 
