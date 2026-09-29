@@ -205,6 +205,103 @@ void drawClassifications(cv::Mat& image, const std::vector<cls::ClassScore>& sco
     }
 }
 
+// ---- COCO 17 关键点骨架 ----
+//! 骨架：19 条边，顶点编号 1-based（COCO 标准）。
+const std::vector<std::pair<int,int>>& cocoSkeleton()
+{
+    static const std::vector<std::pair<int,int>> kSkeleton = {
+        {16, 14}, {14, 12}, {17, 15}, {15, 13}, {12, 13}, {6, 12},
+        {7, 13},  {6, 7},   {6, 8},   {7, 9},   {8, 10},  {9, 11},
+        {2, 3},   {1, 2},   {1, 3},   {2, 4},   {3, 5},   {4, 6},
+        {5, 7}
+    };
+    return kSkeleton;
+}
+
+//! 关键点颜色（17 个，BGR）。
+const std::vector<cv::Scalar>& cocoKptColor()
+{
+    static const std::vector<cv::Scalar> kColor = {
+        {0, 255, 0},    {0, 255, 0},    {0, 255, 0},
+        {0, 255, 0},    {0, 255, 0},    {255, 128, 0},
+        {255, 128, 0},  {255, 128, 0},  {255, 128, 0},
+        {255, 128, 0},  {255, 128, 0},  {51, 153, 255},
+        {51, 153, 255}, {51, 153, 255}, {51, 153, 255},
+        {51, 153, 255}, {51, 153, 255}
+    };
+    return kColor;
+}
+
+//! 骨架颜色（19 条边，BGR）。
+const std::vector<cv::Scalar>& cocoLimbColor()
+{
+    static const std::vector<cv::Scalar> kColor = {
+        {51, 153, 255}, {51, 153, 255}, {51, 153, 255}, {51, 153, 255},
+        {255, 51, 255}, {255, 51, 255}, {255, 51, 255},
+        {255, 128, 0},  {255, 128, 0},  {255, 128, 0},  {255, 128, 0},
+        {255, 128, 0},
+        {0, 255, 0},    {0, 255, 0},    {0, 255, 0},    {0, 255, 0},
+        {0, 255, 0},    {0, 255, 0},    {0, 255, 0}
+    };
+    return kColor;
+}
+
+//! 画姿态（框 + 17 关键点 + 骨架）。
+void drawKeypoints(cv::Mat& image, const std::vector<kpt::KeypointResult>& results)
+{
+    constexpr float kKptConfThresh = 0.5f;
+    const auto& skeleton = cocoSkeleton();
+    const auto& kptColors = cocoKptColor();
+    const auto& limbColors = cocoLimbColor();
+
+    for (const auto& kr : results)
+    {
+        // 画框（如果有 label >= 0）
+        if (kr.box.label >= 0)
+        {
+            const int x0 = clampCoord(kr.box.left,   image.cols);
+            const int y0 = clampCoord(kr.box.top,    image.rows);
+            const int x1 = clampCoord(kr.box.right,  image.cols);
+            const int y1 = clampCoord(kr.box.bottom, image.rows);
+            if (x1 > x0 && y1 > y0)
+            {
+                cv::rectangle(image, cv::Point(x0, y0), cv::Point(x1, y1),
+                              cv::Scalar(0, 255, 0), kBoxThickness, cv::LINE_AA);
+            }
+        }
+
+        // 画关键点
+        const int n = static_cast<int>(kr.keypoints.size());
+        for (int k = 0; k < n; ++k)
+        {
+            const auto& kp = kr.keypoints[k];
+            if (kp.confidence < kKptConfThresh) { continue; }
+            const int kx = static_cast<int>(std::lround(kp.x));
+            const int ky = static_cast<int>(std::lround(kp.y));
+            if (kx < 0 || kx >= image.cols || ky < 0 || ky >= image.rows) { continue; }
+            cv::circle(image, cv::Point(kx, ky), 5,
+                       kptColors[k % kptColors.size()], cv::FILLED, cv::LINE_AA);
+        }
+
+        // 画骨架
+        for (std::size_t si = 0; si < skeleton.size(); ++si)
+        {
+            const int a = skeleton[si].first - 1;   // 1-based -> 0-based
+            const int b = skeleton[si].second - 1;
+            if (a < 0 || a >= n || b < 0 || b >= n) { continue; }
+            const auto& ka = kr.keypoints[a];
+            const auto& kb = kr.keypoints[b];
+            if (ka.confidence < kKptConfThresh || kb.confidence < kKptConfThresh) { continue; }
+            cv::line(image,
+                     cv::Point(static_cast<int>(std::lround(ka.x)),
+                               static_cast<int>(std::lround(ka.y))),
+                     cv::Point(static_cast<int>(std::lround(kb.x)),
+                               static_cast<int>(std::lround(kb.y))),
+                     limbColors[si % limbColors.size()], 2, cv::LINE_AA);
+        }
+    }
+}
+
 }  // namespace
 
 void OpenCVRenderer::drawResult(core::BatchResult& result,
@@ -232,6 +329,10 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
         if (i < result.classifications.size())
         {
             drawClassifications(image, result.classifications[i], classNames);
+        }
+        if (i < result.keypoints.size())
+        {
+            drawKeypoints(image, result.keypoints[i]);
         }
     }
 }

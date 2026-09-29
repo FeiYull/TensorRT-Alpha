@@ -503,6 +503,55 @@ __global__ void decodeSegHeadKernel(int batchSize, int numClasses, int topK,
     }
 }
 
+__global__ void decodePoseHeadKernel(int batchSize, int topK,
+                                     float confThresh, const float* __restrict__ src,
+                                     int srcRow, int anchors,
+                                     int numKpts,
+                                     float* __restrict__ dst, int dstRow)
+{
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // anchor 序号
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+    if (dx >= anchors || dy >= batchSize)
+    {
+        return;
+    }
+    const int srcArea = anchors * srcRow;
+    const int dstArea = 1 + dstRow * topK;
+
+    const float* item = src + dy * srcArea + dx * srcRow;
+    const float conf = item[4];   // 无 class，只有 conf
+    if (conf < confThresh)
+    {
+        return;
+    }
+
+    const int index = atomicAdd(dst + dy * dstArea, 1);
+    if (index >= topK)
+    {
+        return;
+    }
+
+    const float cx = item[0];
+    const float cy = item[1];
+    const float w  = item[2];
+    const float h  = item[3];
+    float* out = dst + dy * dstArea + 1 + index * dstRow;
+    out[0] = cx - w * 0.5f;
+    out[1] = cy - h * 0.5f;
+    out[2] = cx + w * 0.5f;
+    out[3] = cy + h * 0.5f;
+    out[4] = conf;
+    out[5] = 0.f;     // label（pose 单类，固定 0）
+    out[6] = 1.f;     // keep
+
+    // 后 numKpts*3 个：关键点的 (x, y, conf)，原样（网络输入坐标）
+    const float* kpt = item + 5;
+    for (int i = 0; i < numKpts * 3; ++i)
+    {
+        out[7 + i] = kpt[i];
+    }
+}
+
 }  // namespace detail
 
 void decodeYuNetHead(cudaStream_t stream,
@@ -590,6 +639,22 @@ void decodeYoloV8SegHead(cudaStream_t stream, const YoloDecodeParams& p,
         p.batch, p.numClasses, p.topK, p.confThreshold,
         src, srcRow, anchors, numMaskCoeffs, objects, dstRow);
     checkCuda(cudaGetLastError(), "decodeYoloV8SegHead launch");
+}
+
+void decodeYoloV8PoseHead(cudaStream_t stream, const YoloDecodeParams& p,
+                          const float* src, int anchors,
+                          int numKpts, float* objects)
+{
+    const dim3 block(kBlockSize, kBlockSize);
+    const dim3 grid((anchors + kBlockSize - 1) / kBlockSize,
+                    (p.batch + kBlockSize - 1) / kBlockSize);
+    const int dstRow = kObjectWidth + numKpts * 3;   // 7 + 51 = 58
+    const int srcRow = 4 + 1 + numKpts * 3;          // 5 + 51 = 56
+
+    detail::decodePoseHeadKernel<<<grid, block, 0, stream>>>(
+        p.batch, p.topK, p.confThreshold,
+        src, srcRow, anchors, numKpts, objects, dstRow);
+    checkCuda(cudaGetLastError(), "decodeYoloV8PoseHead launch");
 }
 
 void decodeYoloV4Head(cudaStream_t stream, const YoloDecodeParams& p,

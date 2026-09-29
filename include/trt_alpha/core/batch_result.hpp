@@ -6,7 +6,7 @@
 //  字段说明：
 //    * sourceId / firstFrameIndex：跟 Batch 对齐（多源分辨 + 帧号）
 //    * buffer / views / validCount：原图（推理时输入的那批图）
-//    * detections / segmentations / classifications：各任务结果
+//    * detections / segmentations / classifications / keypoints：各任务结果
 //      （按模型类型填，未命中的任务字段保持空）
 //    * inferenceMs / submitTime：性能元信息
 //
@@ -22,6 +22,7 @@
 #include "trt_alpha/core/buffer_view.hpp"
 #include "trt_alpha/det/types.hpp"
 #include "trt_alpha/seg/types.hpp"
+#include "trt_alpha/kpt/types.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -46,6 +47,7 @@ struct BatchResult
     std::vector<std::vector<det::Detection>> detections;          //!< 每张图的检测结果
     std::vector<std::vector<seg::Segmentation>> segmentations;    //!< 每张图的分割结果
     std::vector<std::vector<cls::ClassScore>> classifications;    //!< 每张图的分类结果
+    std::vector<std::vector<kpt::KeypointResult>> keypoints;      //!< 每张图的姿态结果
 
     // ---- 性能元信息 ----
     double inferenceMs = 0.0;                    //!< 本批推理耗时（ms）

@@ -56,6 +56,12 @@ __global__ void decodeSegHeadKernel(int batchSize, int numClasses, int topK,
                                     int numMaskCoeffs,
                                     float* __restrict__ dst, int dstRow);
 
+__global__ void decodePoseHeadKernel(int batchSize, int topK,
+                                     float confThresh, const float* __restrict__ src,
+                                     int srcRow, int anchors,
+                                     int numKpts,
+                                     float* __restrict__ dst, int dstRow);
+
 __global__ void nmsFastKernel(int topK, int batchSize, float iouThresh,
                               float* __restrict__ src, int srcRow);
 

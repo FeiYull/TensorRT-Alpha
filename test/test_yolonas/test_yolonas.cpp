@@ -1,16 +1,16 @@
 // =============================================================================
 //  test/test_yolonas/test_yolonas.cpp
 // -----------------------------------------------------------------------------
-//  yolonas 测试�?
-//    [1] 注册中心能创�?
-//    [2] init 失败（engine 不存在）抛异�?
-//    [3] 真推理（需�?engine + 图片）：
-//          读图 -> 构�?Batch -> setBatch/preprocess/infer/postprocess ->
-//          检查框�?-> �?OpenCV 画框 -> 存盘
+//  yolonas tests:
+//    [1] registry can create
+//    [2] init fails (engine not exist) throws
+//    [3] real inference (needs engine + image):
+//          read image -> build Batch -> setBatch/preprocess/infer/postprocess ->
+//          check detections -> draw with OpenCV -> save
 //
-//  用法�?
-//    test_yolonas                                 # 只跑 [1][2]
-//    test_yolonas <engine.trt> <image>            # �?[1][2][3]
+//  usage:
+//    test_yolonas                                 # only [1][2]
+//    test_yolonas <engine.trt> <image>            # [1][2][3]
 // =============================================================================
 #include "trt_alpha/core/buffer.hpp"
 #include "trt_alpha/core/data_type.hpp"
@@ -50,7 +50,7 @@ void check(bool cond, const char* what)
     else      { std::cout << "[FAIL] " << what << "\n"; ++g_failures; }
 }
 
-//! �?cv::Mat 构�?Batch（batch_size == 1）�?
+//! build Batch from cv::Mat (batch_size == 1)
 Batch batchFromMat(const cv::Mat& img, int batchSize)
 {
     if (img.empty() || img.type() != CV_8UC3)
@@ -97,7 +97,7 @@ Batch batchFromMat(const cv::Mat& img, int batchSize)
     return b;
 }
 
-//! 固定调色板：�?label 循环取色（同一 label 恒定同色）�?
+//! fixed palette: color per label
 cv::Scalar colorForLabel(int label)
 {
     static const cv::Scalar kPalette[] = {
@@ -109,14 +109,14 @@ cv::Scalar colorForLabel(int label)
     return kPalette[((label % kCount) + kCount) % kCount];
 }
 
-//! 把坐标裁进图像范围（防越界）�?
+//! clamp coordinate into image range
 int clampCoord(float v, int limit)
 {
     const int iv = static_cast<int>(std::lround(v));
     return std::max(0, std::min(iv, limit));
 }
 
-//! 画检测框 + 标签�?
+//! draw detection boxes + labels
 void drawDetections(cv::Mat& image, const std::vector<Detection>& detections,
                     const std::vector<std::string>& classNames = {})
 {
@@ -133,14 +133,13 @@ void drawDetections(cv::Mat& image, const std::vector<Detection>& detections,
         const int y1 = clampCoord(d.bottom, image.rows);
         if (x1 <= x0 || y1 <= y0)
         {
-            continue;   // 框退�?
+            continue;   // degenerate box
         }
 
         const cv::Scalar color = colorForLabel(d.label);
         cv::rectangle(image, cv::Point(x0, y0), cv::Point(x1, y1),
                       color, kThickness, cv::LINE_AA);
 
-        // 标签文字�?class N 0.95"�?
         std::string label = "class " + std::to_string(d.label);
         if (d.label >= 0 && static_cast<std::size_t>(d.label) < classNames.size())
         {
@@ -174,7 +173,7 @@ int main(int argc, char** argv)
 {
     std::cout << "=== yolonas tests ===\n";
 
-    // [1] 注册中心能创�?
+    // [1] registry can create
     {
         bool ok = false;
         try
@@ -189,7 +188,7 @@ int main(int argc, char** argv)
         check(ok, "[1] 'yolonas' registered and created");
     }
 
-    // [2] init 失败（engine 不存在）
+    // [2] init fails (engine not exist)
     {
         ModelConfig cfg;
         cfg.engine = "/definitely/not/exist/yolo_12345.trt";
@@ -211,7 +210,7 @@ int main(int argc, char** argv)
         check(threw, "[2] init with missing engine throws");
     }
 
-    // [3] 真推�?
+    // [3] real inference
     if (argc >= 3)
     {
         std::cout << "\n--- real inference ---\n";
@@ -272,11 +271,10 @@ int main(int argc, char** argv)
                         }
                         check(n > 0, "[3] at least 1 detection (real inference works)");
 
-                        // ---- �?OpenCV 画框 + 存盘 ----
                         cv::Mat canvas = img.clone();
                         drawDetections(canvas, result.detections[0]);
 
-                        const std::string outPath = "test_yolov6_result.jpg";
+                        const std::string outPath = "test_yolonas_result.jpg";
                         if (cv::imwrite(outPath, canvas))
                         {
                             std::cout << "       saved: " << outPath << "\n";

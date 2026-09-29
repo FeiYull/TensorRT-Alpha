@@ -76,7 +76,7 @@ build/
 *FileTree.txt
 *.github
 *test_pipeline_out
-*.txt
+*log*.txt
 *.github
 *z_cmd.txt
 *.ps1

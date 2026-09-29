@@ -83,6 +83,13 @@ void decodeYoloV8SegHead(cudaStream_t stream, const YoloDecodeParams& p,
                           const float* src, int anchors,
                           int numMaskCoeffs, float* objects);
 
+//! 解码 YOLOv8-pose 头：和 decodeYoloV8Head 一样，但额外把 numKpts 个关键点的
+//! (x, y, conf) 写进行尾（网络输入坐标，不做仿射变换）。
+//! src 每行布局 = [4 + 1 + numKpts * 3]。
+void decodeYoloV8PoseHead(cudaStream_t stream, const YoloDecodeParams& p,
+                          const float* src, int anchors,
+                          int numKpts, float* objects);
+
 //! u2net 后处理归一化：out = scale * (val - min) / (max - min)
 //! 每张图独立（minVals/maxVals 长度 = batch）。
 void normPred(cudaStream_t stream, int batch,
