@@ -1,10 +1,11 @@
 // =============================================================================
 //  trt_alpha :: det :: YuNet（实现）
 // =============================================================================
-#include "trt_alpha/kernels/preprocess.hpp"
 #include "yunet.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/kernels/cast.hpp"
+#include "trt_alpha/kernels/preprocess.hpp"
 
 #include <algorithm>
 #include <cfloat>
@@ -43,10 +44,10 @@ void calFeatureMapSize(int srcW, int srcH, float* out /* [4*3] */)
     const int p4_h = int(p3_h / 2);
     const int p4_w = int(p3_w / 2);
 
-    out[0]  = float(p1_h); out[1]  = float(p1_w); out[2]  = 51.f;   // P1: 51 通道
-    out[3]  = float(p2_h); out[4]  = float(p2_w); out[5]  = 34.f;   // P2: 34 通道
-    out[6]  = float(p3_h); out[7]  = float(p3_w); out[8]  = 34.f;   // P3: 34 通道
-    out[9]  = float(p4_h); out[10] = float(p4_w); out[11] = 51.f;   // P4: 51 通道
+    out[0]  = float(p1_h); out[1]  = float(p1_w); out[2]  = 51.f;
+    out[3]  = float(p2_h); out[4]  = float(p2_w); out[5]  = 34.f;
+    out[6]  = float(p3_h); out[7]  = float(p3_w); out[8]  = 34.f;
+    out[9]  = float(p4_h); out[10] = float(p4_w); out[11] = 51.f;
 }
 
 //! 计算 prior boxes（照 legacy calPriorBox）。
@@ -130,35 +131,29 @@ void YuNet::discoverEngineIo()
 
 void YuNet::allocateConstBuffers()
 {
-    // min_sizes
     m_minSizes.allocate(sizeof(kMinSizesHost));
     cudaMemcpyAsync(m_minSizes.data(), kMinSizesHost, sizeof(kMinSizesHost),
                     cudaMemcpyHostToDevice, m_stream.get());
-    // variances
     m_variances.allocate(sizeof(kVariancesHost));
     cudaMemcpyAsync(m_variances.data(), kVariancesHost, sizeof(kVariancesHost),
                     cudaMemcpyHostToDevice, m_stream.get());
-    // feat_hw（下一行 setBatch 里填）
     m_featHw.allocate(4 * 3 * sizeof(float));
     m_stream.synchronize();
 }
 
 void YuNet::rebuildForSize(int W, int H)
 {
-    // 算 feature map 尺寸
     std::vector<float> featHw(4 * 3);
     calFeatureMapSize(W, H, featHw.data());
     cudaMemcpyAsync(m_featHw.data(), featHw.data(), featHw.size() * sizeof(float),
                     cudaMemcpyHostToDevice, m_stream.get());
 
-    // 算 N
     m_numCandidates = calNumCandidates(featHw.data());
     if (m_numCandidates <= 0)
     {
         throw std::runtime_error("yunet: numCandidates <= 0, invalid input size");
     }
 
-    // 算 prior boxes
     std::vector<float> priorBoxes(std::size_t(m_numCandidates) * 4);
     calPriorBox(featHw.data(), W, H, priorBoxes.data());
     m_priorBoxes.allocate(priorBoxes.size() * sizeof(float));
@@ -166,10 +161,8 @@ void YuNet::rebuildForSize(int W, int H)
                     priorBoxes.size() * sizeof(float),
                     cudaMemcpyHostToDevice, m_stream.get());
 
-    // 输入 NCHW buffer（HWC->CHW 后的结果）
     m_inputNchw.allocate(std::size_t(m_batch) * 3 * m_srcH * m_srcW * sizeof(float));
 
-    // 输出 buffer
     m_outputLoc.allocate(std::size_t(m_batch) * m_numCandidates * 14 * sizeof(float));
     m_outputConf.allocate(std::size_t(m_batch) * m_numCandidates * 2 * sizeof(float));
     m_outputIou.allocate(std::size_t(m_batch) * m_numCandidates * 1 * sizeof(float));
@@ -178,7 +171,6 @@ void YuNet::rebuildForSize(int W, int H)
     m_objects.allocate(std::size_t(m_batch) * objectsPerImage * sizeof(float));
     m_objectsHost.allocate(std::size_t(m_batch) * objectsPerImage * sizeof(float));
 
-    // 绑定
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     ctx->setInputShape(m_inputName.c_str(), nvinfer1::Dims4(m_batch, 3, H, W));
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
@@ -222,26 +214,27 @@ void YuNet::setBatch(const core::Batch& batch)
     }
     rebuildForSize(m_srcW, m_srcH);
 
-    // 把 batch.buffer 的 uint8 转 float 上传
+    // batch.buffer 是 uint8：H2D uint8 -> GPU kernel -> float HWC
     const std::size_t totalU8 = std::size_t(m_srcH) * m_srcW * 3 * m_batch;
     if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
     {
         throw std::runtime_error("yunet: batch.buffer is null");
     }
-    std::vector<float> hostF32(totalU8);
-    const std::uint8_t* srcU8 = batch.buffer->data();
-    for (std::size_t i = 0; i < totalU8; ++i)
+    if (m_inputU8.bytes() < totalU8)
     {
-        hostF32[i] = static_cast<float>(srcU8[i]);
+        m_inputU8.allocate(totalU8);
     }
-    cudaMemcpyAsync(m_inputHwc.data(), hostF32.data(), totalU8 * sizeof(float),
+    cudaMemcpyAsync(m_inputU8.data(), batch.buffer->data(), totalU8,
                     cudaMemcpyHostToDevice, m_stream.get());
+    kernels::u8ToF32(m_stream.get(),
+                     static_cast<const std::uint8_t*>(m_inputU8.data()),
+                     m_inputHwc.asFloat(),
+                     totalU8);
     m_stream.synchronize();
 }
 
 void YuNet::preprocess()
 {
-    // HWC float (m_inputHwc) -> CHW float (m_inputNchw)
     kernels::hwcToChw(m_stream.get(), m_batch,
                       m_inputHwc.asFloat(),
                       m_inputNchw.asFloat(),
@@ -275,7 +268,6 @@ void YuNet::postprocess()
                              m_variances.asFloat(),
                              m_objects.asFloat());
 
-    // NMS（只处理前 7 个字段，关键点不参与）
     kernels::YoloDecodeParams p;
     p.batch = m_batch;
     p.topK = m_topK;
@@ -303,7 +295,6 @@ void YuNet::postprocess()
             d.bottom = o[3];
             d.confidence = o[4];
             d.label = static_cast<int>(o[5]);
-            // 5 个关键点
             for (int k = 0; k < 5; ++k)
             {
                 Point2f pt;

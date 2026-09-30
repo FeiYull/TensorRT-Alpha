@@ -4,6 +4,7 @@
 #include "efficientdet.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/kernels/cast.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -98,9 +99,15 @@ void EfficientDet::allocateBuffers()
         core::detail::logAllocBox(info);
     };
 
+    // 输入 float32 NHWC
     m_inputSrc.allocate(static_cast<std::size_t>(B) * H * W * 3 * sizeof(float));
     logBox("efficientdet.input_src", B, 3, H, W, core::DataType::Float32,
            m_inputSrc.bytes(), core::MemorySpace::Device);
+
+    // H2D 临时 uint8 buffer
+    m_inputU8.allocate(static_cast<std::size_t>(B) * H * W * 3);
+    logBox("efficientdet.input_u8", B, 3, H, W, core::DataType::UInt8,
+           m_inputU8.bytes(), core::MemorySpace::Device);
 
     m_inputRgb.allocate(static_cast<std::size_t>(B) * H * W * 3 * sizeof(float));
     logBox("efficientdet.input_rgb", B, 3, H, W, core::DataType::Float32,
@@ -161,7 +168,7 @@ void EfficientDet::setBatch(const core::Batch& batch)
 
     buildLetterboxAffine(m_srcW, m_srcH, m_cfg.dstW, m_cfg.dstH, m_dst2src);
 
-    // batch.buffer 是 uint8 Host 连续内存 → 转 float32 → H2D
+    // batch.buffer 是 uint8 Host 连续内存
     const std::size_t oneImageU8 = static_cast<std::size_t>(m_srcH) * m_srcW * 3;
     const std::size_t totalU8 = oneImageU8 * batch.views.size();
     if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
@@ -169,25 +176,23 @@ void EfficientDet::setBatch(const core::Batch& batch)
         throw std::runtime_error("efficientdet: batch.buffer is null");
     }
 
-    // 逐帧 convertTo float32（这里直接手写 uint8 -> float）
-    std::vector<float> hostF32(totalU8);
-    const std::uint8_t* srcU8 = batch.buffer->data();
-    for (std::size_t i = 0; i < totalU8; ++i)
+    // H2D uint8 -> GPU kernel -> float
+    if (m_inputU8.bytes() < totalU8)
     {
-        hostF32[i] = static_cast<float>(srcU8[i]);
+        m_inputU8.allocate(totalU8);
     }
-    if (m_inputSrc.bytes() < totalU8 * sizeof(float))
-    {
-        m_inputSrc.allocate(totalU8 * sizeof(float));
-    }
-    cudaMemcpyAsync(m_inputSrc.data(), hostF32.data(), totalU8 * sizeof(float),
+    cudaMemcpyAsync(m_inputU8.data(), batch.buffer->data(), totalU8,
                     cudaMemcpyHostToDevice, m_stream.get());
+    kernels::u8ToF32(m_stream.get(),
+                     static_cast<const std::uint8_t*>(m_inputU8.data()),
+                     m_inputSrc.asFloat(),
+                     totalU8);
     m_stream.synchronize();
 }
 
 void EfficientDet::preprocess()
 {
-    // 1) letterbox resize：float BGR HWC -> float BGR HWC（走 float 重载）
+    // 1) letterbox resize：float BGR HWC -> float BGR HWC
     kernels::resizeLetterbox(m_stream.get(), m_batch,
                              m_inputSrc.asFloat(),
                              m_srcW, m_srcH,
@@ -238,7 +243,6 @@ void EfficientDet::postprocess()
         const int count = std::min(static_cast<int>(numHost[b]), m_topK);
         for (int i = 0; i < count; ++i)
         {
-            // box 顺序 [y1, x1, y2, x2]
             const float y1 = boxesHost[(b * m_topK + i) * 4 + 0];
             const float x1 = boxesHost[(b * m_topK + i) * 4 + 1];
             const float y2 = boxesHost[(b * m_topK + i) * 4 + 2];

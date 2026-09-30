@@ -10,6 +10,7 @@
 // =============================================================================
 #pragma once
 
+#include "trt_alpha/kernels/cast.hpp"
 #include "trt_alpha/core/batch.hpp"
 #include "trt_alpha/core/batch_result.hpp"
 #include "trt_alpha/core/cuda_stream.hpp"
@@ -80,6 +81,7 @@ private:
     core::CudaStream m_stream;
 
     core::DeviceBuffer m_inputHwc;   // [B, 3, H, W]（float，喂 engine）
+    core::DeviceBuffer m_inputU8;   // H2D 临时
     core::DeviceBuffer m_inputNchw;  // [B, 3, H, W]（HWc->CHW 后，喂 engine）
     core::DeviceBuffer m_outputLoc;  // [B, N, 14]
     core::DeviceBuffer m_outputConf; // [B, N, 2]

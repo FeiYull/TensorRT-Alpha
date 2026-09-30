@@ -2,8 +2,9 @@
 //  trt_alpha :: kernels :: yolo_preprocess（实现）
 // -----------------------------------------------------------------------------
 //  resize kernel 的双线性 + 越界回退逻辑移植自 TensorRT-Alpha（已实测正确）；
-//  改动：参数化 CUDA 流、加边界检查、统一命名。
+//  改动：参数化 CUDA 流、加边界检查、统一命名、block size 走 common.cuh。
 // =============================================================================
+#include "trt_alpha/kernels/common.cuh"
 #include "trt_alpha/kernels/yolo_preprocess.cuh"
 
 #include <cmath>
@@ -12,8 +13,6 @@
 
 namespace trt_alpha::kernels {
 namespace {
-
-constexpr int kBlockSize = 8;
 
 void checkCuda(cudaError_t err, const char* op)
 {
@@ -28,9 +27,6 @@ void checkCuda(cudaError_t err, const char* op)
 
 namespace detail {
 
-
-
-    
 //! 2x3 仿射投影：输出坐标 -> 源图坐标。
 __device__ inline void affineProject(const AffineMat& m, int x, int y,
                                      float* px, float* py)
@@ -44,8 +40,8 @@ __global__ void resizeLetterboxKernel(const std::uint8_t* __restrict__ src,
                                       float* __restrict__ dst, int dstW, int dstH,
                                       int batchSize, float padValue, AffineMat m)
 {
-    const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // dst 像素序号
-    const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
     if (dx >= dstW * dstH || dy >= batchSize)
     {
         return;
@@ -289,7 +285,6 @@ __global__ void bgrToNchwNormKernel(const float* __restrict__ src,
     }
     const int spatial = dx / 3;
     const int chIn = dx % 3;
-    // swapRB: BGR -> RGB；不 swap: 保持 BGR
     const int chOut = swapRB ? (2 - chIn) : chIn;
     const int y = spatial / width;
     const int x = spatial % width;
@@ -344,15 +339,14 @@ __global__ void copyWithPaddingKernel(int batchSize,
 __global__ void bgrToRgbHwcKernel(float* __restrict__ data,
                                   int batchSize, int width, int height)
 {
-    const int dx = blockDim.x * blockIdx.x + threadIdx.x;   // 像素序号（spatial）
-    const int dy = blockDim.y * blockIdx.y + threadIdx.y;   // batch 序号
+    const int dx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int dy = blockDim.y * blockIdx.y + threadIdx.y;
     const int spatial = width * height;
     if (dx >= spatial || dy >= batchSize)
     {
         return;
     }
     float* pixel = data + dy * spatial * 3 + dx * 3;
-    // BGR <-> RGB: 交换第 0 和第 2 个通道
     const float b = pixel[0];
     const float r = pixel[2];
     pixel[0] = r;
@@ -375,8 +369,6 @@ __global__ void hwcToChwKernel(const float* __restrict__ src,
     const int spatial = dx % imgArea;
     const int row = spatial / width;
     const int col = spatial % width;
-    // dst: NCHW -> [dy][ch][row][col]
-    // src: HWC  -> [dy][row][col][ch]
     const int srcIdx = dy * volume + (row * width + col) * 3 + ch;
     dst[dy * volume + dx] = src[srcIdx];
 }
@@ -395,39 +387,13 @@ __global__ void divByMaxKernel(int batchSize, float* __restrict__ data,
 
 }  // namespace detail
 
-
-
-void copyWithPadding(cudaStream_t stream, int batch,
-                     const float* src, int srcW, int srcH,
-                     float* dst, int dstW, int dstH,
-                     float padValue, int padTop, int padLeft)
-{
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((dstW * dstH + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
-    detail::copyWithPaddingKernel<<<grid, block, 0, stream>>>(
-        batch, src, srcW, srcH, dst, dstW, dstH, padValue, padTop, padLeft);
-    checkCuda(cudaGetLastError(), "copyWithPadding launch");
-}
-
-void bgrToRgbHwc(cudaStream_t stream, int batch,
-                 float* data, int width, int height)
-{
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((width * height + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
-    detail::bgrToRgbHwcKernel<<<grid, block, 0, stream>>>(data, batch, width, height);
-    checkCuda(cudaGetLastError(), "bgrToRgbHwc launch");
-}
-
 void resizeLetterbox(cudaStream_t stream, int batch,
                      const std::uint8_t* src, int srcW, int srcH,
                      float* dst, int dstW, int dstH,
                      float padValue, AffineMat dst2src)
 {
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((dstW * dstH + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(dstW) * dstH, batch);
     detail::resizeLetterboxKernel<<<grid, block, 0, stream>>>(
         src, srcW, srcH, dst, dstW, dstH, batch, padValue, dst2src);
     checkCuda(cudaGetLastError(), "resizeLetterbox launch");
@@ -438,9 +404,8 @@ void resizeLetterbox(cudaStream_t stream, int batch,
                      float* dst, int dstW, int dstH,
                      float padValue, AffineMat dst2src)
 {
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((dstW * dstH + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(dstW) * dstH, batch);
     detail::resizeLetterboxF32Kernel<<<grid, block, 0, stream>>>(
         src, srcW, srcH, dst, dstW, dstH, batch, padValue, dst2src);
     checkCuda(cudaGetLastError(), "resizeLetterboxF32 launch");
@@ -451,9 +416,8 @@ void resizeNoPadding(cudaStream_t stream, int batch,
                      float* dst, int dstW, int dstH,
                      bool isGray, AffineMat dst2src)
 {
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((dstW * dstH + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(dstW) * dstH, batch);
     if (isGray)
     {
         detail::resizeNoPaddingGrayKernel<<<grid, block, 0, stream>>>(
@@ -474,9 +438,8 @@ void bgrToNchwNormalized(cudaStream_t stream, int batch,
                          float scale, const float mean[3], const float std_[3],
                          bool swapRB)
 {
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((width * height * 3 + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(width) * height * 3, batch);
     detail::bgrToNchwNormKernel<<<grid, block, 0, stream>>>(
         src, dst, batch, width, height, scale,
         mean[0], mean[1], mean[2], std_[0], std_[1], std_[2],
@@ -488,11 +451,31 @@ void hwcToChw(cudaStream_t stream, int batch,
               const float* src, float* dst,
               int width, int height)
 {
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((width * height * 3 + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(width) * height * 3, batch);
     detail::hwcToChwKernel<<<grid, block, 0, stream>>>(src, dst, batch, width, height);
     checkCuda(cudaGetLastError(), "hwcToChw launch");
+}
+
+void copyWithPadding(cudaStream_t stream, int batch,
+                     const float* src, int srcW, int srcH,
+                     float* dst, int dstW, int dstH,
+                     float padValue, int padTop, int padLeft)
+{
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(dstW) * dstH, batch);
+    detail::copyWithPaddingKernel<<<grid, block, 0, stream>>>(
+        batch, src, srcW, srcH, dst, dstW, dstH, padValue, padTop, padLeft);
+    checkCuda(cudaGetLastError(), "copyWithPadding launch");
+}
+
+void bgrToRgbHwc(cudaStream_t stream, int batch,
+                 float* data, int width, int height)
+{
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(width) * height, batch);
+    detail::bgrToRgbHwcKernel<<<grid, block, 0, stream>>>(data, batch, width, height);
+    checkCuda(cudaGetLastError(), "bgrToRgbHwc launch");
 }
 
 void divByMax(cudaStream_t stream, int batch,
@@ -500,9 +483,8 @@ void divByMax(cudaStream_t stream, int batch,
               const float* maxVals)
 {
     const int volume = width * height * channels;
-    const dim3 block(kBlockSize, kBlockSize);
-    const dim3 grid((volume + kBlockSize - 1) / kBlockSize,
-                    (batch + kBlockSize - 1) / kBlockSize);
+    const dim3 block = block2D();
+    const dim3 grid = gridSize2D(static_cast<std::size_t>(volume), batch);
     detail::divByMaxKernel<<<grid, block, 0, stream>>>(batch, data, volume, maxVals);
     checkCuda(cudaGetLastError(), "divByMax launch");
 }

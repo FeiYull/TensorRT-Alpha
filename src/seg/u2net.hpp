@@ -10,6 +10,8 @@
 // =============================================================================
 #pragma once
 
+#include "trt_alpha/kernels/cast.hpp"
+#include "trt_alpha/kernels/cast.hpp"
 #include "trt_alpha/core/batch.hpp"
 #include "trt_alpha/core/batch_result.hpp"
 #include "trt_alpha/core/cuda_stream.hpp"
@@ -71,6 +73,7 @@ private:
     core::CudaStream m_stream;
 
     // 预处理
+    core::DeviceBuffer m_inputU8;    // [B, 3, srcH, srcW] uint8（H2D 临时）
     core::DeviceBuffer m_inputSrc;      // [B, 3, srcH, srcW] float（uint8->float 后）
     core::DeviceBuffer m_inputRgb;      // [B, 3, srcH, srcW] float（BGR->RGB 后）
     core::DeviceBuffer m_inputResize;   // [B, 3, dstH, dstW] float（resize 后）

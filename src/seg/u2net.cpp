@@ -202,20 +202,22 @@ void U2Net::setBatch(const core::Batch& batch)
         m_maskHost.allocate(oneSrcGray * sizeof(float));
     }
 
-    // batch.buffer 是 uint8，转到 m_inputSrc（float）
+    // batch.buffer 是 uint8：H2D uint8 -> GPU kernel -> float
     const std::size_t totalU8 = std::size_t(m_batch) * oneSrc;
     if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
     {
         throw std::runtime_error("u2net: batch.buffer is null");
     }
-    std::vector<float> hostF32(totalU8);
-    const std::uint8_t* srcU8 = batch.buffer->data();
-    for (std::size_t i = 0; i < totalU8; ++i)
+    if (m_inputU8.bytes() < totalU8)
     {
-        hostF32[i] = static_cast<float>(srcU8[i]);
+        m_inputU8.allocate(totalU8);
     }
-    cudaMemcpyAsync(m_inputSrc.data(), hostF32.data(), totalU8 * sizeof(float),
+    cudaMemcpyAsync(m_inputU8.data(), batch.buffer->data(), totalU8,
                     cudaMemcpyHostToDevice, m_stream.get());
+    kernels::u8ToF32(m_stream.get(),
+                     static_cast<const std::uint8_t*>(m_inputU8.data()),
+                     m_inputSrc.asFloat(),
+                     totalU8);
     m_stream.synchronize();
 }
 

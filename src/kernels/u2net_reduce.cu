@@ -1,6 +1,7 @@
 // =============================================================================
 //  trt_alpha :: kernels :: u2net_reduce（实现）
 // =============================================================================
+#include "trt_alpha/kernels/common.cuh"
 #include "trt_alpha/kernels/u2net_reduce.hpp"
 
 #include <cfloat>
@@ -9,8 +10,6 @@
 
 namespace trt_alpha::kernels {
 namespace {
-
-constexpr int kBlock = 256;
 
 void checkCuda(cudaError_t err, const char* op)
 {
@@ -63,7 +62,7 @@ __global__ void reduceMinMaxKernel(const float* __restrict__ data,
     const int b = blockIdx.x;
     const float* row = data + static_cast<std::size_t>(b) * N;
 
-    extern __shared__ float sdata[];   // 2 * blockDim.x
+    extern __shared__ float sdata[];
     float* sMin = sdata;
     float* sMax = sdata + blockDim.x;
 
@@ -108,8 +107,8 @@ void reduceMax(cudaStream_t stream,
     {
         throw std::runtime_error("reduceMax: batch/N must be > 0");
     }
-    const std::size_t smem = kBlock * sizeof(float);
-    reduceMaxKernel<<<batch, kBlock, smem, stream>>>(data, out, N);
+    const std::size_t smem = kBlock1D * sizeof(float);
+    reduceMaxKernel<<<batch, kBlock1D, smem, stream>>>(data, out, N);
     checkCuda(cudaGetLastError(), "reduceMax launch");
 }
 
@@ -123,8 +122,8 @@ void reduceMinMax(cudaStream_t stream,
     {
         throw std::runtime_error("reduceMinMax: batch/N must be > 0");
     }
-    const std::size_t smem = 2 * kBlock * sizeof(float);
-    reduceMinMaxKernel<<<batch, kBlock, smem, stream>>>(data, outMin, outMax, N);
+    const std::size_t smem = 2 * kBlock1D * sizeof(float);
+    reduceMinMaxKernel<<<batch, kBlock1D, smem, stream>>>(data, outMin, outMax, N);
     checkCuda(cudaGetLastError(), "reduceMinMax launch");
 }
 

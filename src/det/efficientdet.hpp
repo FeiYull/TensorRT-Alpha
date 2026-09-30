@@ -10,6 +10,7 @@
 // =============================================================================
 #pragma once
 
+#include "trt_alpha/kernels/cast.hpp"
 #include "trt_alpha/core/batch.hpp"
 #include "trt_alpha/core/batch_result.hpp"
 #include "trt_alpha/core/cuda_stream.hpp"
@@ -71,6 +72,7 @@ private:
     int m_topK = 100;                 // engine 固定 100
 
     core::CudaStream m_stream;
+    core::DeviceBuffer m_inputU8;    // H2D 临时
     core::DeviceBuffer m_inputSrc;    // float32 NHWC（原图，H2D 后）
     core::DeviceBuffer m_inputRgb;    // float32 NHWC（网络输入，in-place BGR->RGB 后）
 
