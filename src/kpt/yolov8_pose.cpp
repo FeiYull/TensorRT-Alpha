@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace trt_alpha::det {
+namespace trt_alpha::seg {
 namespace {
 
 void buildLetterboxAffine(int srcW, int srcH, int dstW, int dstH,
@@ -277,4 +277,4 @@ void YoloV8Pose::reset()
 
 }  // namespace trt_alpha::det
 
-TRT_ALPHA_REGISTER_MODEL("yolov8-pose", trt_alpha::det::YoloV8Pose);
+TRT_ALPHA_REGISTER_MODEL("yolov8-pose", trt_alpha::seg::YoloV8Pose);

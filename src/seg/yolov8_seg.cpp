@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-namespace trt_alpha::det {
+namespace trt_alpha::seg {
 namespace {
 
 void buildLetterboxAffine(int srcW, int srcH, int dstW, int dstH,
@@ -400,4 +400,4 @@ void YoloV8Seg::reset()
 
 }  // namespace trt_alpha::det
 
-TRT_ALPHA_REGISTER_MODEL("yolov8-seg", trt_alpha::det::YoloV8Seg);
+TRT_ALPHA_REGISTER_MODEL("yolov8-seg", trt_alpha::seg::YoloV8Seg);

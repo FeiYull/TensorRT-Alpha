@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-namespace trt_alpha::det {
+namespace trt_alpha::seg {
 namespace {
 
 //! 计算 src->dst 的缩放仿射（u2net 是"非等比缩放"，x 和 y 独立）。
@@ -325,4 +325,4 @@ void U2Net::reset()
 
 }  // namespace trt_alpha::det
 
-TRT_ALPHA_REGISTER_MODEL("u2net", trt_alpha::det::U2Net);
+TRT_ALPHA_REGISTER_MODEL("u2net", trt_alpha::seg::U2Net);

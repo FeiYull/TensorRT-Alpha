@@ -61,10 +61,10 @@
 
 # deep learning's file
 
-*onnx
-*trt
-*pt
-*pth
+*.onnx
+*.trt
+*.pt
+*.pth
 build/
 *include_legacy
 *src_legacy

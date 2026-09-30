@@ -26,7 +26,7 @@
 #include <string>
 #include <vector>
 
-namespace trt_alpha::det {
+namespace trt_alpha::seg {
 
 class U2Net final : public seg::ISegmentor
 {

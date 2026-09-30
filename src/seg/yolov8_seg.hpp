@@ -1,11 +1,11 @@
 // =============================================================================
-//  trt_alpha :: det :: YoloV8Pose（私有头文件）
+//  trt_alpha :: det :: YoloV8Seg（私有头文件）
 // -----------------------------------------------------------------------------
-//  YOLOv8-pose 姿态估计。
-//  - 输入 [B, 3, 640, 640]
-//  - 输出 [B, 56, 8400]（4 + 1 conf + 17 kpts × 3）
-//  - 需要 transpose（[B, 56, 8400] -> [B, 8400, 56]）
-//  - 关键点是 (x, y, conf) 三连，网络输入坐标，postprocess 里做 m_dst2src 变换
+//  YOLOv8-seg 实例分割。
+//  - 2 个输出：output0 [B, 116, 8400] / output1 [B, 32, 160, 160]
+//  - output0: 4 + 80 + 32（前 4 是 xywh，中 80 是 class，后 32 是 mask 系数）
+//  - output1: 32 个 160×160 的 mask 原型
+//  - mask 后处理在 CPU（cv::Mat，不用 Eigen）
 // =============================================================================
 #pragma once
 
@@ -18,23 +18,23 @@
 #include "trt_alpha/core/pinned_buffer.hpp"
 #include "trt_alpha/kernels/postprocess.hpp"
 #include "trt_alpha/kernels/preprocess.hpp"
-#include "trt_alpha/kpt/keypointer.hpp"
+#include "trt_alpha/seg/segmentor.hpp"
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace trt_alpha::det {
+namespace trt_alpha::seg {
 
-class YoloV8Pose final : public kpt::IKeypointer
+class YoloV8Seg final : public seg::ISegmentor
 {
 public:
-    YoloV8Pose() = default;
-    ~YoloV8Pose() override = default;
+    YoloV8Seg() = default;
+    ~YoloV8Seg() override = default;
 
-    YoloV8Pose(const YoloV8Pose&) = delete;
-    YoloV8Pose& operator=(const YoloV8Pose&) = delete;
+    YoloV8Seg(const YoloV8Seg&) = delete;
+    YoloV8Seg& operator=(const YoloV8Seg&) = delete;
 
     [[nodiscard]] const std::string& name() const noexcept override;
 
@@ -53,7 +53,10 @@ public:
 
 private:
     core::ModelConfig m_cfg;
-    int m_numKpts = 17;          // COCO 17 关键点
+    int m_numClass = 80;
+    int m_numMaskCoeffs = 32;
+    int m_maskProtoH = 160;
+    int m_maskProtoW = 160;
     float m_confThreshold = 0.25f;
     float m_iouThreshold = 0.7f;
     int m_topK = 300;
@@ -64,26 +67,29 @@ private:
 
     std::unique_ptr<core::TrtEngine> m_engine;
     std::string m_inputName;    // "images"
-    std::string m_outputName;   // "output0"
+    std::string m_output0Name;  // "output0"
+    std::string m_output1Name;  // "output1"
 
     int m_batch = 0;
     int m_srcW = 0;
     int m_srcH = 0;
 
-    int m_srcRow = 0;      // 5 + 17*3 = 56
+    int m_srcRow = 0;      // 4 + nc + 32
     int m_anchors = 0;     // 8400
-    int m_objectsRow = 0;  // 7 + 17*3 = 58
 
     core::CudaStream m_stream;
     core::DeviceBuffer m_inputSrc;
     core::DeviceBuffer m_resizeOut;
     core::DeviceBuffer m_inputNchw;
-    core::DeviceBuffer m_outputSrc;         // [B, 56, 8400]
-    core::DeviceBuffer m_outputTransposed;  // [B, 8400, 56]
-    core::DeviceBuffer m_objects;           // [B, 1 + topK*58]
+    core::DeviceBuffer m_outputSrc;         // [B, 116, 8400]
+    core::DeviceBuffer m_outputTransposed;  // [B, 8400, 116]
+    core::DeviceBuffer m_outputSeg;         // [B, 32, 160, 160]
+    core::DeviceBuffer m_objects;           // [B, 1 + topK*39]
     core::PinnedBuffer m_objectsHost;
+    core::PinnedBuffer m_outputSegHost;
 
     int m_objectsPerImage = 0;
+    int m_objectsRow = 0;  // 7 + 32
 
     trt_alpha::kernels::AffineMat m_dst2src{};
 
