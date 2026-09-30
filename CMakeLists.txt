@@ -105,7 +105,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # CUDA_SEPARABLE_COMPILATION + CUDA_RESOLVE_DEVICE_SYMBOLS 是 .cu 与 .cpp
 # 跨编译单元互相引用时必须的（否则 __cudaRegisterLinkedBinary_* 链接失败）。
 # =============================================================================
-file(GLOB_RECURSE TRT_ALPHA_SOURCES
+file(GLOB_RECURSE TRT_ALPHA_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/*.cpp"
   "${CMAKE_SOURCE_DIR}/src/*.cu")
 

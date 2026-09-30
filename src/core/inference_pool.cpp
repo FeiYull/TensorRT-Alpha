@@ -120,9 +120,9 @@ std::future<BatchResult> InferencePool::submit(Batch batch)
         {
             if (m_tasks.size() >= m_maxQueueSize)
             {
-                TRT_LOG_WARN("[InferencePool] submit task #" << taskId
-                            << " BLOCKED: queue full (" << m_tasks.size()
-                            << "/" << m_maxQueueSize << ")");
+                TRT_LOG_DEBUG("[InferencePool] submit task #" << taskId
+                             << " BLOCKED: queue full (" << m_tasks.size()
+                             << "/" << m_maxQueueSize << ")");
             }
             m_cvNotFull.wait(lock, [this] {
                 return m_stop || m_tasks.size() < m_maxQueueSize;

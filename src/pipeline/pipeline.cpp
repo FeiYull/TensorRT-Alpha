@@ -188,8 +188,8 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
         }
         if (dropped)
         {
-            TRT_LOG_WARN("Pipeline: result queue full (" << m_cfg.resultQueueSize
-                          << "), dropped oldest future");
+            TRT_LOG_DEBUG("Pipeline: result queue full (" << m_cfg.resultQueueSize
+                           << "), dropped oldest future");
         }
         TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
                      << "] pushed future, loop again");                        // ← 加
