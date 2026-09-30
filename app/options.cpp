@@ -52,6 +52,12 @@ bool RunOptions::hasSource() const noexcept
     return !image.empty() || !images.empty() || !video.empty() || cameraId >= 0;
 }
 
+std::string RunOptions::resolveConfigPath() const
+{
+    if (!config.empty()) { return config; }
+    return "configs/" + net + ".ini";
+}
+
 void RunOptions::validate() const
 {
     const int sourceCount =
@@ -79,6 +85,10 @@ void RunOptions::validate() const
     {
         throw std::runtime_error("run: --workers must be > 0");
     }
+    if (net.empty())
+    {
+        throw std::runtime_error("run: --net must not be empty");
+    }
 }
 
 RunOptions parseRunOptions(const std::vector<std::string>& args)
@@ -96,7 +106,7 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
         else if (a == "--camera")   { opt.cameraId = parseInt(nextArg(args, i, a), a); }
         else if (a == "--config")   { opt.config = nextArg(args, i, a); }
         else if (a == "--engine")   { opt.engine = nextArg(args, i, a); }
-        else if (a == "--model")    { opt.model = nextArg(args, i, a); }
+        else if (a == "--net")      { opt.net = nextArg(args, i, a); }
         else if (a == "--batch")    { opt.batch = parseInt(nextArg(args, i, a), a); }
         else if (a == "--save-dir") { opt.saveDir = nextArg(args, i, a); }
         else if (a == "--workers")  { opt.workers = static_cast<std::size_t>(parseInt(nextArg(args, i, a), a)); }
@@ -116,11 +126,17 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
 //  BenchOptions
 // =============================================================================
 
+std::string BenchOptions::resolveConfigPath() const
+{
+    if (!config.empty()) { return config; }
+    return "configs/" + net + ".ini";
+}
+
 void BenchOptions::validate() const
 {
-    if (engine.empty() && config.empty())
+    if (engine.empty() && config.empty() && net.empty())
     {
-        throw std::runtime_error("bench: need --engine or --config");
+        throw std::runtime_error("bench: need --engine or --config or --net");
     }
     if (iters <= 0)
     {
@@ -150,7 +166,7 @@ BenchOptions parseBenchOptions(const std::vector<std::string>& args)
 
         if      (a == "--engine") { opt.engine = nextArg(args, i, a); }
         else if (a == "--config") { opt.config = nextArg(args, i, a); }
-        else if (a == "--model")  { opt.model = nextArg(args, i, a); }
+        else if (a == "--net")    { opt.net = nextArg(args, i, a); }
         else if (a == "--batch")  { opt.batch = parseInt(nextArg(args, i, a), a); }
         else if (a == "--iters")  { opt.iters = parseInt(nextArg(args, i, a), a); }
         else if (a == "--warmup") { opt.warmup = parseInt(nextArg(args, i, a), a); }

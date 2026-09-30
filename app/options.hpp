@@ -21,9 +21,9 @@ struct RunOptions
     int cameraId = -1;          //!< --camera <id>
 
     // ---- 模型 ----
-    std::string config;         //!< --config <ini>（默认 configs/yolov8.ini）
+    std::string config;         //!< --config <ini>（不传则 configs/<net>.ini）
     std::string engine;         //!< --engine <trt>（覆盖 INI）
-    std::string model = "yolov8";
+    std::string net = "yolov8"; //!< --net <name>（模型名，默认 yolov8）
     int batch = -1;             //!< --batch <n>（-1 = 用 INI）
 
     // ---- 渲染 ----
@@ -42,6 +42,9 @@ struct RunOptions
 
     //! 是否指定了任何数据源。
     [[nodiscard]] bool hasSource() const noexcept;
+
+    //! 解析 INI 路径：显式 --config 优先，否则 configs/<net>.ini。
+    [[nodiscard]] std::string resolveConfigPath() const;
 };
 
 //! 解析 `run` 命令的参数（args[0] == "run"，跳过）。
@@ -55,14 +58,17 @@ RunOptions parseRunOptions(const std::vector<std::string>& args);
 struct BenchOptions
 {
     std::string engine;             //!< --engine <trt>（与 config 至少一个）
-    std::string config;             //!< --config <ini>（默认 configs/yolov8.ini）
-    std::string model = "yolov8";   //!< --model <name>
+    std::string config;             //!< --config <ini>（不传则 configs/<net>.ini）
+    std::string net = "yolov8";     //!< --net <name>
     int batch = -1;                 //!< --batch <n>（-1 = 用 INI）
     int iters = 100;                //!< --iters <n>（测量次数）
     int warmup = 10;                //!< --warmup <n>（预热次数，不计入统计）
     std::string root;               //!< --root <dir>
 
     void validate() const;
+
+    //! 解析 INI 路径：显式 --config 优先，否则 configs/<net>.ini。
+    [[nodiscard]] std::string resolveConfigPath() const;
 };
 
 BenchOptions parseBenchOptions(const std::vector<std::string>& args);

@@ -64,27 +64,51 @@ trt_alpha::core::Batch makeBenchBatch(int batchSize, int width, int height)
 void printUsage()
 {
     std::cout <<
-        "trt_alpha v1.0\n"
+        "trt_alpha v1.0 -- TensorRT inference framework\n"
         "\n"
         "Usage:\n"
         "  trt_alpha list\n"
-        "  trt_alpha run    --image <path> [--engine <trt>] [--save] [--show]\n"
-        "  trt_alpha run    --video <path> [--engine <trt>] [--save]\n"
-        "  trt_alpha bench  --engine <trt> [--batch <n>] [--iters <n>] [--warmup <n>]\n"
-        "  trt_alpha build  (TODO)\n"
+        "  trt_alpha run   <source> [options]\n"
+        "  trt_alpha bench <options>\n"
+        "  trt_alpha build (TODO)\n"
         "\n"
-        "Options:\n"
-        "  --config <ini>   model INI (default: configs/yolov8.ini)\n"
-        "  --engine <trt>   override INI's engine path\n"
-        "  --model <name>   model name (default: yolov8)\n"
-        "  --batch <n>      override INI's batch_size\n"
-        "  --save           save result images\n"
-        "  --save-dir <dir> output dir (default: save)\n"
-        "  --show           show result window\n"
-        "  --workers <n>    inference pool workers (default: 1)\n"
-        "  --iters <n>      bench iterations (default: 100)\n"
-        "  --warmup <n>     bench warmup iterations (default: 10)\n"
-        "  --root <dir>     override project root\n";
+        "Commands:\n"
+        "  list   List all registered models\n"
+        "  run    Run inference on image / images / video / camera\n"
+        "  bench  Benchmark latency and throughput\n"
+        "  build  Convert ONNX to engine (TODO)\n"
+        "\n"
+        "Run options:\n"
+        "  --image <path>    single image\n"
+        "  --images <dir>    image directory\n"
+        "  --video <path>    video file\n"
+        "  --camera <id>     camera device id\n"
+        "  --net <name>      model name (default: yolov8)\n"
+        "  --config <ini>    model INI (default: configs/<net>.ini)\n"
+        "  --engine <trt>    override INI's engine path\n"
+        "  --batch <n>       override INI's batch_size\n"
+        "  --workers <n>     inference pool workers (default: 1)\n"
+        "  --save            save result images\n"
+        "  --save-dir <dir>  output dir (default: save)\n"
+        "  --show            show result window\n"
+        "  --root <dir>      override project root\n"
+        "\n"
+        "Bench options:\n"
+        "  --net <name>      model name (default: yolov8)\n"
+        "  --config <ini>    model INI (default: configs/<net>.ini)\n"
+        "  --engine <trt>    override INI's engine path\n"
+        "  --batch <n>       override INI's batch_size\n"
+        "  --iters <n>       bench iterations (default: 100)\n"
+        "  --warmup <n>      warmup iterations (default: 10)\n"
+        "  --root <dir>      override project root\n"
+        "\n"
+        "Examples:\n"
+        "  trt_alpha list\n"
+        "  trt_alpha run --image data/bus.jpg --net yolov8 --save\n"
+        "  trt_alpha run --video data/people.mp4 --net yolor --show\n"
+        "  trt_alpha run --camera 0 --net yolov8-pose --show\n"
+        "  trt_alpha bench --net yolov8 --iters 100 --warmup 10\n"
+        "  trt_alpha run --image data/bus.jpg --net yolov8 --engine D:/models/yolov8n.trt\n";
 }
 
 int listCommand(const std::vector<std::string>& /*args*/)
@@ -110,9 +134,8 @@ int runCommand(const std::vector<std::string>& args)
         trt_alpha::core::Paths::setOverride(opt.root);
     }
 
-    // 读 INI
-    const std::string iniPath =
-        opt.config.empty() ? "configs/yolov8.ini" : opt.config;
+    // 读 INI（--config 优先，否则 configs/<net>.ini）
+    const std::string iniPath = opt.resolveConfigPath();
     trt_alpha::core::ModelConfig modelCfg = trt_alpha::core::loadModelConfig(iniPath);
 
     if (!opt.engine.empty()) { modelCfg.engine = opt.engine; }
@@ -123,7 +146,7 @@ int runCommand(const std::vector<std::string>& args)
     // 推理池
     trt_alpha::core::InferencePool pool(
         modelCfg,
-        [name = opt.model]() -> std::unique_ptr<trt_alpha::IModel> {
+        [name = opt.net]() -> std::unique_ptr<trt_alpha::IModel> {
             return trt_alpha::ModelRegistry::instance().create(name);
         },
         opt.workers);
@@ -193,8 +216,7 @@ int benchCommand(const std::vector<std::string>& args)
     }
 
     // 读 INI
-    const std::string iniPath =
-        opt.config.empty() ? "configs/yolov8.ini" : opt.config;
+    const std::string iniPath = opt.resolveConfigPath();
     trt_alpha::core::ModelConfig cfg = trt_alpha::core::loadModelConfig(iniPath);
 
     if (!opt.engine.empty()) { cfg.engine = opt.engine; }
@@ -203,7 +225,7 @@ int benchCommand(const std::vector<std::string>& args)
     cfg.classNames = trt_alpha::core::loadClassNamesFile(cfg.classNamesFile);
 
     // 造模型
-    auto model = trt_alpha::ModelRegistry::instance().create(opt.model);
+    auto model = trt_alpha::ModelRegistry::instance().create(opt.net);
     model->init(cfg);
 
     // 固定输入
@@ -268,7 +290,7 @@ int benchCommand(const std::vector<std::string>& args)
     for (double v : lat) { sum += v; }
     const double mean = sum / static_cast<double>(n);
 
-    std::cout << "=== bench: " << opt.model << " ===\n";
+    std::cout << "=== bench: " << opt.net << " ===\n";
     std::cout << "engine  : " << cfg.engine << "\n";
     std::cout << "batch   : " << B << "\n";
     std::cout << "iters   : " << opt.iters << " (warmup " << opt.warmup << ")\n";

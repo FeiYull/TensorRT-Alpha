@@ -277,4 +277,4 @@ void YoloV8Pose::reset()
 
 }  // namespace trt_alpha::det
 
-TRT_ALPHA_REGISTER_MODEL("yolov8-pose", trt_alpha::seg::YoloV8Pose);
+TRT_ALPHA_REGISTER_MODEL("yolov8_pose", trt_alpha::seg::YoloV8Pose);
