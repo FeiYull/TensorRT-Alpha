@@ -80,3 +80,4 @@ build/
 *.github
 *z_cmd.txt
 *.ps1
+*docs/
