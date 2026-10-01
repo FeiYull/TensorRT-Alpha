@@ -26,6 +26,11 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <memory>
+
+namespace trt_alpha::core {
+    class Engine;   // 前置声明
+}
 
 namespace trt_alpha::core {
 
@@ -47,6 +52,10 @@ struct ModelConfig
 
     // ---- 运行时填 ----
     std::vector<ClassInfo> classNames;
+
+    //! 共享 engine（可选）。非空时，IModel::init 复用它，不再从 engine 路径反序列化。
+    //! 用于"1 engine + N context"。
+    std::shared_ptr<Engine> sharedEngine;
 
     // ---- 便捷读取（找不到返回 fallback；类型转换失败抛异常）----
     [[nodiscard]] std::string getString(const std::string& key,

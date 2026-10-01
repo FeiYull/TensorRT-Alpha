@@ -135,7 +135,9 @@ void YoloV8Pose::allocateBuffers()
 void YoloV8Pose::init(const core::ModelConfig& cfg)
 {
     loadConfig(cfg);
-    m_engine = std::make_unique<core::TrtEngine>(cfg.engine);
+    m_engine = cfg.sharedEngine
+        ? std::make_unique<core::TrtEngine>(cfg.sharedEngine)
+        : std::make_unique<core::TrtEngine>(cfg.engine);
     discoverEngineIo();
     allocateBuffers();
     m_keypoints.assign(static_cast<std::size_t>(m_cfg.batchSize), {});

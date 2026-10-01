@@ -51,6 +51,14 @@ InferencePool::InferencePool(const ModelConfig& cfg,
 
     try
     {
+        // ---- 阶段 0：先建 1 个共享 Engine（1 engine + N context）----
+        TRT_LOG_INFO("[InferencePool] loading shared engine: " << cfg.engine);
+        auto sharedEngine = std::make_shared<core::Engine>(cfg.engine);
+
+        // 每个 worker 的 ModelConfig 都带同一个 sharedEngine
+        core::ModelConfig workerCfg = cfg;
+        workerCfg.sharedEngine = sharedEngine;
+
         // ---- 阶段 1：创建 + init 全部模型（只填数据，不启线程）----
         m_workers.reserve(workers);
         for (std::size_t i = 0; i < workers; ++i)
@@ -63,7 +71,7 @@ InferencePool::InferencePool(const ModelConfig& cfg,
                 throw std::runtime_error("[InferencePool] factory returned nullptr");
             }
             TRT_LOG_DEBUG("[InferencePool] worker[" << i << "] calling init()");
-            worker.model->init(cfg);
+            worker.model->init(workerCfg);
             TRT_LOG_DEBUG("[InferencePool] worker[" << i << "] init() done");
             m_workers.push_back(std::move(worker));
         }

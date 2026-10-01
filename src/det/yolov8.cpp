@@ -201,7 +201,9 @@ void YoloV8::init(const core::ModelConfig& cfg)
     TRT_LOG_DEBUG("YoloV8::init: entering");
     loadConfig(cfg);
     TRT_LOG_DEBUG("YoloV8::init: config loaded");
-    m_engine = std::make_unique<core::TrtEngine>(cfg.engine);
+    m_engine = cfg.sharedEngine
+        ? std::make_unique<core::TrtEngine>(cfg.sharedEngine)
+        : std::make_unique<core::TrtEngine>(cfg.engine);
     TRT_LOG_DEBUG("YoloV8::init: engine loaded");
     discoverEngineIo();
     TRT_LOG_DEBUG("YoloV8::init: io discovered (srcRow=" << m_srcRow

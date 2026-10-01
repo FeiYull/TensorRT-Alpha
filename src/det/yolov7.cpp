@@ -170,7 +170,9 @@ void YoloV7::allocateBuffers()
 void YoloV7::init(const core::ModelConfig& cfg)
 {
     loadConfig(cfg);
-    m_engine = std::make_unique<core::TrtEngine>(cfg.engine);
+    m_engine = cfg.sharedEngine
+        ? std::make_unique<core::TrtEngine>(cfg.sharedEngine)
+        : std::make_unique<core::TrtEngine>(cfg.engine);
     discoverEngineIo();
     allocateBuffers();
     m_detections.assign(static_cast<std::size_t>(m_cfg.batchSize), {});

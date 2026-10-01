@@ -1,25 +1,16 @@
 // =============================================================================
 //  trt_alpha :: core :: engine
 // -----------------------------------------------------------------------------
-//  TrtEngine —— IRuntime / ICudaEngine / IExecutionContext 的 RAII 封装。
+//  Engine  —— 共享的 ICudaEngine 封装（线程安全，可被多个 Context 引用）。
+//  Context —— 独占的 IExecutionContext 封装（非线程安全，每个 worker 一个）。
+//  TrtEngine —— 兼容壳：持 shared_ptr<Engine> + 独占 Context。
 //
-//  职责（只做引擎生命周期，不含任何预处理 / 后处理逻辑）：
-//    * 从序列化 engine 文件（.trt / .engine）反序列化，失败抛异常
-//    * 按名字枚举全部 I/O 张量（ioTensors()）
-//    * 对动态 shape 引擎设置实际输入形状（setInputShape；静态引擎自动跳过）
+//  1 engine + N context 模型：
+//    * 反序列化 1 次 engine（权重 1 份）
+//    * 每个 worker 1 个 context
 //
-//  TRT 10 专用 API（不兼容 8.x）：
-//    getNbIOTensors / getIOTensorName / getTensorIOMode / getTensorShape
-//    setInputShape / setTensorAddress / enqueueV3
-//
-//  生命周期：
-//    * 构造 = 加载 engine + 创建 context；失败抛异常（RAII 回滚）
-//    * 每个 IExecutionContext 只能被一个线程使用
-//      （要并发 → 每线程构造一个 TrtEngine 实例，共享同一个 engine 文件）
-//
-//  TODO：
-//    * buildFromOnnx 目前只声明 + 抛未实现；将来移到独立的 builder 模块
-//      （因为 core 不依赖 nvonnxparser）
+//  兼容旧用法：
+//    * TrtEngine(file) 会自己反序列化一份 engine（独立，不复用）
 // =============================================================================
 #pragma once
 
@@ -35,8 +26,7 @@
 
 namespace trt_alpha::core {
 
-//! I/O 张量描述（名字 / 形状 / 元素类型 / 输入还是输出）。
-//! shape 直接用 nvinfer1::Dims —— TrtEngine 就是 TRT 封装，绑死合理。
+//! I/O 张量描述。
 struct TensorDesc
 {
     std::string name;
@@ -44,26 +34,77 @@ struct TensorDesc
     DataType dtype = DataType::Float32;
     bool isInput = false;
 
-    //! 元素个数（动态维 -1 视为 0；调用方应先 setInputShape 再取）。
     [[nodiscard]] std::size_t volume() const noexcept;
 };
 
-//! TensorRT 引擎的 RAII 封装。
+//! 共享的 ICudaEngine（线程安全，可被多个 Context 引用）。
+class Engine
+{
+public:
+    //! 从序列化 engine 文件加载。失败抛 std::runtime_error。
+    explicit Engine(const std::string& engineFile);
+
+    Engine(const Engine&) = delete;
+    Engine& operator=(const Engine&) = delete;
+    Engine(Engine&&) = delete;
+    Engine& operator=(Engine&&) = delete;
+
+    [[nodiscard]] nvinfer1::ICudaEngine* get() noexcept { return m_engine.get(); }
+    [[nodiscard]] const nvinfer1::ICudaEngine* get() const noexcept { return m_engine.get(); }
+
+    [[nodiscard]] const std::vector<TensorDesc>& ioTensors() const noexcept { return m_io; }
+    [[nodiscard]] const TensorDesc* find(const std::string& name) const noexcept;
+
+private:
+    void discoverIo();
+
+    std::shared_ptr<nvinfer1::ICudaEngine> m_engine;
+    std::vector<TensorDesc> m_io;
+};
+
+//! 独占的 IExecutionContext（非线程安全，每个 worker 一个）。
+class Context
+{
+public:
+    //! 从共享 engine 创建 context。engine 必须比 Context 活得更久。
+    explicit Context(Engine& engine);
+
+    Context(const Context&) = delete;
+    Context& operator=(const Context&) = delete;
+    Context(Context&&) = delete;
+    Context& operator=(Context&&) = delete;
+
+    [[nodiscard]] nvinfer1::IExecutionContext* get() noexcept { return m_context.get(); }
+    [[nodiscard]] const nvinfer1::IExecutionContext* get() const noexcept { return m_context.get(); }
+
+    //! 设置实际输入形状。静态 shape 的引擎自动跳过。
+    void setInputShape(const std::string& name, const nvinfer1::Dims& dims);
+
+    //! context 级（已应用 setInputShape 后）的实际形状。
+    [[nodiscard]] nvinfer1::Dims contextShape(const std::string& name) const;
+
+private:
+    std::unique_ptr<nvinfer1::IExecutionContext> m_context;
+    nvinfer1::ICudaEngine* m_engine = nullptr;   // 不拥有
+};
+
+//! 兼容壳：持 shared_ptr<Engine> + 独占 Context。
 class TrtEngine
 {
 public:
-    //! ONNX → engine 转换的构建选项（TODO：将来移到 builder 模块）。
     struct BuildOptions
     {
-        std::size_t workspaceBytes = 1ULL << 30;  //!< 1 GiB 构建 workspace
-        bool fp16 = true;                         //!< 平台支持时开启
+        std::size_t workspaceBytes = 1ULL << 30;
+        bool fp16 = true;
     };
 
-    //! 从序列化 engine 文件加载。文件不存在 / 反序列化失败抛 std::runtime_error。
+    //! 旧构造：自己反序列化一份 engine（独立，不复用）。
     explicit TrtEngine(const std::string& engineFile);
 
-    //! ONNX → 序列化 engine（TODO：当前未实现，调用抛 std::logic_error）。
-    //! 将来移到独立 builder 模块（core 不依赖 nvonnxparser）。
+    //! 新构造：复用共享 engine（1 engine + N context）。
+    explicit TrtEngine(std::shared_ptr<Engine> sharedEngine);
+
+    //! ONNX → engine（TODO）。
     static void buildFromOnnx(const std::string& onnxFile,
                               const std::string& engineFile,
                               const BuildOptions& options = {});
@@ -71,36 +112,36 @@ public:
     TrtEngine(const TrtEngine&) = delete;
     TrtEngine& operator=(const TrtEngine&) = delete;
 
-    [[nodiscard]] nvinfer1::ICudaEngine* engine() noexcept { return m_engine.get(); }
+    [[nodiscard]] nvinfer1::ICudaEngine* engine() noexcept
+    {
+        return m_sharedEngine ? m_sharedEngine->get() : nullptr;
+    }
     [[nodiscard]] nvinfer1::IExecutionContext* context() noexcept
     {
-        return m_context.get();
+        return m_context ? m_context->get() : nullptr;
     }
-
-    //! 引擎全部 I/O 张量描述（构造时枚举一次）。
     [[nodiscard]] const std::vector<TensorDesc>& ioTensors() const noexcept
     {
-        return m_io;
+        static const std::vector<TensorDesc> kEmpty;
+        return m_sharedEngine ? m_sharedEngine->ioTensors() : kEmpty;
+    }
+    [[nodiscard]] const TensorDesc* find(const std::string& name) const noexcept
+    {
+        return m_sharedEngine ? m_sharedEngine->find(name) : nullptr;
     }
 
-    //! 按名字找张量描述；找不到返回 nullptr。
-    [[nodiscard]] const TensorDesc* find(const std::string& name) const noexcept;
-
-    //! 设置实际输入形状。
-    //! 静态 shape 的引擎自动跳过（调 setInputShape 会让后续推理失败，
-    //! 这是 TRT 10 与 8.x 行为差异点之一）。
-    void setInputShape(const std::string& name, const nvinfer1::Dims& dims);
-
-    //! context 级（已应用 setInputShape 后）的实际形状。
-    [[nodiscard]] nvinfer1::Dims contextShape(const std::string& name) const;
+    void setInputShape(const std::string& name, const nvinfer1::Dims& dims)
+    {
+        if (m_context) { m_context->setInputShape(name, dims); }
+    }
+    [[nodiscard]] nvinfer1::Dims contextShape(const std::string& name) const
+    {
+        return m_context ? m_context->contextShape(name) : nvinfer1::Dims{};
+    }
 
 private:
-    void loadSerialized(const void* data, std::size_t size);
-    void discoverIo();
-
-    std::unique_ptr<nvinfer1::ICudaEngine> m_engine;
-    std::unique_ptr<nvinfer1::IExecutionContext> m_context;
-    std::vector<TensorDesc> m_io;
+    std::shared_ptr<Engine> m_sharedEngine;
+    std::unique_ptr<Context> m_context;
 };
 
 }  // namespace trt_alpha::core
