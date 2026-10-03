@@ -25,6 +25,10 @@ Pipeline::Pipeline(PipelineConfig cfg)
     m_resultQueue = std::make_unique<core::BoundedQueue<std::future<core::BatchResult>>>(
         m_cfg.resultQueueSize,
         core::BoundedQueue<std::future<core::BatchResult>>::FullPolicy::DropOldest);
+
+    m_processedQueue = std::make_unique<core::BoundedQueue<core::BatchResult>>(
+        m_cfg.resultQueueSize,
+        core::BoundedQueue<core::BatchResult>::FullPolicy::DropOldest);
 }
 
 Pipeline::~Pipeline()
@@ -108,10 +112,10 @@ void Pipeline::start()
     m_sourceThreads.reserve(m_cfg.sources.size());
     for (std::size_t i = 0; i < m_cfg.sources.size(); ++i)
     {
-        TRT_LOG_INFO("Pipeline: launching source thread " << i); // ← 加
+        TRT_LOG_INFO("Pipeline: launching source thread " << i);
         m_sourceThreads.emplace_back([this, i] { sourceLoop(i); });
     }
-    TRT_LOG_INFO("Pipeline: all source threads launched");      // ← 加
+    TRT_LOG_INFO("Pipeline: all source threads launched");
 
     TRT_LOG_INFO("Pipeline: started (N sources + 1 render = "
                  << (m_cfg.sources.size() + 1) << " threads)");
@@ -119,26 +123,21 @@ void Pipeline::start()
 
 void Pipeline::sourceLoop(std::size_t sourceIndex)
 {
-    TRT_LOG_INFO("Pipeline: source[" << sourceIndex << "] thread entered");   // ← 加
+    TRT_LOG_INFO("Pipeline: source[" << sourceIndex << "] thread entered");
 
-    TRT_LOG_INFO("Pipeline: source[" << sourceIndex
-                 << "] accessing sources[" << sourceIndex << "]");             // ← 加
     auto& source = *m_cfg.sources[sourceIndex];
-
-    TRT_LOG_INFO("Pipeline: source[" << sourceIndex
-                 << "] accessing pools[" << m_cfg.sourceToPool[sourceIndex] << "]");  // ← 加
     core::InferencePool* pool = m_cfg.pools[m_cfg.sourceToPool[sourceIndex]];
 
     TRT_LOG_INFO("Pipeline: source[" << sourceIndex << "] '" << source.typeName()
                  << "' using pool[" << m_cfg.sourceToPool[sourceIndex] << "]");
 
-    int iterCount = 0;                                                         // ← 加
+    int iterCount = 0;
 
     while (!m_stopRequested.load())
     {
-        ++iterCount;                                                           // ← 加
+        ++iterCount;
         TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
-                     << "] iteration " << iterCount << ": calling next()");    // ← 加
+                     << "] iteration " << iterCount << ": calling next()");
 
         core::Batch batch;
         try
@@ -146,7 +145,7 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
             if (!source.next(batch))
             {
                 TRT_LOG_INFO("Pipeline: source[" << sourceIndex
-                             << "] next() returned false, breaking");          // ← 加
+                             << "] next() returned false, breaking");
                 break;
             }
         }
@@ -160,17 +159,17 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
         TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
                      << "] got batch, views=" << batch.views.size()
                      << " validCount=" << batch.validCount
-                     << " buffer=" << (batch.buffer ? "ok" : "null"));         // ← 加
+                     << " buffer=" << (batch.buffer ? "ok" : "null"));
 
         // 提交到池
         std::future<core::BatchResult> future;
         try
         {
             TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
-                         << "] submitting to pool");                           // ← 加
+                         << "] submitting to pool");
             future = pool->submit(std::move(batch));
             TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
-                         << "] submit returned");                              // ← 加
+                         << "] submit returned");
         }
         catch (const std::exception& e)
         {
@@ -181,12 +180,12 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
 
         // 推到结果队列
         TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
-                     << "] pushing future to result queue");                   // ← 加
+                     << "] pushing future to result queue");
         bool dropped = false;
         if (!m_resultQueue->push(std::move(future), &dropped))
         {
             TRT_LOG_WARN("Pipeline: source[" << sourceIndex
-                         << "] result queue closed");                          // ← 加
+                         << "] result queue closed");
             break;
         }
         if (dropped)
@@ -195,7 +194,7 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
                            << "), dropped oldest future");
         }
         TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
-                     << "] pushed future, loop again");                        // ← 加
+                     << "] pushed future, loop again");
     }
 
     TRT_LOG_INFO("Pipeline: source[" << sourceIndex << "] exiting");
@@ -217,32 +216,32 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
 
 void Pipeline::renderLoop()
 {
-    TRT_LOG_INFO("Pipeline: render loop started, entering while");   // ← 改（加 "entering while"）
+    TRT_LOG_INFO("Pipeline: render loop started, entering while");
 
-    int loopCount = 0;                                               // ← 加
+    int loopCount = 0;
     while (true)
     {
-        ++loopCount;                                                 // ← 加
+        ++loopCount;
         TRT_LOG_DEBUG("Pipeline: render loop iteration " << loopCount
-                     << ": waiting for future");                     // ← 加
+                     << ": waiting for future");
 
         std::future<core::BatchResult> future;
         if (!m_resultQueue->pop(future))
         {
-            TRT_LOG_INFO("Pipeline: render loop pop() returned false, exiting");  // ← 加
+            TRT_LOG_INFO("Pipeline: render loop pop() returned false, exiting");
             break;
         }
 
-        TRT_LOG_DEBUG("Pipeline: render loop got future, valid=" << future.valid());  // ← 加
+        TRT_LOG_DEBUG("Pipeline: render loop got future, valid=" << future.valid());
 
         if (!future.valid())
         {
-            TRT_LOG_WARN("Pipeline: future invalid, skipping");       // ← 加
+            TRT_LOG_WARN("Pipeline: future invalid, skipping");
             continue;
         }
 
         // 等推理完成
-        TRT_LOG_DEBUG("Pipeline: render loop waiting future.get()");  // ← 加
+        TRT_LOG_DEBUG("Pipeline: render loop waiting future.get()");
         core::BatchResult result;
         try
         {
@@ -254,7 +253,6 @@ void Pipeline::renderLoop()
             continue;
         }
 
-                // ---- 诊断日志 ----
         TRT_LOG_DEBUG("Pipeline: got result  views=" << result.views.size()
                      << " validCount=" << result.validCount
                      << " detections=" << result.detections.size()
@@ -273,14 +271,13 @@ void Pipeline::renderLoop()
                          << " h=" << result.views[i].height
                          << " stride=" << result.views[i].stride);
         }
-        // ---- 诊断日志结束 ----
 
         // 画
-        TRT_LOG_DEBUG("Pipeline: calling drawResult");                    // ← 加
+        TRT_LOG_DEBUG("Pipeline: calling drawResult");
         try
         {
             m_cfg.renderer->drawResult(result, m_cfg.classNames);
-            TRT_LOG_DEBUG("Pipeline: drawResult done");                   // ← 加
+            TRT_LOG_DEBUG("Pipeline: drawResult done");
         }
         catch (const std::exception& e)
         {
@@ -290,7 +287,7 @@ void Pipeline::renderLoop()
 
         if (m_cfg.saveEnabled)
         {
-            TRT_LOG_DEBUG("Pipeline: calling save");                      // ← 加
+            TRT_LOG_DEBUG("Pipeline: calling save");
             try
             {
                 m_cfg.renderer->save(result, m_cfg.saveDir);
@@ -312,6 +309,17 @@ void Pipeline::renderLoop()
                 TRT_LOG_ERROR("Pipeline: show failed: " << e.what());
             }
         }
+
+        // ★ 把处理完的结果推给"渲染后队列"（供用户 popProcessed 取）
+        if (m_processedQueue != nullptr)
+        {
+            m_processedQueue->push(std::move(result));
+        }
+    }
+
+    if (m_processedQueue != nullptr)
+    {
+        m_processedQueue->close();
     }
 
     TRT_LOG_INFO("Pipeline: render loop exiting");
@@ -358,6 +366,12 @@ void Pipeline::waitForCompletion()
         m_renderThread.join();
     }
 
+    // 渲染线程退出时会关 m_processedQueue；这里再兜一次（防没起渲染线程）
+    if (m_processedQueue != nullptr)
+    {
+        m_processedQueue->close();
+    }
+
     m_running.store(false);
     TRT_LOG_INFO("Pipeline: all threads joined");
 }
@@ -389,6 +403,15 @@ bool Pipeline::popResult(core::BatchResult& out)
         return false;
     }
     return true;
+}
+
+bool Pipeline::popProcessed(core::BatchResult& out)
+{
+    if (m_processedQueue == nullptr)
+    {
+        return false;
+    }
+    return m_processedQueue->pop(out);
 }
 
 }  // namespace trt_alpha::pipeline

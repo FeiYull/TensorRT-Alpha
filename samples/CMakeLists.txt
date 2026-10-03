@@ -12,3 +12,4 @@
 add_subdirectory(sample_yolov8_seg)
 add_subdirectory(sample_u2net)
 add_subdirectory(sample_yolov8_pose)
+add_subdirectory(sample_infer)

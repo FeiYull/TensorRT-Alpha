@@ -63,7 +63,7 @@ datasource::SourceConfig build_source_config(const InferParams& p, int batch_siz
 
     if (!p.source.empty())
     {
-        // 判断源类型：摄像头 ID 字符串 / 视频 / 图片
+        // 判断源类型：视频 / URL / 图片
         const std::string& s = p.source;
         const bool is_video =
             s.find(".mp4") != std::string::npos ||
@@ -214,26 +214,20 @@ std::vector<cls::ClassScore> Result::classifications() const
 struct Infer::Impl
 {
     InferParams params;
-    core::ModelConfig final_cfg;               // base + special + 覆盖 合并结果
+    core::ModelConfig final_cfg;
     std::shared_ptr<core::InferencePool> pool;
     renderer::OpenCVRenderer renderer;
 
-    //! 打印最终配置（带来源标注）。
     void print_config() const;
-
-    //! 合并配置（base + special + InferParams 覆盖）。
     core::ModelConfig merge_config() const;
-
-    //! 懒建 pool。
     void ensure_pool();
 };
 
 core::ModelConfig Infer::Impl::merge_config() const
 {
-    // 1. 读 ini（loadModelConfig 内部会先读 base.ini 再读 special，我们假设它已支持；否则这里手动合并）
     core::ModelConfig cfg = core::loadModelConfig(params.config_path);
 
-    // 2. 应用 InferParams 覆盖（非默认值才覆盖）
+    // 应用 InferParams 覆盖（非默认值才覆盖）
     if (!params.engine.empty())          cfg.engine = params.engine;
     if (!params.class_names_file.empty()) cfg.classNamesFile = params.class_names_file;
     if (params.batch_size > 0)           cfg.batchSize = params.batch_size;
@@ -244,8 +238,8 @@ core::ModelConfig Infer::Impl::merge_config() const
     if (params.iou_thresh  >= 0.f) cfg.extras["iou_thresh"]  = std::to_string(params.iou_thresh);
     if (params.top_k > 0)          cfg.extras["top_k"]       = std::to_string(params.top_k);
 
-    if (params.workers > 0)          cfg.extras["workers"] = std::to_string(params.workers);
-    if (params.max_queue_size > 0)   cfg.extras["max_queue_size"] = std::to_string(params.max_queue_size);
+    if (params.workers > 0)           cfg.extras["workers"] = std::to_string(params.workers);
+    if (params.max_queue_size > 0)    cfg.extras["max_queue_size"] = std::to_string(params.max_queue_size);
     if (params.result_queue_size > 0) cfg.extras["result_queue_size"] = std::to_string(params.result_queue_size);
 
     if (!params.save_dir.empty())    cfg.extras["save_dir"] = params.save_dir;
@@ -255,9 +249,7 @@ core::ModelConfig Infer::Impl::merge_config() const
         cfg.extras[k] = v;
     }
 
-    // classNames 运行时从文件读
     cfg.classNames = core::loadClassNamesFile(cfg.classNamesFile);
-
     return cfg;
 }
 
@@ -327,6 +319,9 @@ Result Infer::run()
 {
     m_impl->ensure_pool();
 
+    // 是否渲染：show || save
+    const bool render = m_impl->params.show || m_impl->params.save;
+
     pipeline::PipelineConfig pcfg;
     pcfg.sources.push_back(
         std::make_unique<datasource::OpenCVSource>(
@@ -339,16 +334,28 @@ Result Infer::run()
             ? static_cast<std::size_t>(m_impl->params.result_queue_size)
             : std::size_t{32};
 
-    // run() 永远不渲染：renderer = nullptr
-    pcfg.renderer = nullptr;
-    pcfg.saveEnabled = false;
-    pcfg.showEnabled = false;
+    if (render) {
+        pcfg.renderer = &m_impl->renderer;
+        pcfg.saveEnabled = m_impl->params.save;
+        pcfg.showEnabled = m_impl->params.show;
+        if (!m_impl->params.save_dir.empty())    pcfg.saveDir = m_impl->params.save_dir;
+        if (!m_impl->params.show_window.empty()) pcfg.showWindow = m_impl->params.show_window;
+    } else {
+        pcfg.renderer = nullptr;
+        pcfg.saveEnabled = false;
+        pcfg.showEnabled = false;
+    }
 
     pipeline::Pipeline pipe(std::move(pcfg));
     pipe.start();
 
     core::BatchResult br;
-    const bool got = pipe.popResult(br);
+    bool got = false;
+    if (render) {
+        got = pipe.popProcessed(br);   // 渲染后拿
+    } else {
+        got = pipe.popResult(br);      // 非渲染，原始结果
+    }
 
     pipe.stop();
     pipe.waitForCompletion();
@@ -378,12 +385,16 @@ bool Stream::get(Result& out)
     if (m_impl == nullptr || m_impl->pipeline == nullptr) {
         return false;
     }
-    // 渲染模式：Pipeline 自己消费，没结果给用户
-    if (m_impl->pipeline->hasRenderer()) {
-        return false;
-    }
+
     core::BatchResult br;
-    if (!m_impl->pipeline->popResult(br)) {
+    bool got = false;
+    if (m_impl->pipeline->hasRenderer()) {
+        got = m_impl->pipeline->popProcessed(br);   // 渲染后拿
+    } else {
+        got = m_impl->pipeline->popResult(br);      // 非渲染，原始结果
+    }
+
+    if (!got) {
         return false;
     }
     out = Result(std::move(br));
@@ -434,7 +445,7 @@ Stream Infer::async()
         pcfg.renderer = &m_impl->renderer;
         pcfg.saveEnabled = m_impl->params.save;
         pcfg.showEnabled = m_impl->params.show;
-        if (!m_impl->params.save_dir.empty())   pcfg.saveDir = m_impl->params.save_dir;
+        if (!m_impl->params.save_dir.empty())    pcfg.saveDir = m_impl->params.save_dir;
         if (!m_impl->params.show_window.empty()) pcfg.showWindow = m_impl->params.show_window;
     } else {
         pcfg.renderer = nullptr;

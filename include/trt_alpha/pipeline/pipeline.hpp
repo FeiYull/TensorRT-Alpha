@@ -64,6 +64,10 @@ public:
     //! 只在没渲染线程（renderer == nullptr）时使用。
     bool popResult(core::BatchResult& out);
 
+    //! 从"渲染后结果队列"取一个结果（阻塞）。
+    //! 只在有渲染线程（renderer != nullptr）时使用。
+    bool popProcessed(core::BatchResult& out);
+
     //! 是否起了渲染线程（renderer != nullptr）。
     [[nodiscard]] bool hasRenderer() const noexcept { return m_cfg.renderer != nullptr; }
 
@@ -92,6 +96,7 @@ private:
     mutable std::mutex m_mutex;
     std::condition_variable m_cvDone;
     std::size_t m_sourcesRunning = 0;
+    std::unique_ptr<core::BoundedQueue<core::BatchResult>> m_processedQueue;
 };
 
 }  // namespace trt_alpha::pipeline
