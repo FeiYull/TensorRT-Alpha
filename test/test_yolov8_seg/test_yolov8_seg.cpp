@@ -36,14 +36,14 @@ int main(int argc, char** argv)
         bool ok = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8-seg");
-            ok = (m != nullptr) && (m->name() == "yolov8-seg");
+            auto m = ModelRegistry::instance().create("yolov8_seg");
+            ok = (m != nullptr) && (m->name() == "yolov8_seg");
         }
         catch (const std::exception& e)
         {
             std::cout << "[FAIL] create threw: " << e.what() << "\n";
         }
-        check(ok, "[1] 'yolov8-seg' registered and created");
+        check(ok, "[1] 'yolov8_seg' registered and created");
     }
 
     // [2]
@@ -57,7 +57,7 @@ int main(int argc, char** argv)
         bool threw = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8-seg");
+            auto m = ModelRegistry::instance().create("yolov8_seg");
             m->init(cfg);
         }
         catch (const std::runtime_error& e)

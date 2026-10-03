@@ -60,6 +60,13 @@ public:
     //! 阻塞等所有源结束 + 所有结果渲染完。
     void waitForCompletion();
 
+    //! 从结果队列取一个 BatchResult（阻塞）。返回 false = 流结束。
+    //! 只在没渲染线程（renderer == nullptr）时使用。
+    bool popResult(core::BatchResult& out);
+
+    //! 是否起了渲染线程（renderer != nullptr）。
+    [[nodiscard]] bool hasRenderer() const noexcept { return m_cfg.renderer != nullptr; }
+
     [[nodiscard]] bool running() const noexcept { return m_running.load(); }
 
 private:

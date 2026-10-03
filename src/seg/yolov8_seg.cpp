@@ -35,7 +35,7 @@ void buildLetterboxAffine(int srcW, int srcH, int dstW, int dstH,
 
 const std::string& YoloV8Seg::name() const noexcept
 {
-    static const std::string kName = "yolov8-seg";
+    static const std::string kName = "yolov8_seg";
     return kName;
 }
 
@@ -45,7 +45,7 @@ void YoloV8Seg::loadConfig(const core::ModelConfig& cfg)
     m_numClass = cfg.getInt("num_class", 80);
     if (m_numClass <= 0)
     {
-        throw std::runtime_error("yolov8-seg: num_class must be > 0");
+        throw std::runtime_error("yolov8_seg: num_class must be > 0");
     }
     m_numMaskCoeffs = cfg.getInt("num_mask_coeffs", 32);
     m_maskProtoH = cfg.getInt("mask_proto_h", 160);
@@ -74,7 +74,7 @@ void YoloV8Seg::discoverEngineIo()
     }
     if (m_inputName.empty() || m_output0Name.empty() || m_output1Name.empty())
     {
-        throw std::runtime_error("yolov8-seg: missing expected I/O tensors");
+        throw std::runtime_error("yolov8_seg: missing expected I/O tensors");
     }
 
     m_engine->setInputShape(m_inputName, nvinfer1::Dims4(m_cfg.batchSize, 3,
@@ -84,14 +84,14 @@ void YoloV8Seg::discoverEngineIo()
     const nvinfer1::Dims out0 = m_engine->contextShape(m_output0Name);
     if (out0.nbDims != 3)
     {
-        throw std::runtime_error("yolov8-seg: expect output0 as [B, 4+nc+32, anchors]");
+        throw std::runtime_error("yolov8_seg: expect output0 as [B, 4+nc+32, anchors]");
     }
     m_srcRow  = static_cast<int>(out0.d[1]);
     m_anchors = static_cast<int>(out0.d[2]);
     if (m_srcRow != 4 + m_numClass + m_numMaskCoeffs)
     {
         throw std::runtime_error(
-            "yolov8-seg: output0 channel = " + std::to_string(m_srcRow) +
+            "yolov8_seg: output0 channel = " + std::to_string(m_srcRow) +
             " but 4+num_class+mask_coeffs = " +
             std::to_string(4 + m_numClass + m_numMaskCoeffs));
     }
@@ -100,14 +100,14 @@ void YoloV8Seg::discoverEngineIo()
     const nvinfer1::Dims out1 = m_engine->contextShape(m_output1Name);
     if (out1.nbDims != 4)
     {
-        throw std::runtime_error("yolov8-seg: expect output1 as [B, 32, H, W]");
+        throw std::runtime_error("yolov8_seg: expect output1 as [B, 32, H, W]");
     }
     const int protoH = static_cast<int>(out1.d[2]);
     const int protoW = static_cast<int>(out1.d[3]);
     const int protoC = static_cast<int>(out1.d[1]);
     if (protoC != m_numMaskCoeffs || protoH != m_maskProtoH || protoW != m_maskProtoW)
     {
-        TRT_LOG_WARN("yolov8-seg: output1 shape [" << protoC << ", " << protoH
+        TRT_LOG_WARN("yolov8_seg: output1 shape [" << protoC << ", " << protoH
                      << ", " << protoW << "] != config ["
                      << m_numMaskCoeffs << ", " << m_maskProtoH << ", "
                      << m_maskProtoW << "], using engine shape");
@@ -172,7 +172,7 @@ void YoloV8Seg::allocateBuffers()
         !ctx->setTensorAddress(m_output0Name.c_str(), m_outputSrc.data()) ||
         !ctx->setTensorAddress(m_output1Name.c_str(), m_outputSeg.data()))
     {
-        throw std::runtime_error("yolov8-seg: setTensorAddress failed");
+        throw std::runtime_error("yolov8_seg: setTensorAddress failed");
     }
 }
 
@@ -194,7 +194,7 @@ void YoloV8Seg::setBatch(const core::Batch& batch)
 {
     if (batch.views.empty())
     {
-        throw std::runtime_error("yolov8-seg: empty batch");
+        throw std::runtime_error("yolov8_seg: empty batch");
     }
     m_batch = static_cast<int>(batch.views.size());
     m_srcH = batch.views[0].height;
@@ -206,7 +206,7 @@ void YoloV8Seg::setBatch(const core::Batch& batch)
     const std::size_t total = oneImage * batch.views.size();
     if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
     {
-        throw std::runtime_error("yolov8-seg: batch.buffer is null");
+        throw std::runtime_error("yolov8_seg: batch.buffer is null");
     }
     if (total > m_inputSrc.bytes())
     {
@@ -239,7 +239,7 @@ void YoloV8Seg::infer()
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     if (!ctx->enqueueV3(m_stream.get()))
     {
-        throw std::runtime_error("yolov8-seg: enqueueV3 failed");
+        throw std::runtime_error("yolov8_seg: enqueueV3 failed");
     }
 }
 

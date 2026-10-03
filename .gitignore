@@ -81,3 +81,4 @@ build/
 *z_cmd.txt
 *.ps1
 *docs/
+*.log

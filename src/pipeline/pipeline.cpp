@@ -46,10 +46,6 @@ void Pipeline::validateConfig()
     {
         throw std::runtime_error("Pipeline: no pools");
     }
-    if (m_cfg.renderer == nullptr)
-    {
-        throw std::runtime_error("Pipeline: renderer is null");
-    }
 
     // sourceToPool 校验
     if (m_cfg.sourceToPool.empty())
@@ -96,10 +92,17 @@ void Pipeline::start()
     m_running.store(true);
     m_sourcesRunning = m_cfg.sources.size();
 
-    // ---- 起渲染线程 ----
-    TRT_LOG_INFO("Pipeline: launching render thread");          // ← 加
-    m_renderThread = std::thread([this] { renderLoop(); });
-    TRT_LOG_INFO("Pipeline: render thread launched");           // ← 加
+    // ---- 起渲染线程（仅 renderer != nullptr 时）----
+    if (m_cfg.renderer != nullptr)
+    {
+        TRT_LOG_INFO("Pipeline: launching render thread");
+        m_renderThread = std::thread([this] { renderLoop(); });
+        TRT_LOG_INFO("Pipeline: render thread launched");
+    }
+    else
+    {
+        TRT_LOG_INFO("Pipeline: no renderer, skip render thread");
+    }
 
     // ---- 起源线程 ----
     m_sourceThreads.reserve(m_cfg.sources.size());
@@ -357,6 +360,35 @@ void Pipeline::waitForCompletion()
 
     m_running.store(false);
     TRT_LOG_INFO("Pipeline: all threads joined");
+}
+
+bool Pipeline::popResult(core::BatchResult& out)
+{
+    if (m_resultQueue == nullptr)
+    {
+        return false;
+    }
+
+    std::future<core::BatchResult> fut;
+    if (!m_resultQueue->pop(fut))
+    {
+        return false;
+    }
+    if (!fut.valid())
+    {
+        return false;
+    }
+
+    try
+    {
+        out = fut.get();
+    }
+    catch (const std::exception& e)
+    {
+        TRT_LOG_ERROR("Pipeline::popResult: inference failed: " << e.what());
+        return false;
+    }
+    return true;
 }
 
 }  // namespace trt_alpha::pipeline
