@@ -245,9 +245,6 @@ public:
     Infer(Infer&&) noexcept;
     Infer& operator=(Infer&&) noexcept;
 
-    //! 同步：跑一批，返回 Result。永远不渲染。
-    [[nodiscard]] Result run();
-
     //! 异步：返回 Stream。
     //! show || save 时，Pipeline 起渲染线程自己消费（Stream::get() 返回 false）。
     //! 否则，用户用 Stream::get() 拿 Result。

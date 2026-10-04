@@ -50,15 +50,15 @@ public:
     }
 
 private:
-    core::ModelConfig m_cfg;
-    int m_numClass = 80;
-    float m_confThreshold = 0.25f;
-    float m_iouThreshold = 0.7f;
-    int m_topK = 300;
-    float m_normScale = 255.f;
-    float m_normMean[3] = {0.f, 0.f, 0.f};
-    float m_normStd[3]  = {1.f, 1.f, 1.f};
-    float m_padValue = 114.f;
+    // core::ModelConfig m_cfg;
+    // int m_numClass = 80;
+    // float m_confThreshold = 0.25f;
+    // float m_iouThreshold = 0.7f;
+    // int m_topK = 300;
+    // float m_normScale = 255.f;
+    // float m_normMean[3] = {0.f, 0.f, 0.f};
+    // float m_normStd[3]  = {1.f, 1.f, 1.f};
+    // float m_padValue = 114.f;
 
     // YOLO-NAS 特有：先缩放到 resizeW×resizeH，再 pad 到 dstW×dstH
     int m_resizeW = 636;

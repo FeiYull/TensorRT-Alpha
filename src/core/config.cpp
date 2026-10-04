@@ -22,61 +22,101 @@ std::string trim(const std::string& s)
     return s.substr(begin, end - begin + 1);
 }
 
-//! 从 INI 读一个必填字符串。缺失则抛异常。
-std::string requireString(const IniParser& ini, const std::string& section,
-                          const std::string& key, const std::string& iniPath)
+//! 从合并后的 map 里读一个必填字符串。缺失则抛异常。
+std::string requireString(
+    const std::unordered_map<std::string, std::string>& merged,
+    const std::string& fullKey,
+    const std::string& iniPath)
 {
-    const std::string v = ini.getString(key, section, "");
-    if (v.empty())
+    const auto it = merged.find(fullKey);
+    if (it == merged.end() || it->second.empty())
     {
-        const std::string fullKey = section.empty() ? key : (section + "." + key);
         TRT_LOG_ERROR("Config: INI missing required key '" << fullKey
                       << "' in " << Paths::toDisplay(Paths::resolve(iniPath)));
         throw std::runtime_error("INI missing required key: " + fullKey +
                                  "  (file: " + Paths::toDisplay(Paths::resolve(iniPath)) +
                                  ")");
     }
-    return v;
+    return it->second;
+}
+
+//! 从合并后的 map 里读 int，缺省返回 fallback。
+int getIntOr(
+    const std::unordered_map<std::string, std::string>& merged,
+    const std::string& fullKey, int fallback)
+{
+    const auto it = merged.find(fullKey);
+    if (it == merged.end() || it->second.empty()) { return fallback; }
+    try {
+        std::size_t consumed = 0;
+        const int v = std::stoi(it->second, &consumed);
+        if (consumed != it->second.size()) throw std::invalid_argument("trailing");
+        return v;
+    } catch (...) {
+        throw std::runtime_error("INI key '" + fullKey +
+                                 "' expects int, got '" + it->second + "'");
+    }
 }
 
 }  // namespace
 
 ModelConfig loadModelConfig(const std::string& iniPath)
 {
-    const IniParser ini = IniParser::load(iniPath);
+    // 1. 读公共配置
+    const std::string basePath = "configs/base.ini";
+    const IniParser base = IniParser::load(basePath);
 
+    // 2. 读特殊配置
+    const IniParser special = IniParser::load(iniPath);
+
+    // 3. 合并：special 覆盖 base
+    std::unordered_map<std::string, std::string> merged = base.all();
+    for (const auto& [k, v] : special.all()) {
+        merged[k] = v;
+    }
+
+    // 4. 从合并结果解出 ModelConfig
     ModelConfig cfg;
 
-    // ---- 通用字段 ----
-    cfg.engine = requireString(ini, "model", "engine", iniPath);
-    cfg.classNamesFile = requireString(ini, "model", "class_names_file", iniPath);
-    cfg.inputOutputNames = ini.getStringList("input_output_names", "model");
-    if (cfg.inputOutputNames.empty())
-    {
-        TRT_LOG_ERROR("Config: model.input_output_names is empty in " << iniPath);
-        throw std::runtime_error("INI missing required key: model.input_output_names");
-    }
-    cfg.batchSize = ini.getInt("batch_size", "model", cfg.batchSize);
-    cfg.dstH = ini.getInt("dst_h", "input", cfg.dstH);
-    cfg.dstW = ini.getInt("dst_w", "input", cfg.dstW);
+    // 必填
+    cfg.engine = requireString(merged, "model.engine", iniPath);
+    cfg.classNamesFile = requireString(merged, "model.class_names_file", iniPath);
 
-    // ---- extras：把 INI 全部 key-value 存起来，模型自己取 ----
-    // INI 内部 key 是 "section.key" 或 "key"（无节）
-    // 同时存"短名"（去 section 前缀），方便模型用 "num_class" 取
-    for (const auto& [k, v] : ini.all())
+    // input_output_names（逗号分隔）
     {
+        const auto it = merged.find("model.input_output_names");
+        if (it == merged.end() || it->second.empty()) {
+            TRT_LOG_ERROR("Config: model.input_output_names is empty in " << iniPath);
+            throw std::runtime_error("INI missing required key: model.input_output_names");
+        }
+        std::istringstream iss(it->second);
+        std::string token;
+        while (std::getline(iss, token, ',')) {
+            token = trim(token);
+            if (!token.empty()) cfg.inputOutputNames.push_back(token);
+        }
+        if (cfg.inputOutputNames.empty()) {
+            throw std::runtime_error("INI: input_output_names is empty: " + iniPath);
+        }
+    }
+
+    // 可选（从合并结果读）
+    cfg.batchSize = getIntOr(merged, "input.batch_size", cfg.batchSize);
+    cfg.dstH      = getIntOr(merged, "input.dst_h",      cfg.dstH);
+    cfg.dstW      = getIntOr(merged, "input.dst_w",      cfg.dstW);
+
+    // 5. extras：把合并后的 key-value 全存起来（短名 + 长名都存）
+    for (const auto& [k, v] : merged) {
         cfg.extras[k] = v;
         const auto dot = k.find('.');
-        if (dot != std::string::npos)
-        {
-            const std::string shortKey = k.substr(dot + 1);
-            // 短名不覆盖已有的长名（同名不同 section 时保留第一个）
-            cfg.extras.emplace(shortKey, v);
+        if (dot != std::string::npos) {
+            cfg.extras.emplace(k.substr(dot + 1), v);
         }
     }
 
     TRT_LOG_INFO("Config: loaded " << iniPath
-                 << " (engine=" << cfg.engine
+                 << " (with " << basePath << ") "
+                 << "(engine=" << cfg.engine
                  << ", batch=" << cfg.batchSize
                  << ", dst=" << cfg.dstW << "x" << cfg.dstH
                  << ", extras=" << cfg.extras.size() << " entries)");
@@ -102,7 +142,6 @@ std::vector<ClassInfo> loadClassNamesFile(const std::string& txtPath)
     while (std::getline(in, line))
     {
         ++lineNo;
-        // 去注释和空白（# 和 ; 都当注释符）
         const auto hash = line.find_first_of("#;");
         if (hash != std::string::npos) { line = line.substr(0, hash); }
         line = trim(line);

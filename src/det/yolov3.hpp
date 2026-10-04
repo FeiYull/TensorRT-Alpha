@@ -50,15 +50,15 @@ public:
     }
 
 private:
-    core::ModelConfig m_cfg;
-    int m_numClass = 80;
-    float m_confThreshold = 0.25f;
-    float m_iouThreshold = 0.45f;
-    int m_topK = 300;
-    float m_normScale = 255.f;
-    float m_normMean[3] = {0.f, 0.f, 0.f};
-    float m_normStd[3]  = {1.f, 1.f, 1.f};
-    float m_padValue = 114.f;
+    // core::ModelConfig m_cfg;
+    // int m_numClass = 80;
+    // float m_confThreshold = 0.25f;
+    // float m_iouThreshold = 0.45f;
+    // int m_topK = 300;
+    // float m_normScale = 255.f;
+    // float m_normMean[3] = {0.f, 0.f, 0.f};
+    // float m_normStd[3]  = {1.f, 1.f, 1.f};
+    // float m_padValue = 114.f;
 
     std::unique_ptr<core::TrtEngine> m_engine;
     std::string m_inputName;    // "images"

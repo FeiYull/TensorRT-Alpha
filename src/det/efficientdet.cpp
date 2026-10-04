@@ -38,11 +38,10 @@ const std::string& EfficientDet::name() const noexcept
 
 void EfficientDet::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
-    m_numClass = cfg.getInt("num_class", 91);
-    m_confThreshold = cfg.getFloat("conf_thresh", 0.45f);
-    m_padValue = cfg.getFloat("pad_value", 114.f);
-    m_topK = 100;
+    loadCommonConfig(cfg);
+
+    m_numClass = cfg.getInt("num_class", 91);   // efficientdet 是 91
+    m_topK     = 100;                           // efficientdet 固定 100
 
     TRT_LOG_INFO("EfficientDet: config num_class=" << m_numClass
                  << " conf=" << m_confThreshold

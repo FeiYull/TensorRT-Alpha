@@ -36,13 +36,13 @@ const std::string& YoloV8Pose::name() const noexcept
 
 void YoloV8Pose::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
+    loadCommonConfig(cfg);
+
+    // pose 官方默认 iou
+    if (cfg.getString("iou_thresh", "").empty()) m_iouThreshold = 0.7f;
+
+    // pose 特有
     m_numKpts = cfg.getInt("num_kpts", 17);
-    m_confThreshold = cfg.getFloat("conf_thresh", 0.25f);
-    m_iouThreshold = cfg.getFloat("iou_thresh", 0.7f);
-    m_topK = cfg.getInt("top_k", 300);
-    m_normScale = cfg.getFloat("norm_scale", 255.f);
-    m_padValue = cfg.getFloat("pad_value", 114.f);
 
     TRT_LOG_INFO("YoloV8Pose: config num_kpts=" << m_numKpts
                  << " conf=" << m_confThreshold

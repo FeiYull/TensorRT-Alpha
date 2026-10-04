@@ -2,12 +2,6 @@
 //  trt_alpha :: det :: detector
 // -----------------------------------------------------------------------------
 //  IDetector —— 检测任务基类（继承 IModel，加 detections() 访问器）。
-//
-//  设计：
-//    * 任务基类只约定【输出结构体】，不约定输出内存布局
-//    * 具体模型（YoloV8 / EfficientDet / ...）继承本类，自己实现
-//      init / setBatch / preprocess / infer / postprocess / commitResult
-//    * commitResult() 由本基类提供默认实现（把 m_detections move 到 out）
 // =============================================================================
 #pragma once
 
@@ -15,6 +9,8 @@
 #include "trt_alpha/core/model.hpp"
 #include "trt_alpha/det/types.hpp"
 
+#include <cstdio>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -23,15 +19,11 @@ namespace trt_alpha::det {
 class IDetector : public IModel
 {
 public:
-    //! 每张图一个 Detection 列表；生命周期到下一次 commitResult / reset 为止。
-    //! 注意：commitResult() 会 move 走这个列表，之后调用本方法返回空。
     [[nodiscard]] const std::vector<std::vector<Detection>>& detections() const noexcept
     {
         return m_detections;
     }
 
-    //! 默认实现：把 m_detections move 到 out.detections，本对象清空。
-    //! 派生类通常不需要覆盖。
     void commitResult(core::BatchResult& out) override
     {
         out.detections = std::move(m_detections);
@@ -39,6 +31,44 @@ public:
     }
 
 protected:
+    //! 从 cfg 读通用参数（一次实现，所有检测模型共用）。
+    void loadCommonConfig(const core::ModelConfig& cfg)
+    {
+        m_cfg           = cfg;
+        m_numClass      = cfg.getInt  ("num_class",   m_numClass);
+        m_confThreshold = cfg.getFloat("conf_thresh", m_confThreshold);
+        m_iouThreshold  = cfg.getFloat("iou_thresh",  m_iouThreshold);
+        m_topK          = cfg.getInt  ("top_k",       m_topK);
+        m_normScale     = cfg.getFloat("scale",       m_normScale);
+        m_padValue      = cfg.getFloat("pad_value",   m_padValue);
+
+        const std::string meanStr = cfg.getString("mean", "");
+        if (!meanStr.empty()) {
+            float v[3];
+            if (std::sscanf(meanStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3) {
+                m_normMean[0] = v[0]; m_normMean[1] = v[1]; m_normMean[2] = v[2];
+            }
+        }
+        const std::string stdStr = cfg.getString("std", "");
+        if (!stdStr.empty()) {
+            float v[3];
+            if (std::sscanf(stdStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3) {
+                m_normStd[0] = v[0]; m_normStd[1] = v[1]; m_normStd[2] = v[2];
+            }
+        }
+    }
+
+    //! 所有检测模型共用的 9 个成员。
+    core::ModelConfig m_cfg;
+    int   m_numClass      = 80;
+    float m_confThreshold = 0.25f;
+    float m_iouThreshold  = 0.45f;
+    int   m_topK          = 300;
+    float m_normScale     = 255.f;
+    float m_normMean[3]   = {0.f, 0.f, 0.f};
+    float m_normStd[3]    = {1.f, 1.f, 1.f};
+    float m_padValue      = 114.f;
+
     std::vector<std::vector<Detection>> m_detections;
 };
 

@@ -44,29 +44,10 @@ const std::string& U2Net::name() const noexcept
 
 void U2Net::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
-    m_numClass = cfg.getInt("num_class", 1);
-    m_normScale = cfg.getFloat("norm_scale", 1.f);
-    m_postScale = cfg.getFloat("post_scale", 255.f);
+    loadCommonConfig(cfg);
 
-    const std::string meanStr = cfg.getString("mean", "");
-    if (!meanStr.empty())
-    {
-        float v[3];
-        if (std::sscanf(meanStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3)
-        {
-            m_normMean[0] = v[0]; m_normMean[1] = v[1]; m_normMean[2] = v[2];
-        }
-    }
-    const std::string stdStr = cfg.getString("std", "");
-    if (!stdStr.empty())
-    {
-        float v[3];
-        if (std::sscanf(stdStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3)
-        {
-            m_normStd[0] = v[0]; m_normStd[1] = v[1]; m_normStd[2] = v[2];
-        }
-    }
+    // u2net 特有
+    m_postScale = cfg.getFloat("post_scale", 255.f);
 
     TRT_LOG_INFO("U2Net: config num_class=" << m_numClass
                  << " norm_scale=" << m_normScale

@@ -52,15 +52,14 @@ public:
     }
 
 private:
-    core::ModelConfig m_cfg;
-    int m_numKpts = 17;          // COCO 17 关键点
-    float m_confThreshold = 0.25f;
-    float m_iouThreshold = 0.7f;
-    int m_topK = 300;
-    float m_normScale = 255.f;
-    float m_normMean[3] = {0.f, 0.f, 0.f};
-    float m_normStd[3]  = {1.f, 1.f, 1.f};
-    float m_padValue = 114.f;
+    // core::ModelConfig m_cfg;
+    // float m_confThreshold = 0.25f;
+    // float m_iouThreshold = 0.7f;
+    // int m_topK = 300;
+    // float m_normScale = 255.f;
+    // float m_normMean[3] = {0.f, 0.f, 0.f};
+    // float m_normStd[3]  = {1.f, 1.f, 1.f};
+    // float m_padValue = 114.f;
 
     std::unique_ptr<core::TrtEngine> m_engine;
     std::string m_inputName;    // "images"
@@ -72,6 +71,7 @@ private:
 
     int m_srcRow = 0;      // 5 + 17*3 = 56
     int m_anchors = 0;     // 8400
+    int m_numKpts = 17;          // COCO 17 关键点
     int m_objectsRow = 0;  // 7 + 17*3 = 58
 
     core::CudaStream m_stream;

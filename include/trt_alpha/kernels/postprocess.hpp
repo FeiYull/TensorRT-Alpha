@@ -18,6 +18,7 @@ namespace trt_alpha::kernels {
 //! YOLOv8 解码头参数。
 struct YoloDecodeParams
 {
+    // default value
     int batch = 1;
     int numClasses = 80;
     int topK = 300;

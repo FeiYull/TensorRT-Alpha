@@ -39,38 +39,16 @@ const std::string& YoloV4::name() const noexcept
 
 void YoloV4::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
-    m_numClass = cfg.getInt("num_class", 80);
-    if (m_numClass <= 0)
-    {
+    loadCommonConfig(cfg);
+
+    // YOLOv4 官方默认值
+    if (cfg.getString("conf_thresh", "").empty()) m_confThreshold = 0.4f;
+    if (cfg.getString("iou_thresh",  "").empty()) m_iouThreshold  = 0.6f;
+
+    if (m_numClass <= 0) {
         throw std::runtime_error("yolov4: num_class must be > 0");
     }
-    m_confThreshold = cfg.getFloat("conf_thresh", 0.4f);
-    m_iouThreshold = cfg.getFloat("iou_thresh", 0.6f);
-    m_topK = cfg.getInt("top_k", 300);
-    m_normScale = cfg.getFloat("norm_scale", 255.f);
-    m_padValue = cfg.getFloat("pad_value", 114.f);
 
-    {
-        const std::string meanStr = cfg.getString("mean", "");
-        if (!meanStr.empty())
-        {
-            float v[3];
-            if (std::sscanf(meanStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3)
-            {
-                m_normMean[0] = v[0]; m_normMean[1] = v[1]; m_normMean[2] = v[2];
-            }
-        }
-        const std::string stdStr = cfg.getString("std", "");
-        if (!stdStr.empty())
-        {
-            float v[3];
-            if (std::sscanf(stdStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3)
-            {
-                m_normStd[0] = v[0]; m_normStd[1] = v[1]; m_normStd[2] = v[2];
-            }
-        }
-    }
     TRT_LOG_INFO("YoloV4: config num_class=" << m_numClass
                  << " conf=" << m_confThreshold
                  << " iou=" << m_iouThreshold

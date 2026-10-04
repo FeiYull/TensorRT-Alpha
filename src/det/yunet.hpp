@@ -53,11 +53,11 @@ public:
     }
 
 private:
-    core::ModelConfig m_cfg;
-    int m_numClass = 2;              // 背景 + 人脸
-    float m_confThreshold = 0.3f;
-    float m_iouThreshold = 0.45f;
-    int m_topK = 1000;               // 动态尺寸时候选框数可能很大
+    // core::ModelConfig m_cfg;
+    // int m_numClass = 2;              // 背景 + 人脸
+    // float m_confThreshold = 0.3f;
+    // float m_iouThreshold = 0.45f;
+    // int m_topK = 1000;               // 动态尺寸时候选框数可能很大
 
     std::unique_ptr<core::TrtEngine> m_engine;
     std::string m_inputName;         // "input"

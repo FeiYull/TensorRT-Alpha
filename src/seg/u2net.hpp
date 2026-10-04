@@ -55,11 +55,11 @@ public:
     }
 
 private:
-    core::ModelConfig m_cfg;
-    int m_numClass = 1;          // 显著性，单类
-    float m_normScale = 1.f;     // u2net 的 scale = 1.0（预处理）
-    float m_normMean[3] = {0.485f, 0.456f, 0.406f};
-    float m_normStd[3]  = {0.229f, 0.224f, 0.225f};
+    // core::ModelConfig m_cfg;
+    // int m_numClass = 1;          // 显著性，单类
+    // float m_normScale = 1.f;     // u2net 的 scale = 1.0（预处理）
+    // float m_normMean[3] = {0.485f, 0.456f, 0.406f};
+    // float m_normStd[3]  = {0.229f, 0.224f, 0.225f};
     float m_postScale = 255.f;   // 后处理归一化到 [0, 255]
 
     std::unique_ptr<core::TrtEngine> m_engine;

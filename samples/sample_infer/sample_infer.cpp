@@ -1,13 +1,4 @@
-// =============================================================================
-//  sample_infer —— Infer 高层 API 使用示例
-// -----------------------------------------------------------------------------
-//  用法：
-//    sample_infer                          # 默认 data/bus.jpg
-//    sample_infer <path>                   # 图片 / 视频 / URL
-//    sample_infer <camera_id>              # 摄像头（如 0）
-// =============================================================================
 #include "trt_alpha/infer/infer.hpp"
-
 #include <cctype>
 #include <iostream>
 #include <string>
@@ -15,94 +6,64 @@
 int main(int argc, char** argv)
 {
     trt_alpha::InferParams p;
-    p.model_type  = trt_alpha::ModelType::yolov8;
-    p.config_path = "configs/yolov8.ini";
-    p.show        = true;
 
-    std::string display_source;
-    bool is_stream = false;   // 视频 / 摄像头 / 流
+    // 模型选择：sample_infer <model> <source>
+    // 默认 yolov8
+    std::string model_name = "yolov8";
+    std::string source = "data/bus.jpg";
 
-    if (argc >= 2)
-    {
-        const std::string arg = argv[1];
+    if (argc >= 2) model_name = argv[1];
+    if (argc >= 3) source = argv[2];
 
-        // 纯数字 → 摄像头 ID
-        bool is_num = !arg.empty();
-        for (char c : arg) {
-            if (!std::isdigit(static_cast<unsigned char>(c))) { is_num = false; break; }
-        }
-
-        if (is_num)
-        {
-            p.camera_id = std::stoi(arg);
-            display_source = "camera " + std::to_string(p.camera_id);
-            is_stream = true;
-        }
-        else
-        {
-            p.source = arg;
-            display_source = arg;
-            is_stream =
-                arg.find(".mp4") != std::string::npos ||
-                arg.find(".avi") != std::string::npos ||
-                arg.find(".mov") != std::string::npos ||
-                arg.find("rtsp://") == 0 ||
-                arg.find("http://") == 0  ||
-                arg.find("https://") == 0;
-        }
+    // model 名 → ModelType
+    if (model_name == "yolov8") {
+        p.model_type = trt_alpha::ModelType::yolov8;
+        p.config_path = "configs/yolov8.ini";
+    } else if (model_name == "yolov8_seg") {
+        p.model_type = trt_alpha::ModelType::yolov8_seg;
+        p.config_path = "configs/yolov8_seg.ini";
+    } else if (model_name == "u2net") {
+        p.model_type = trt_alpha::ModelType::u2net;
+        p.config_path = "configs/u2net.ini";
+    } else if (model_name == "yolov8_pose") {
+        p.model_type = trt_alpha::ModelType::yolov8_pose;
+        p.config_path = "configs/yolov8_pose.ini";
+    } else {
+        std::cerr << "unknown model: " << model_name << "\n";
+        return 1;
     }
-    else
-    {
-        p.source = "data/bus.jpg";
-        display_source = "data/bus.jpg";
+
+    p.show = true;
+    p.workers = 1;
+    p.max_queue_size = 1;    // max_queue_size：推理池任务队列能放多少个任务。每个任务 = 一个 batch。
+    p.result_queue_size = 1;    // 结果队列能放多少个future。每个 future = 一个 batch 的结果。
+
+    
+    // 摄像头（纯数字）
+    bool is_num = !source.empty();
+    for (char c : source) {
+        if (!std::isdigit(static_cast<unsigned char>(c))) { is_num = false; break; }
     }
+    if (is_num) p.camera_id = std::stoi(source);
+    else        p.source = source;
 
     trt_alpha::Infer model(p);
+    auto stream = model.async();
 
-    std::cout << "=== sample_infer ===\n";
-    std::cout << "source : " << display_source << "\n";
-
-    if (is_stream)
-    {
-        // ---- 视频 / 摄像头 / 流：异步 ----
-        auto stream = model.async();
-
-        int batchCount = 0;
-        trt_alpha::Result result;
-        while (stream.get(result))
-        {
-            ++batchCount;
-            for (auto& frame : result.frames())
-            {
-                auto img = frame.image();
-                std::cout << "  batch " << batchCount
-                          << " frame: " << img.width << "x" << img.height
-                          << " boxes=" << frame.boxes().size() << "\n";
-            }
-        }
-        stream.stop();
-        std::cout << "total batches: " << batchCount << "\n";
-    }
-    else
-    {
-        // ---- 图片：同步 ----
-        trt_alpha::Result result = model.run();
-
-        std::cout << "size        : " << result.size() << "\n";
-        std::cout << "valid_count : " << result.valid_count() << "\n";
-        std::cout << "inference_ms: " << result.inference_ms() << "\n";
-
-        for (auto& frame : result.frames())
-        {
+    int batchCount = 0;
+    trt_alpha::Result r;
+    while (stream.get(r)) {
+        ++batchCount;
+        for (auto& frame : r.frames()) {
             auto img = frame.image();
-            std::cout << "  frame: " << img.width << "x" << img.height << "\n";
-            for (auto& box : frame.boxes())
-            {
-                std::cout << "    box: label=" << box.label
-                          << " conf=" << box.confidence << "\n";
-            }
+            std::cout << "  batch " << batchCount
+                      << " frame: " << img.width << "x" << img.height
+                      << " boxes=" << frame.boxes().size()
+                      << " masks=" << frame.masks().size()
+                      << " kpts=" << frame.keypoints().size() << "\n";
         }
     }
-
+    stream.stop();
+    std::cout << "total batches: " << batchCount << "\n";
     return 0;
 }

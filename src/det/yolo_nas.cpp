@@ -37,19 +37,16 @@ const std::string& YoloNas::name() const noexcept
 
 void YoloNas::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
-    m_numClass = cfg.getInt("num_class", 80);
-    if (m_numClass <= 0)
-    {
+    loadCommonConfig(cfg);
+
+    // YOLO-NAS 官方默认值
+    if (cfg.getString("iou_thresh", "").empty()) m_iouThreshold = 0.7f;
+
+    if (m_numClass <= 0) {
         throw std::runtime_error("yolo_nas: num_class must be > 0");
     }
-    m_confThreshold = cfg.getFloat("conf_thresh", 0.25f);
-    m_iouThreshold = cfg.getFloat("iou_thresh", 0.7f);
-    m_topK = cfg.getInt("top_k", 300);
-    m_normScale = cfg.getFloat("norm_scale", 255.f);
-    m_padValue = cfg.getFloat("pad_value", 114.f);
 
-    // YOLO-NAS 特有：先缩放到 resize_shape，再 pad 到 dst
+    // YOLO-NAS 特有字段
     m_resizeW = cfg.getInt("resize_w", 636);
     m_resizeH = cfg.getInt("resize_h", 636);
     m_padTop  = (m_cfg.dstH - m_resizeH) / 2;

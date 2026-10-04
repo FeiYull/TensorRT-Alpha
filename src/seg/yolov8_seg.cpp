@@ -41,20 +41,19 @@ const std::string& YoloV8Seg::name() const noexcept
 
 void YoloV8Seg::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
-    m_numClass = cfg.getInt("num_class", 80);
-    if (m_numClass <= 0)
-    {
-        throw std::runtime_error("yolov8_seg: num_class must be > 0");
+    loadCommonConfig(cfg);
+
+    // seg 官方默认 iou
+    if (cfg.getString("iou_thresh", "").empty()) m_iouThreshold = 0.7f;
+
+    if (m_numClass <= 0) {
+        throw std::runtime_error("yolov8-seg: num_class must be > 0");
     }
+
+    // seg 特有字段
     m_numMaskCoeffs = cfg.getInt("num_mask_coeffs", 32);
-    m_maskProtoH = cfg.getInt("mask_proto_h", 160);
-    m_maskProtoW = cfg.getInt("mask_proto_w", 160);
-    m_confThreshold = cfg.getFloat("conf_thresh", 0.25f);
-    m_iouThreshold = cfg.getFloat("iou_thresh", 0.7f);
-    m_topK = cfg.getInt("top_k", 300);
-    m_normScale = cfg.getFloat("norm_scale", 255.f);
-    m_padValue = cfg.getFloat("pad_value", 114.f);
+    m_maskProtoH    = cfg.getInt("mask_proto_h", 160);
+    m_maskProtoW    = cfg.getInt("mask_proto_w", 160);
 
     TRT_LOG_INFO("YoloV8Seg: config num_class=" << m_numClass
                  << " mask_coeffs=" << m_numMaskCoeffs

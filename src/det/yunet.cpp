@@ -97,11 +97,13 @@ const std::string& YuNet::name() const noexcept
 
 void YuNet::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
-    m_numClass = cfg.getInt("num_class", 2);
-    m_confThreshold = cfg.getFloat("conf_thresh", 0.3f);
-    m_iouThreshold = cfg.getFloat("iou_thresh", 0.45f);
-    m_topK = cfg.getInt("top_k", 1000);
+    loadCommonConfig(cfg);
+
+    // YuNet 官方默认值
+    if (cfg.getString("conf_thresh", "").empty()) m_confThreshold = 0.3f;
+    if (cfg.getString("top_k",       "").empty()) m_topK          = 1000;
+
+    m_objectsRow = 17;
 
     TRT_LOG_INFO("YuNet: config num_class=" << m_numClass
                  << " conf=" << m_confThreshold

@@ -287,6 +287,13 @@ void Infer::Impl::ensure_pool()
     const std::size_t workers =
         (params.workers > 0) ? static_cast<std::size_t>(params.workers) : std::size_t{0};
 
+    // 队列大小优先级：InferParams > base.ini > 16
+    int max_q_int = params.max_queue_size;
+    if (max_q_int <= 0) {
+        max_q_int = final_cfg.getInt("max_queue_size", 16);
+    }
+    const std::size_t max_q = static_cast<std::size_t>(max_q_int > 0 ? max_q_int : 16);
+
     const std::string net = registry_name(params.model_type);
 
     pool = std::make_shared<core::InferencePool>(
@@ -295,7 +302,7 @@ void Infer::Impl::ensure_pool()
             return ModelRegistry::instance().create(net);
         },
         workers,
-        /*maxQueueSize=*/16);
+        max_q);
 }
 
 // =============================================================================
@@ -314,58 +321,6 @@ Infer::Infer(const InferParams& p)
 Infer::~Infer() = default;
 Infer::Infer(Infer&&) noexcept = default;
 Infer& Infer::operator=(Infer&&) noexcept = default;
-
-Result Infer::run()
-{
-    m_impl->ensure_pool();
-
-    // 是否渲染：show || save
-    const bool render = m_impl->params.show || m_impl->params.save;
-
-    pipeline::PipelineConfig pcfg;
-    pcfg.sources.push_back(
-        std::make_unique<datasource::OpenCVSource>(
-            build_source_config(m_impl->params, m_impl->final_cfg.batchSize)));
-    pcfg.pools = { m_impl->pool.get() };
-    pcfg.sourceToPool = { 0 };
-    pcfg.classNames = m_impl->final_cfg.classNames;
-    pcfg.resultQueueSize =
-        (m_impl->params.result_queue_size > 0)
-            ? static_cast<std::size_t>(m_impl->params.result_queue_size)
-            : std::size_t{32};
-
-    if (render) {
-        pcfg.renderer = &m_impl->renderer;
-        pcfg.saveEnabled = m_impl->params.save;
-        pcfg.showEnabled = m_impl->params.show;
-        if (!m_impl->params.save_dir.empty())    pcfg.saveDir = m_impl->params.save_dir;
-        if (!m_impl->params.show_window.empty()) pcfg.showWindow = m_impl->params.show_window;
-    } else {
-        pcfg.renderer = nullptr;
-        pcfg.saveEnabled = false;
-        pcfg.showEnabled = false;
-    }
-
-    pipeline::Pipeline pipe(std::move(pcfg));
-    pipe.start();
-
-    core::BatchResult br;
-    bool got = false;
-    if (render) {
-        got = pipe.popProcessed(br);   // 渲染后拿
-    } else {
-        got = pipe.popResult(br);      // 非渲染，原始结果
-    }
-
-    pipe.stop();
-    pipe.waitForCompletion();
-
-    if (!got) {
-        TRT_LOG_WARN("Infer::run: no result produced");
-        return Result{};
-    }
-    return Result(std::move(br));
-}
 
 // =============================================================================
 //  Stream::Impl
