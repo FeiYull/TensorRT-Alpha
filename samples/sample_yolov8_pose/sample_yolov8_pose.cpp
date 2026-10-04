@@ -57,7 +57,7 @@ int main(int argc, char** argv)
         trt_alpha::core::InferencePool pool(
             cfg,
             []() -> std::unique_ptr<trt_alpha::IModel> {
-                return trt_alpha::ModelRegistry::instance().create("yolov8-pose");
+                return trt_alpha::ModelRegistry::instance().create("yolov8_pose");
             },
             /*workers=*/1);
 

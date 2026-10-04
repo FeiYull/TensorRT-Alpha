@@ -106,7 +106,7 @@ void printUsage()
         "  trt_alpha list\n"
         "  trt_alpha run --image data/bus.jpg --net yolov8 --save\n"
         "  trt_alpha run --video data/people.mp4 --net yolor --show\n"
-        "  trt_alpha run --camera 0 --net yolov8-pose --show\n"
+        "  trt_alpha run --camera 0 --net yolov8_pose --show\n"
         "  trt_alpha bench --net yolov8 --iters 100 --warmup 10\n"
         "  trt_alpha run --image data/bus.jpg --net yolov8 --engine D:/models/yolov8n.trt\n";
 }

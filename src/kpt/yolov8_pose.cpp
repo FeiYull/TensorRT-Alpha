@@ -30,7 +30,7 @@ void buildLetterboxAffine(int srcW, int srcH, int dstW, int dstH,
 
 const std::string& YoloV8Pose::name() const noexcept
 {
-    static const std::string kName = "yolov8-pose";
+    static const std::string kName = "yolov8_pose";
     return kName;
 }
 
@@ -59,7 +59,7 @@ void YoloV8Pose::discoverEngineIo()
     }
     if (m_inputName.empty() || m_outputName.empty())
     {
-        throw std::runtime_error("yolov8-pose: missing input/output tensor");
+        throw std::runtime_error("yolov8_pose: missing input/output tensor");
     }
 
     m_engine->setInputShape(m_inputName, nvinfer1::Dims4(m_cfg.batchSize, 3,
@@ -68,14 +68,14 @@ void YoloV8Pose::discoverEngineIo()
     const nvinfer1::Dims outDims = m_engine->contextShape(m_outputName);
     if (outDims.nbDims != 3)
     {
-        throw std::runtime_error("yolov8-pose: expect output0 as [B, 5+3*K, anchors]");
+        throw std::runtime_error("yolov8_pose: expect output0 as [B, 5+3*K, anchors]");
     }
     m_srcRow  = static_cast<int>(outDims.d[1]);
     m_anchors = static_cast<int>(outDims.d[2]);
     if (m_srcRow != 5 + m_numKpts * 3)
     {
         throw std::runtime_error(
-            "yolov8-pose: output0 channel = " + std::to_string(m_srcRow) +
+            "yolov8_pose: output0 channel = " + std::to_string(m_srcRow) +
             " but 5 + 3*num_kpts = " + std::to_string(5 + m_numKpts * 3));
     }
 }
@@ -128,7 +128,7 @@ void YoloV8Pose::allocateBuffers()
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
         !ctx->setTensorAddress(m_outputName.c_str(), m_outputSrc.data()))
     {
-        throw std::runtime_error("yolov8-pose: setTensorAddress failed");
+        throw std::runtime_error("yolov8_pose: setTensorAddress failed");
     }
 }
 
@@ -150,7 +150,7 @@ void YoloV8Pose::setBatch(const core::Batch& batch)
 {
     if (batch.views.empty())
     {
-        throw std::runtime_error("yolov8-pose: empty batch");
+        throw std::runtime_error("yolov8_pose: empty batch");
     }
     m_batch = static_cast<int>(batch.views.size());
     m_srcH = batch.views[0].height;
@@ -162,7 +162,7 @@ void YoloV8Pose::setBatch(const core::Batch& batch)
     const std::size_t total = oneImage * batch.views.size();
     if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
     {
-        throw std::runtime_error("yolov8-pose: batch.buffer is null");
+        throw std::runtime_error("yolov8_pose: batch.buffer is null");
     }
     if (total > m_inputSrc.bytes())
     {
@@ -195,7 +195,7 @@ void YoloV8Pose::infer()
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     if (!ctx->enqueueV3(m_stream.get()))
     {
-        throw std::runtime_error("yolov8-pose: enqueueV3 failed");
+        throw std::runtime_error("yolov8_pose: enqueueV3 failed");
     }
 }
 

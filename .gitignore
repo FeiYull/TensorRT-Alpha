@@ -82,3 +82,5 @@ build/
 *.ps1
 *docs/
 *.log
+*.txt
+*logs/
