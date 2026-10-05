@@ -15,6 +15,8 @@
 #pragma once
 
 #include "trt_alpha/core/data_type.hpp"
+#include "trt_alpha/core/layout.hpp"
+#include "trt_alpha/core/model_config.hpp"
 
 #include <NvInfer.h>
 
@@ -43,6 +45,10 @@ struct TensorDesc
     nvinfer1::Dims optShape{};   // profile kOPT
     nvinfer1::Dims maxShape{};   // profile kMAX
     DataType dtype = DataType::Float32;
+    //! 物理内存排布（线性 / 分块向量化）。与 shape 的【逻辑次序】正交：
+    //! shape 决定哪根轴是 H/W/C，format 决定这些值在内存里怎么摆。
+    nvinfer1::TensorFormat format = nvinfer1::TensorFormat::kLINEAR;
+    std::string formatDesc;      //!< 人类可读的格式名（日志 / 异常信息用）
     bool isInput = false;
 
     [[nodiscard]] std::size_t volume() const noexcept;
@@ -83,6 +89,33 @@ struct ResolvedBatch
                                          int requested,
                                          const std::string& who,
                                          int declaredMax = 0);
+
+//! 引擎输入【空间维】的解析结果（按语义命名，与布局的排列无关）。
+struct ResolvedInputShape
+{
+    int  depth     = 0;      //!< 布局无 D 轴 / 引擎未声明时为 0
+    int  height    = 0;
+    int  width     = 0;
+    bool dynamic   = false;  //!< 空间维中存在动态（-1）轴（此时采用调用方意图值）
+    bool corrected = false;  //!< 静态维被引擎纠正过（与意图值不同）
+};
+
+//! 校验输入张量的【秩 / 通道轴 / 物理格式】，任一不符抛 std::runtime_error：
+//!   * shape.nbDims != layout.rank()  → 布局声明与引擎不符
+//!   * C 轴静态尺寸 != channels       → 布局声明写错（防止把 H/W 当通道、静默错读）
+//!   * format != kLINEAR             → 引擎要求分块/向量化排布，本框架只喂线性 buffer
+//! 这三条是"安全不放步"的护栏：宁可明确报错，也不静默拿错轴。
+//! @param channels 期望通道数；<=0 表示跳过通道校验
+void validateInputTensor(const TensorDesc& input, const Layout& layout,
+                         int channels, const std::string& who);
+
+//! 以【引擎声明形状】为唯一真相源解析输入的空间维（D/H/W）。
+//!   * 静态轴（> 0）：忽略 intent，采用引擎值；与 intent 不同则 corrected = true
+//!   * 动态轴（-1）  ：采用 intent（调用方意图值）；intent 未提供则为 0
+//! 前置校验同 validateInputTensor。
+void resolveInputShape(const TensorDesc& input, const Layout& layout, int channels,
+                       const ResolvedInputShape& intent, const std::string& who,
+                       ResolvedInputShape& out);
 
 //! 共享的 ICudaEngine（线程安全，可被多个 Context 引用）。
 class Engine
@@ -197,5 +230,14 @@ private:
     std::shared_ptr<Engine> m_sharedEngine;
     std::unique_ptr<Context> m_context;
 };
+
+//! 一步到位：解析输入布局 / 空间维并下发 setInputShape，结果就地写回 cfg.dstH / cfg.dstW。
+//!   * 布局优先级：cfg.layout（INI 的 input.layout）> modelLayout（模型规范布局）
+//!   * 目标形状按 layout 逐轴构造 → 天然支持 3~8 维的任意排列（NCHW/NHWC/NCDHW/CHWN/…）
+//!   * 配置里的 dst_h / dst_w 降级为"意图值"：仅在引擎对应维为动态（-1）时生效；
+//!     静态维一律以引擎为准并 WARN 纠正。
+//! 失败（引擎无此输入 / 校验不过 / 某轴尺寸无法确定）抛 std::runtime_error。
+void applyInputShape(TrtEngine& engine, const std::string& tensorName,
+                     const Layout& modelLayout, int channels, ModelConfig& cfg);
 
 }  // namespace trt_alpha::core

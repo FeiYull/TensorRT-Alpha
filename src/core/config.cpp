@@ -103,8 +103,23 @@ ModelConfig loadModelConfig(const std::string& iniPath)
     // 可选（从合并结果读）
     cfg.batchSize = getIntOr(merged, "input.batch_size", cfg.batchSize);
     cfg.maxBatchSize = getIntOr(merged, "input.max_batch_size", cfg.maxBatchSize);
-    cfg.dstH      = getIntOr(merged, "input.dst_h",      cfg.dstH);
-    cfg.dstW      = getIntOr(merged, "input.dst_w",      cfg.dstW);
+
+    // 输入逻辑维序（可选；缺省用模型的规范布局）
+    if (const auto it = merged.find("input.layout"); it != merged.end())
+    {
+        const std::string v = trim(it->second);
+        if (!v.empty() && !Layout::tryParse(v, cfg.layout))
+        {
+            TRT_LOG_ERROR("Config: invalid input.layout '" << v << "' in " << iniPath);
+            throw std::runtime_error(
+                "INI: invalid input.layout '" + v +
+                "' (expect e.g. nchw / nhwc / ncdhw / ndhwc / chw / hwc)");
+        }
+    }
+
+    // 空间维"意图值"：一般不需要设置（仅引擎该维为动态时有意义）
+    cfg.dstH = getIntOr(merged, "input.dst_h", cfg.dstH);
+    cfg.dstW = getIntOr(merged, "input.dst_w", cfg.dstW);
 
     // 5. extras：把合并后的 key-value 全存起来（短名 + 长名都存）
     for (const auto& [k, v] : merged) {
@@ -120,7 +135,7 @@ ModelConfig loadModelConfig(const std::string& iniPath)
                  << "(engine=" << cfg.engine
                  << ", batch=" << cfg.batchSize
                  << (cfg.maxBatchSize > 0 ? " (max=" + std::to_string(cfg.maxBatchSize) + ")" : "")
-                 << ", dst=" << cfg.dstW << "x" << cfg.dstH
+                 << ", layout=" << (cfg.layout.empty() ? "auto" : cfg.layout.str())
                  << ", extras=" << cfg.extras.size() << " entries)");
 
     return cfg;

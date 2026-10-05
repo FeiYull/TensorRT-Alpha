@@ -38,14 +38,16 @@ const std::string& EfficientDet::name() const noexcept
 
 void EfficientDet::loadConfig(const core::ModelConfig& cfg)
 {
+    // 通用成员（m_cfg / m_numClass / m_confThreshold / m_padValue / m_topK …）
+    // 统一由基类读一次；模型不再重复声明同名成员，避免遮蔽导致配置被静默忽略。
     loadCommonConfig(cfg);
 
-    m_numClass = cfg.getInt("num_class", 91);   // efficientdet 是 91
-    m_topK     = 100;                           // efficientdet 固定 100
+    // 模型特有默认值（与基类默认不同，配置缺键时兜底）
+    m_numClass      = cfg.getInt  ("num_class",   91);   // efficientdet 是 91
+    m_confThreshold = cfg.getFloat("conf_thresh", 0.45f);
 
     TRT_LOG_INFO("EfficientDet: config num_class=" << m_numClass
-                 << " conf=" << m_confThreshold
-                 << " topK=" << m_topK);
+                 << " conf=" << m_confThreshold);
 }
 
 void EfficientDet::discoverEngineIo()
@@ -64,22 +66,23 @@ void EfficientDet::discoverEngineIo()
         throw std::runtime_error("efficientdet: missing expected I/O tensors");
     }
 
-    const core::TensorDesc* in = m_engine->find(m_inputName);
-    if (in == nullptr || in->shape.nbDims != 4)
-    {
-        throw std::runtime_error("efficientdet: expect input as [B, H, W, 3]");
-    }
-    if (in->shape.d[3] != 3)
-    {
-        throw std::runtime_error("efficientdet: input channel dim != 3 (expect NHWC)");
-    }
+    // 输入是 NHWC [B, H, W, 3]，H/W 在 trtexec 建引擎时焊死
+    // （efficientdet0/1/2/3 = 512/640/768/896），配置改不了它。
+    // 与 batch 同口径：以【引擎声明形状】为唯一真相源，
+    // 秩 / 通道轴 / 物理格式不符直接报错，配置尺寸不符则告警并按引擎纠正。
+    core::applyInputShape(*m_engine, m_inputName, core::Layout::NHWC, 3, m_cfg);
 
-    m_engine->setInputShape(m_inputName, nvinfer1::Dims4(
-        m_cfg.batchSize, m_cfg.dstH, m_cfg.dstW, 3));
+    // NMS 输出上限同样由引擎写死（detection_boxes [B, N, 4]）。
+    // 用它给缓冲区定尺寸，避免硬编码 100 与引擎不符时越界。
+    const core::TensorDesc* boxes = m_engine->find(m_boxesName);
+    if (boxes != nullptr && boxes->shape.nbDims == 3 && boxes->shape.d[1] > 0)
+    {
+        m_topK = boxes->shape.d[1];
+    }
 
     TRT_LOG_INFO("EfficientDet: input '" << m_inputName
-                 << "' set to [" << m_cfg.batchSize << ", "
-                 << m_cfg.dstH << ", " << m_cfg.dstW << ", 3]");
+                 << "' dst=" << m_cfg.dstW << "x" << m_cfg.dstH
+                 << ", maxDet=" << m_topK);
 }
 
 void EfficientDet::allocateBuffers()
@@ -181,6 +184,14 @@ void EfficientDet::setBatch(const core::Batch& batch)
     if (m_inputU8.bytes() < totalU8)
     {
         m_inputU8.allocate(totalU8);
+    }
+    // m_inputSrc 装的是"源图尺寸"的 float32（u8ToF32 逐元素展开成 float），
+    // 源图大于 dst 时必须扩容，否则越界写显存。
+    const std::size_t totalF32Bytes = totalU8 * sizeof(float);
+    if (m_inputSrc.bytes() < totalF32Bytes)
+    {
+        // 尺寸变化触发扩容（少见）
+        m_inputSrc.allocate(totalF32Bytes);
     }
     cudaMemcpyAsync(m_inputU8.data(), batch.buffer->data(), totalU8,
                     cudaMemcpyHostToDevice, m_stream.get());

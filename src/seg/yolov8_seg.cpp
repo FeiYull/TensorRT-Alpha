@@ -76,8 +76,7 @@ void YoloV8Seg::discoverEngineIo()
         throw std::runtime_error("yolov8_seg: missing expected I/O tensors");
     }
 
-    m_engine->setInputShape(m_inputName, nvinfer1::Dims4(m_cfg.batchSize, 3,
-                                                          m_cfg.dstH, m_cfg.dstW));
+    core::applyInputShape(*m_engine, m_inputName, core::Layout::NCHW, 3, m_cfg);
 
     // output0: [B, 116, 8400]
     const nvinfer1::Dims out0 = m_engine->contextShape(m_output0Name);

@@ -22,6 +22,7 @@
 #pragma once
 
 #include "trt_alpha/core/class_info.hpp"
+#include "trt_alpha/core/layout.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -41,8 +42,14 @@ struct ModelConfig
     std::string classNamesFile;                //!< 类别文件路径（名字 + RGB）
     int batchSize = 1;                         //!< 本次推理实际使用的 batch（运行时按引擎能力修正）
     int maxBatchSize = -1;                     //!< 可选：声明的引擎 batch 上界契约；<=0 表示未声明
-    int dstH = 640;
-    int dstW = 640;
+    //! 输入【逻辑维序】（INI: input.layout，如 nchw / nhwc / ncdhw）。
+    //! 空 = 用模型自身的规范布局。H/W 不再需要配置：以引擎声明形状为唯一真相源。
+    Layout layout;
+    //! 空间维"意图值"（INI: input.dst_h / input.dst_w）。0 = 未设置（默认）。
+    //! 一般不需要设置：静态维一律以引擎声明形状为准；
+    //! 仅当引擎该维是动态维（-1）时，这里才作为"跑多大"的意图值生效。
+    int dstH = 0;
+    int dstW = 0;
     std::vector<std::string> inputOutputNames;
 
     // ---- 模型特有字段（统一放这里）----

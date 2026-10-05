@@ -77,9 +77,8 @@ void YoloV8::discoverEngineIo()
     m_inputName = input->name;
     m_outputName = output->name;
 
-    // 设置动态输入形状（静态引擎自动跳过）
-    m_engine->setInputShape(m_inputName, nvinfer1::Dims4(m_cfg.batchSize, 3,
-                                                          m_cfg.dstH, m_cfg.dstW));
+    // 解析并下发输入形状：以引擎声明形状为真相源（H/W 静态维自动纠正，无需配置）
+    core::applyInputShape(*m_engine, m_inputName, core::Layout::NCHW, 3, m_cfg);
 
     const nvinfer1::Dims outDims = m_engine->contextShape(m_outputName);
     if (outDims.nbDims != 3)

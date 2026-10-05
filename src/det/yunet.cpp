@@ -125,6 +125,16 @@ void YuNet::discoverEngineIo()
     {
         throw std::runtime_error("yunet: missing expected I/O tensors");
     }
+
+    // 输入结构守卫：秩 / 通道轴 / 物理格式。
+    // H/W 是动态维且由原图尺寸决定（不 resize，见 rebuildForSize），故不解析配置意图值。
+    const core::TensorDesc* in = m_engine->find(m_inputName);
+    if (in == nullptr)
+    {
+        throw std::runtime_error("yunet: input tensor '" + m_inputName + "' not found");
+    }
+    core::validateInputTensor(*in, core::Layout::NCHW, 3, "YuNet");
+
     TRT_LOG_INFO("YuNet: io names: input='" << m_inputName
                  << "' loc='" << m_locName
                  << "' conf='" << m_confName

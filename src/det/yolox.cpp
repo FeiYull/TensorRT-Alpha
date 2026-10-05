@@ -67,14 +67,8 @@ void YoloX::discoverEngineIo()
     m_inputName = input->name;
     m_outputName = output->name;
 
-    // 输入形状结构校验
-    if (input->shape.nbDims != 4)
-    {
-        throw std::runtime_error("yolox: expect input as [B, 3, H, W]");
-    }
-
-    m_engine->setInputShape(m_inputName, nvinfer1::Dims4(m_cfg.batchSize, 3,
-                                                          m_cfg.dstH, m_cfg.dstW));
+    // 解析并下发输入形状（秩 / 通道轴 / 格式在这里统一校验）
+    core::applyInputShape(*m_engine, m_inputName, core::Layout::NCHW, 3, m_cfg);
 
     const nvinfer1::Dims outDims = m_engine->contextShape(m_outputName);
     if (outDims.nbDims != 3)

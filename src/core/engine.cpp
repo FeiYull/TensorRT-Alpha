@@ -20,7 +20,7 @@ namespace fs = std::filesystem;
 namespace trt_alpha::core {
 namespace {
 
-core::DataType trtToCore(nvinfer1::DataType trt) noexcept
+core::DataType trtToCore(nvinfer1::DataType trt, const std::string& tensorName)
 {
     switch (trt)
     {
@@ -32,12 +32,13 @@ core::DataType trtToCore(nvinfer1::DataType trt) noexcept
     case nvinfer1::DataType::kUINT8: return DataType::UInt8;
     case nvinfer1::DataType::kFP8:   return DataType::Float8_E4M3;
     case nvinfer1::DataType::kBF16:  return DataType::BFloat16;
-    case nvinfer1::DataType::kINT64: return DataType::Int32;
-#ifdef TRT_ALPHA_HAS_KINT4
-    case nvinfer1::DataType::kINT4:  return DataType::Int8;
-#endif
+    default: break;
     }
-    return DataType::Float32;
+    // 绝不静默降级：kINT64 / kINT4 等无法用 core::DataType 表示，强行降级会按错误
+    // 位宽分配显存 → 越界（且全程无报错）。这里直接失败。
+    throw std::runtime_error(
+        "unsupported tensor data type (nvinfer1::DataType value " +
+        std::to_string(static_cast<int>(trt)) + ") for tensor '" + tensorName + "'");
 }
 
 bool hasDynamicDim(const nvinfer1::Dims& dims) noexcept
@@ -179,6 +180,147 @@ ResolvedBatch resolveBatch(const TensorDesc& input, int requested,
     return r;
 }
 
+void validateInputTensor(const TensorDesc& input, const Layout& layout,
+                         int channels, const std::string& who)
+{
+    if (layout.empty())
+    {
+        throw std::runtime_error(
+            who + ": input '" + input.name +
+            "' needs an explicit layout (e.g. NCHW / NHWC / NCDHW); none was given");
+    }
+
+    // ① 秩必须与布局一致
+    if (input.shape.nbDims != layout.rank())
+    {
+        throw std::runtime_error(
+            who + ": input '" + input.name + "' rank " +
+            std::to_string(input.shape.nbDims) + " != layout '" + layout.str() +
+            "' rank " + std::to_string(layout.rank()));
+    }
+
+    // ② 物理格式必须是线性（分块 / 向量化排布本框架不认，绝不静默喂错内存）
+    if (input.format != nvinfer1::TensorFormat::kLINEAR)
+    {
+        throw std::runtime_error(
+            who + ": input '" + input.name + "' uses non-linear tensor format '" +
+            (input.formatDesc.empty() ? std::to_string(static_cast<int>(input.format))
+                                      : input.formatDesc) +
+            "'; this framework feeds plain linear buffers. Rebuild the engine with a "
+            "linear I/O format (trtexec --inputIOFormats=<type>:chw)");
+    }
+
+    // ③ 通道轴校验：布局声明与引擎不符时立刻报错，而不是拿错轴当 H/W
+    if (channels > 0 && layout.has(Layout::kChannel))
+    {
+        const int cIdx = layout.indexOf(Layout::kChannel);
+        const int dC   = input.shape.d[cIdx];
+        if (dC > 0 && dC != channels)
+        {
+            throw std::runtime_error(
+                who + ": input '" + input.name + "' layout '" + layout.str() +
+                "' puts channel at index " + std::to_string(cIdx) +
+                " where the engine declares size " + std::to_string(dC) +
+                " (expected " + std::to_string(channels) +
+                "); layout declaration does not match the engine");
+        }
+    }
+}
+
+void resolveInputShape(const TensorDesc& input, const Layout& layout, int channels,
+                       const ResolvedInputShape& intent, const std::string& who,
+                       ResolvedInputShape& out)
+{
+    validateInputTensor(input, layout, channels, who);
+
+    ResolvedInputShape r;
+
+    // 逐轴解析：静态维以引擎为唯一真相源；动态维采用调用方意图值。
+    const auto axis = [&](char letter, int wanted) -> int
+    {
+        const int idx = layout.indexOf(letter);
+        if (idx < 0) { return 0; }
+        const int declared = input.shape.d[idx];
+        if (declared > 0) { return declared; }
+        r.dynamic = true;
+        return wanted > 0 ? wanted : 0;
+    };
+
+    r.depth  = axis(Layout::kDepth,  intent.depth);
+    r.height = axis(Layout::kHeight, intent.height);
+    r.width  = axis(Layout::kWidth,  intent.width);
+
+    // 只比较"布局里真实存在、且调用方给了意图值"的轴
+    r.corrected = (layout.has(Layout::kDepth)  && intent.depth  > 0 && r.depth  != intent.depth) ||
+                  (layout.has(Layout::kHeight) && intent.height > 0 && r.height != intent.height) ||
+                  (layout.has(Layout::kWidth)  && intent.width  > 0 && r.width  != intent.width);
+
+    if (r.corrected)
+    {
+        TRT_LOG_WARN(who << ": config size " << intent.width << "x" << intent.height
+                     << " != engine declared shape, using engine shape ("
+                     << r.width << "x" << r.height << ")");
+    }
+
+    out = r;
+}
+
+void applyInputShape(TrtEngine& engine, const std::string& tensorName,
+                     const Layout& modelLayout, int channels, ModelConfig& cfg)
+{
+    const TensorDesc* input = engine.find(tensorName);
+    if (input == nullptr)
+    {
+        throw std::runtime_error("applyInputShape: input tensor '" + tensorName +
+                                 "' not found in engine");
+    }
+
+    // 布局优先级：INI 的 input.layout（覆盖）> 模型规范布局（默认）
+    const Layout& layout = cfg.layout.empty() ? modelLayout : cfg.layout;
+
+    ResolvedInputShape intent;
+    intent.height = cfg.dstH;
+    intent.width  = cfg.dstW;
+
+    ResolvedInputShape resolved;
+    resolveInputShape(*input, layout, channels, intent, "InputShape", resolved);
+
+    // 按 layout 逐轴构造目标形状 → 天然支持 3~8 维的任意排列
+    nvinfer1::Dims dims{};
+    dims.nbDims = layout.rank();
+    for (int i = 0; i < layout.rank(); ++i)
+    {
+        const char a = layout.at(i);
+        int v = 0;
+        switch (a)
+        {
+        case Layout::kBatch:   v = cfg.batchSize; break;
+        case Layout::kChannel: v = channels;      break;
+        case Layout::kDepth:   v = resolved.depth;  break;
+        case Layout::kHeight:  v = resolved.height; break;
+        case Layout::kWidth:   v = resolved.width;  break;
+        default:               v = input->shape.d[i]; break;   // T / E / ? → 引擎声明值
+        }
+        if (v <= 0)
+        {
+            throw std::runtime_error(
+                "applyInputShape: cannot determine size of axis '" + std::string(1, a) +
+                "' (index " + std::to_string(i) + ") for input '" + tensorName +
+                "'; declare it via layout / config, or use a static engine dimension");
+        }
+        dims.d[i] = v;
+    }
+
+    engine.setInputShape(tensorName, dims);
+
+    // 写回解析结果，供 letterbox / 后处理 / 显存分配使用
+    if (resolved.height > 0) { cfg.dstH = resolved.height; }
+    if (resolved.width  > 0) { cfg.dstW = resolved.width;  }
+
+    TRT_LOG_INFO("InputShape: '" << tensorName << "' layout=" << layout.str()
+                 << " -> " << dimsToString(dims));
+}
+
 // =============================================================================
 //  Engine
 // =============================================================================
@@ -230,7 +372,12 @@ void Engine::discoverIo()
         desc.isInput = (m_engine->getTensorIOMode(desc.name.c_str()) ==
                         nvinfer1::TensorIOMode::kINPUT);
         desc.shape = m_engine->getTensorShape(desc.name.c_str());
-        desc.dtype = trtToCore(m_engine->getTensorDataType(desc.name.c_str()));
+        desc.dtype  = trtToCore(m_engine->getTensorDataType(desc.name.c_str()), desc.name);
+        desc.format = m_engine->getTensorFormat(desc.name.c_str());
+        if (const char* fmtDesc = m_engine->getTensorFormatDesc(desc.name.c_str()))
+        {
+            desc.formatDesc = fmtDesc;
+        }
 
         // 输入张量：填 profile 形状（静态引擎三段相同；动态引擎为 min/opt/max）
         if (desc.isInput && hasProfile)
@@ -248,7 +395,10 @@ void Engine::discoverIo()
         TRT_LOG_INFO("Engine: io[" << i << "] "
                      << (t.isInput ? "input " : "output")
                      << " '" << t.name << "' "
-                     << nameOf(t.dtype) << " " << dimsToString(t.shape));
+                     << nameOf(t.dtype) << " " << dimsToString(t.shape)
+                     << (t.format == nvinfer1::TensorFormat::kLINEAR
+                             ? std::string()
+                             : (" fmt=" + t.formatDesc)));
 
         if (t.isInput)
         {

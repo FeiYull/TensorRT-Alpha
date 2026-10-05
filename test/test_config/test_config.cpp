@@ -7,6 +7,7 @@
 //    [3] loadClassNamesFile 读正常 TXT
 //    [4] TXT 格式错误抛异常（少字段 / RGB 越界）
 //    [5] 空 TXT / 只有注释 → 返回空 vector
+//    [6] input.layout：缺省为空 / 合法解析（含 5D） / 非法报错
 //
 //  临时文件用绝对路径（Paths::resolve 对绝对路径原样返回，不走工程根）
 // =============================================================================
@@ -67,6 +68,7 @@ int main()
             "input_output_names = images,output0\n"
             "\n"
             "[input]\n"
+            "layout = nhwc\n"
             "dst_h = 640\n"
             "dst_w = 640\n"
             "batch_size = 8\n"
@@ -92,6 +94,7 @@ int main()
             check(cfg.batchSize == 8,                       "[1] batch_size");
             check(cfg.maxBatchSize == 4,                    "[1] max_batch_size");
             check(cfg.dstH == 640 && cfg.dstW == 640,      "[1] dst_h/w");
+            check(cfg.layout == trt_alpha::core::Layout::NHWC, "[1] input.layout");
             check(cfg.inputOutputNames.size() == 2,         "[1] io size");
             check(cfg.inputOutputNames[0] == "images",      "[1] io[0]");
             check(cfg.inputOutputNames[1] == "output0",     "[1] io[1]");
@@ -283,6 +286,56 @@ int main()
             ++g_failures;
         }
         removeTempFile(p);
+    }
+
+    // ---------------------------------------------------------------
+    // [6] input.layout：缺省为空 / 合法解析 / 非法报错
+    // ---------------------------------------------------------------
+    {
+        const std::string head =
+            "[model]\n"
+            "engine = a.trt\n"
+            "class_names_file = data/classes/coco80.txt\n"
+            "input_output_names = images,output0\n"
+            "\n"
+            "[input]\n";
+
+        // 缺省：不写 layout → 空布局（由模型规范布局兜底）
+        const fs::path p0 = writeTempFile("test_layout_none.ini", head);
+        try
+        {
+            const ModelConfig cfg = loadModelConfig(p0.string());
+            check(cfg.layout.empty(), "[6a] no input.layout -> empty (model default)");
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "[FAIL] [6a] threw: " << e.what() << "\n";
+            ++g_failures;
+        }
+        removeTempFile(p0);
+
+        // 合法（大小写不敏感、支持 5D）
+        const fs::path p1 = writeTempFile("test_layout_ok.ini", head + "layout = NCDHW\n");
+        try
+        {
+            const ModelConfig cfg = loadModelConfig(p1.string());
+            check(cfg.layout == trt_alpha::core::Layout::NCDHW,
+                  "[6b] input.layout = NCDHW parsed");
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "[FAIL] [6b] threw: " << e.what() << "\n";
+            ++g_failures;
+        }
+        removeTempFile(p1);
+
+        // 非法：未知字母必须报错，绝不静默忽略
+        const fs::path p2 = writeTempFile("test_layout_bad.ini", head + "layout = nchq\n");
+        bool threw = false;
+        try { (void)loadModelConfig(p2.string()); }
+        catch (const std::runtime_error&) { threw = true; }
+        check(threw, "[6c] invalid input.layout -> throws");
+        removeTempFile(p2);
     }
 
     std::cout << "====================\n";

@@ -62,8 +62,7 @@ void YoloV8Pose::discoverEngineIo()
         throw std::runtime_error("yolov8_pose: missing input/output tensor");
     }
 
-    m_engine->setInputShape(m_inputName, nvinfer1::Dims4(m_cfg.batchSize, 3,
-                                                          m_cfg.dstH, m_cfg.dstW));
+    core::applyInputShape(*m_engine, m_inputName, core::Layout::NCHW, 3, m_cfg);
 
     const nvinfer1::Dims outDims = m_engine->contextShape(m_outputName);
     if (outDims.nbDims != 3)

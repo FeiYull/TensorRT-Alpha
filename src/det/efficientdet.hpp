@@ -53,10 +53,10 @@ public:
     }
 
 private:
-    core::ModelConfig m_cfg;
-    int m_numClass = 91;             // COCO91
-    float m_confThreshold = 0.45f;
-    float m_padValue = 114.f;
+    // 通用参数（m_cfg / m_numClass / m_confThreshold / m_padValue / m_topK …）
+    // 只保留 IDetector 基类那一份：这里再声明一次会【遮蔽】基类成员，
+    // 造成 loadCommonConfig() 写的是基类那份、模型读的是自己这份（配置被静默忽略）。
+    // 模型特有的默认值差异在 loadConfig() 里显式给。
 
     std::unique_ptr<core::TrtEngine> m_engine;
     std::string m_inputName;          // "input"
@@ -68,8 +68,6 @@ private:
     int m_batch = 0;
     int m_srcW = 0;
     int m_srcH = 0;
-
-    int m_topK = 100;                 // engine 固定 100
 
     core::CudaStream m_stream;
     core::DeviceBuffer m_inputU8;    // H2D 临时
