@@ -59,6 +59,21 @@ InferencePool::InferencePool(const ModelConfig& cfg,
         core::ModelConfig workerCfg = cfg;
         workerCfg.sharedEngine = sharedEngine;
 
+        // ---- 阶段 0.5：依据引擎实际能力解析输入 batch ----
+        // 静态引擎 → 固定值；动态引擎 → clamp 到 [min, max]。
+        // 可选：配置声明的 max_batch_size 作为上界契约参与校验。
+        // 修正后写回 workerCfg，保证模型 / 引擎 / 数据源三者 batch 一致。
+        for (const auto& t : sharedEngine->ioTensors())
+        {
+            if (!t.isInput) { continue; }
+            const core::ResolvedBatch rb =
+                core::resolveBatch(t, workerCfg.batchSize, "[InferencePool]",
+                                   workerCfg.maxBatchSize);
+            workerCfg.batchSize = rb.batch;
+            m_resolvedBatch = rb.batch;
+            break;
+        }
+
         // ---- 阶段 1：创建 + init 全部模型（只填数据，不启线程）----
         m_workers.reserve(workers);
         for (std::size_t i = 0; i < workers; ++i)

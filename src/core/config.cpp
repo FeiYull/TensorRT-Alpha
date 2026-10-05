@@ -102,6 +102,7 @@ ModelConfig loadModelConfig(const std::string& iniPath)
 
     // 可选（从合并结果读）
     cfg.batchSize = getIntOr(merged, "input.batch_size", cfg.batchSize);
+    cfg.maxBatchSize = getIntOr(merged, "input.max_batch_size", cfg.maxBatchSize);
     cfg.dstH      = getIntOr(merged, "input.dst_h",      cfg.dstH);
     cfg.dstW      = getIntOr(merged, "input.dst_w",      cfg.dstW);
 
@@ -118,6 +119,7 @@ ModelConfig loadModelConfig(const std::string& iniPath)
                  << " (with " << basePath << ") "
                  << "(engine=" << cfg.engine
                  << ", batch=" << cfg.batchSize
+                 << (cfg.maxBatchSize > 0 ? " (max=" + std::to_string(cfg.maxBatchSize) + ")" : "")
                  << ", dst=" << cfg.dstW << "x" << cfg.dstH
                  << ", extras=" << cfg.extras.size() << " entries)");
 

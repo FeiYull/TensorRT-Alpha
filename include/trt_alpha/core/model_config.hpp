@@ -39,7 +39,8 @@ struct ModelConfig
     // ---- 所有模型共用的字段 ----
     std::string engine;                        //!< engine 路径（相对根 / 绝对）
     std::string classNamesFile;                //!< 类别文件路径（名字 + RGB）
-    int batchSize = 1;
+    int batchSize = 1;                         //!< 本次推理实际使用的 batch（运行时按引擎能力修正）
+    int maxBatchSize = -1;                     //!< 可选：声明的引擎 batch 上界契约；<=0 表示未声明
     int dstH = 640;
     int dstW = 640;
     std::vector<std::string> inputOutputNames;

@@ -93,6 +93,10 @@ public:
     [[nodiscard]] std::size_t size() const noexcept { return m_workers.size(); }
     [[nodiscard]] std::size_t pending() const;
 
+    //! 依据引擎实际能力修正后的输入 batch（静态=固定值；动态=clamp 到 [min,max]）。
+    //! 数据源攒批必须用它，才能与模型 / 引擎一致。
+    [[nodiscard]] int resolvedBatch() const noexcept { return m_resolvedBatch; }
+
 private:
     struct Worker
     {
@@ -106,6 +110,7 @@ private:
     ModelConfig m_cfg;
     Factory m_factory;
     std::size_t m_maxQueueSize;
+    int m_resolvedBatch = 1;         //!< 引擎实际能力修正后的 batch
     std::vector<Worker> m_workers;
 
     std::queue<std::pair<Batch, std::promise<BatchResult>>> m_tasks;

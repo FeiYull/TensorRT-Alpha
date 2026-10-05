@@ -65,11 +65,12 @@ int main()
             "num_class = 80\n"
             "class_names_file = data/classes/coco80.txt\n"
             "input_output_names = images,output0\n"
-            "batch_size = 8\n"
             "\n"
             "[input]\n"
             "dst_h = 640\n"
             "dst_w = 640\n"
+            "batch_size = 8\n"
+            "max_batch_size = 4\n"
             "\n"
             "[postprocess]\n"
             "conf_thresh = 0.25\n"
@@ -89,6 +90,7 @@ int main()
             check(cfg.classNamesFile == "data/classes/coco80.txt",
                   "[1] class_names_file");
             check(cfg.batchSize == 8,                       "[1] batch_size");
+            check(cfg.maxBatchSize == 4,                    "[1] max_batch_size");
             check(cfg.dstH == 640 && cfg.dstW == 640,      "[1] dst_h/w");
             check(cfg.inputOutputNames.size() == 2,         "[1] io size");
             check(cfg.inputOutputNames[0] == "images",      "[1] io[0]");

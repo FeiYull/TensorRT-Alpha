@@ -303,6 +303,14 @@ void Infer::Impl::ensure_pool()
         },
         workers,
         max_q);
+
+    // 池已按引擎实际能力修正 batch（静态固定 / 动态钳制）
+    if (pool->resolvedBatch() != final_cfg.batchSize)
+    {
+        TRT_LOG_INFO("Infer: batch corrected by engine: config "
+                     << final_cfg.batchSize << " -> " << pool->resolvedBatch());
+    }
+    TRT_LOG_INFO("Infer: effective batch = " << pool->resolvedBatch());
 }
 
 // =============================================================================
@@ -387,7 +395,7 @@ Stream Infer::async()
     pipeline::PipelineConfig pcfg;
     pcfg.sources.push_back(
         std::make_unique<datasource::OpenCVSource>(
-            build_source_config(m_impl->params, m_impl->final_cfg.batchSize)));
+            build_source_config(m_impl->params, m_impl->pool->resolvedBatch())));
     pcfg.pools = { m_impl->pool.get() };
     pcfg.sourceToPool = { 0 };
     pcfg.classNames = m_impl->final_cfg.classNames;
