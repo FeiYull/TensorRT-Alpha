@@ -89,10 +89,6 @@ void YoloV4::discoverEngineIo()
             " but 4+num_class = " + std::to_string(4 + m_numClass) +
             " (check 'num_class' in INI)");
     }
-    if (outDims.d[0] > 0 && outDims.d[0] < m_cfg.batchSize)
-    {
-        throw std::runtime_error("yolov4: engine max batch < config batch_size");
-    }
 }
 
 void YoloV4::allocateBuffers()

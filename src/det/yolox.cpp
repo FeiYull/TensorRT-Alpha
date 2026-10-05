@@ -67,18 +67,10 @@ void YoloX::discoverEngineIo()
     m_inputName = input->name;
     m_outputName = output->name;
 
-    // ---- YOLOX 特有：静态 batch 校验 ----
+    // 输入形状结构校验
     if (input->shape.nbDims != 4)
     {
         throw std::runtime_error("yolox: expect input as [B, 3, H, W]");
-    }
-    const int engineBatch = input->shape.d[0];
-    if (engineBatch > 0 && engineBatch != m_cfg.batchSize)
-    {
-        throw std::runtime_error(
-            "yolox: engine batch = " + std::to_string(engineBatch) +
-            " but config batch_size = " + std::to_string(m_cfg.batchSize) +
-            " (YOLOX engine 是静态 batch，导出时定死，必须一致)");
     }
 
     m_engine->setInputShape(m_inputName, nvinfer1::Dims4(m_cfg.batchSize, 3,
@@ -96,12 +88,6 @@ void YoloX::discoverEngineIo()
         throw std::runtime_error(
             "yolox: output channel = " + std::to_string(m_srcRow) +
             " but 5+num_class = " + std::to_string(5 + m_numClass));
-    }
-    if (outDims.d[0] > 0 && outDims.d[0] != m_cfg.batchSize)
-    {
-        throw std::runtime_error(
-            "yolox: engine output batch = " + std::to_string(outDims.d[0]) +
-            " but config batch_size = " + std::to_string(m_cfg.batchSize));
     }
 }
 
@@ -177,13 +163,6 @@ void YoloX::setBatch(const core::Batch& batch)
         throw std::runtime_error("yolox: empty batch");
     }
     m_batch = static_cast<int>(batch.views.size());
-    if (m_batch != m_cfg.batchSize)
-    {
-        throw std::runtime_error(
-            "yolox: batch.views.size() = " + std::to_string(m_batch) +
-            " but config batch_size = " + std::to_string(m_cfg.batchSize) +
-            " (静态 batch 必须一致)");
-    }
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 

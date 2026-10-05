@@ -46,42 +46,13 @@ const std::string& YoloV8::name() const noexcept
 
 void YoloV8::loadConfig(const core::ModelConfig& cfg)
 {
-    m_cfg = cfg;
+    loadCommonConfig(cfg);
 
-    m_numClass = cfg.getInt("num_class", 80);
     if (m_numClass <= 0)
     {
         throw std::runtime_error("yolov8: num_class must be > 0 (got " +
                                  std::to_string(m_numClass) + ")");
     }
-    m_confThreshold = cfg.getFloat("conf_thresh", 0.25f);
-    m_iouThreshold = cfg.getFloat("iou_thresh", 0.45f);
-    m_topK = cfg.getInt("top_k", 300);
-
-    // 归一化参数：mean / std 用 "a,b,c" 逗号分隔
-    {
-        const std::string meanStr = cfg.getString("mean", "");
-        if (!meanStr.empty())
-        {
-            float v[3];
-            if (std::sscanf(meanStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3)
-            {
-                m_normMean[0] = v[0]; m_normMean[1] = v[1]; m_normMean[2] = v[2];
-            }
-        }
-        const std::string stdStr = cfg.getString("std", "");
-        if (!stdStr.empty())
-        {
-            float v[3];
-            if (std::sscanf(stdStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3)
-            {
-                m_normStd[0] = v[0]; m_normStd[1] = v[1]; m_normStd[2] = v[2];
-            }
-        }
-    }
-
-    m_normScale = cfg.getFloat("norm_scale", 255.f);
-    m_padValue = cfg.getFloat("pad_value", 114.f);
 
     TRT_LOG_INFO("YoloV8: config num_class=" << m_numClass
                  << " conf=" << m_confThreshold
@@ -123,12 +94,6 @@ void YoloV8::discoverEngineIo()
             "yolov8: output0 channel = " + std::to_string(m_srcRow) +
             " but 4+num_class = " + std::to_string(4 + m_numClass) +
             " (check 'num_class' in INI)");
-    }
-    if (outDims.d[0] < m_cfg.batchSize)
-    {
-        throw std::runtime_error(
-            "yolov8: engine max batch " + std::to_string(outDims.d[0]) +
-            " < config batch_size " + std::to_string(m_cfg.batchSize));
     }
 }
 
@@ -225,11 +190,6 @@ void YoloV8::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("yolov8: empty batch");
     }
-    if (static_cast<int>(batch.views.size()) > m_cfg.batchSize)
-    {
-        throw std::runtime_error("yolov8: batch size larger than engine batch");
-    }
-
     m_batch = static_cast<int>(batch.views.size());
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;

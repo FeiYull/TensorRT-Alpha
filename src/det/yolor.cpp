@@ -84,10 +84,6 @@ void YoloR::discoverEngineIo()
             " but 5+num_class = " + std::to_string(5 + m_numClass) +
             " (check 'num_class' in INI)");
     }
-    if (outDims.d[0] < m_cfg.batchSize)
-    {
-        throw std::runtime_error("yolor: engine max batch < config batch_size");
-    }
 }
 
 void YoloR::allocateBuffers()
