@@ -29,10 +29,10 @@ struct RunOptions
     // ---- 渲染 ----
     bool show = false;
     bool save = false;
-    std::string saveDir = "save";
+    std::string saveDir;        //!< --save-dir <dir>（空 = 用 INI [output].save_dir）
 
     // ---- 池 ----
-    std::size_t workers = 1;    //!< 推理池 worker 数（默认 1）
+    int workers = -1;           //!< --workers <n>（<=0 = 用 INI [pool].workers）
 
     // ---- 全局 ----
     std::string root;           //!< --root <dir>
@@ -63,6 +63,8 @@ struct BenchOptions
     int batch = -1;                 //!< --batch <n>（-1 = 用 INI）
     int iters = 100;                //!< --iters <n>（测量次数）
     int warmup = 10;                //!< --warmup <n>（预热次数，不计入统计）
+    int srcW = 0;                   //!< --src <WxH> 的 W（0 = 用引擎输入尺寸）
+    int srcH = 0;                   //!< --src <WxH> 的 H（0 = 用引擎输入尺寸）
     std::string root;               //!< --root <dir>
 
     void validate() const;

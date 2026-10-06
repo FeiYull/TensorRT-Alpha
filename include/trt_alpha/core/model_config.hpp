@@ -26,6 +26,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 #include <memory>
 
@@ -57,6 +59,33 @@ struct ModelConfig
     //     —— 同时也会存"去掉 section 的短名"（"num_class"）
     // value = INI 原始字符串值
     std::unordered_map<std::string, std::string> extras;
+
+    //! 每个键（只记"长名"，如 "model.engine"）的【来源】+【出现顺序】。
+    //! source 取值："base.ini" / "<模型>.ini" / "CLI"。
+    //! 顺序 = base.ini 出现顺序，模型 ini 新增的键追加在后（重复键保持首次位置）。
+    //! 仅供配置展示（logConfigBox）使用，不参与任何逻辑判定。
+    std::vector<std::pair<std::string, std::string>> origins;
+
+    //! 写入 / 改写某个长名键的来源（CLI 覆盖配置时调用）。保持首次出现顺序。
+    void setOrigin(const std::string& fullKey, const std::string& source);
+
+    //! 查询某个长名键的来源；找不到返回 fallback。
+    [[nodiscard]] std::string originOf(const std::string& fullKey,
+                                       const std::string& fallback = "-") const;
+
+    //! 记录"被真正读取过"的键（短名 / 长名都可能，读到什么记什么）。
+    //!   * 由 getInt / getFloat / getString / getBool 自动登记；
+    //!   * loadModelConfig 对"直接走 IniParser"的那批键显式登记。
+    //! 用途：logConfigBox 借此标出"ini 里写了、本次路径却没读"的死键
+    //!（典型：键写错 section → 静默失效）。纯诊断，不参与任何逻辑判定。
+    //! 注意：读取发生在 init 阶段（每个模型单线程），之后只读，无需加锁。
+    mutable std::unordered_set<std::string> readKeys;
+
+    //! 登记一个键已被消费（短名 / 长名均可）。
+    void markRead(const std::string& key) const { readKeys.insert(key); }
+
+    //! 长名键是否被消费过：精确命中，或去掉 section 后的短名命中。
+    [[nodiscard]] bool wasRead(const std::string& fullKey) const;
 
     // ---- 运行时填 ----
     std::vector<ClassInfo> classNames;

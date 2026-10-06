@@ -8,7 +8,7 @@
 //    * buffer / views / validCount：原图（推理时输入的那批图）
 //    * detections / segmentations / classifications / keypoints：各任务结果
 //      （按模型类型填，未命中的任务字段保持空）
-//    * inferenceMs / submitTime：性能元信息
+//    * inferenceMs：本批端到端耗时（性能元信息）
 //
 //  生命周期：
 //    * buffer 是 shared_ptr（保证 views[i].data 有效）
@@ -24,7 +24,6 @@
 #include "trt_alpha/seg/types.hpp"
 #include "trt_alpha/kpt/types.hpp"
 
-#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -50,8 +49,9 @@ struct BatchResult
     std::vector<std::vector<kpt::KeypointResult>> keypoints;      //!< 每张图的姿态结果
 
     // ---- 性能元信息 ----
-    double inferenceMs = 0.0;                    //!< 本批推理耗时（ms）
-    std::chrono::steady_clock::time_point submitTime;   //!< 提交时间戳
+    //! 本批【端到端】耗时（ms）：setBatch → preprocess → infer → postprocess 全程。
+    //! 注意不是纯 GPU 推理时间 —— infer() 只负责入队，GPU 执行会被统计在此总时长内。
+    double inferenceMs = 0.0;
 
     //! 是否为空。
     [[nodiscard]] bool empty() const noexcept

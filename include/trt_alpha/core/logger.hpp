@@ -36,6 +36,8 @@
 #include <iostream>
 #include <mutex>
 #include <sstream>
+#include <string>
+#include <vector>
 
 // -----------------------------------------------------------------------------
 //  级别常量（数值越大越严重）
@@ -232,5 +234,12 @@ struct AllocInfo
 
 //! 打一个多行框图（原子输出，不撕裂）。
 void logAllocBox(const AllocInfo& info);
+
+//! 把若干"内容行"渲染成一个文本框图并原子输出到 stdout。
+//!   * 上下边框用 hLine（默认 '='，即"双横线"风格），左右边框 '|'
+//!   * 宽度按最长行自适应（不截断内容）
+//!   * 输出【不带】日志前缀，Release 构建下同样输出（INFO 语义）
+//! 用于 [CONFIG] 这类"要完整看到一屏"的展示块。
+void logBox(const std::vector<std::string>& lines, char hLine = '=');
 
 }  // namespace trt_alpha::core::detail

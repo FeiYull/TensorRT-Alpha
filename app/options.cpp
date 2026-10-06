@@ -41,6 +41,24 @@ int parseInt(const std::string& text, const std::string& flag)
     }
 }
 
+//! 解析 "WxH"（大小写 x / X 均可），非法抛异常。
+void parseSize(const std::string& text, const std::string& flag, int& w, int& h)
+{
+    const std::size_t sep = text.find_first_of("xX");
+    if (sep == std::string::npos || sep == 0 || sep + 1 >= text.size())
+    {
+        throw std::runtime_error("invalid size for " + flag +
+                                 ": '" + text + "' (expect WxH, e.g. 640x480)");
+    }
+    w = parseInt(text.substr(0, sep), flag);
+    h = parseInt(text.substr(sep + 1), flag);
+    if (w <= 0 || h <= 0)
+    {
+        throw std::runtime_error("invalid size for " + flag +
+                                 ": '" + text + "' (W/H must be > 0)");
+    }
+}
+
 }  // namespace
 
 // =============================================================================
@@ -81,7 +99,7 @@ void RunOptions::validate() const
         throw std::runtime_error("run: --batch must be > 0 (got " +
                                  std::to_string(batch) + ")");
     }
-    if (workers == 0)
+    if (workers == 0 || workers < -1)
     {
         throw std::runtime_error("run: --workers must be > 0");
     }
@@ -109,7 +127,7 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
         else if (a == "--net")      { opt.net = nextArg(args, i, a); }
         else if (a == "--batch")    { opt.batch = parseInt(nextArg(args, i, a), a); }
         else if (a == "--save-dir") { opt.saveDir = nextArg(args, i, a); }
-        else if (a == "--workers")  { opt.workers = static_cast<std::size_t>(parseInt(nextArg(args, i, a), a)); }
+        else if (a == "--workers")  { opt.workers = parseInt(nextArg(args, i, a), a); }
         else if (a == "--root")     { opt.root = nextArg(args, i, a); }
         else if (a == "--save")     { opt.save = true; }
         else if (a == "--show")     { opt.show = true; }
@@ -170,6 +188,7 @@ BenchOptions parseBenchOptions(const std::vector<std::string>& args)
         else if (a == "--batch")  { opt.batch = parseInt(nextArg(args, i, a), a); }
         else if (a == "--iters")  { opt.iters = parseInt(nextArg(args, i, a), a); }
         else if (a == "--warmup") { opt.warmup = parseInt(nextArg(args, i, a), a); }
+        else if (a == "--src")    { parseSize(nextArg(args, i, a), a, opt.srcW, opt.srcH); }
         else if (a == "--root")   { opt.root = nextArg(args, i, a); }
         else
         {

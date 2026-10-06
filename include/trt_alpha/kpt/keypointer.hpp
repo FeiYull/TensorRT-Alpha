@@ -30,6 +30,8 @@ public:
         m_keypoints.clear();
     }
 
+    [[nodiscard]] const core::ModelConfig& config() const noexcept override { return m_cfg; }
+
 protected:
     //! 从 cfg 读通用参数（一次实现，所有姿态模型共用）。
     void loadCommonConfig(const core::ModelConfig& cfg)

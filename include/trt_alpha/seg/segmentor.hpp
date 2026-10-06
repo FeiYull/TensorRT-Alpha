@@ -30,6 +30,8 @@ public:
         m_segmentations.clear();
     }
 
+    [[nodiscard]] const core::ModelConfig& config() const noexcept override { return m_cfg; }
+
 protected:
     //! 从 cfg 读通用参数（一次实现，所有分割模型共用）。
     //! 派生类的 loadConfig() 里调一次，然后读自己的特有字段。

@@ -127,7 +127,12 @@ IniParser IniParser::parseString(const std::string& content)
             throw std::runtime_error("INI syntax error at line " +
                                      std::to_string(lineNo) + ": empty key");
         }
-        ini.m_kv[makeKey(currentSection, key)] = value;
+        const std::string fullKey = makeKey(currentSection, key);
+        // insert_or_assign：一次哈希查找完成"插入或覆盖"；
+        // inserted == true 说明是首次出现，才记顺序（重复键保留原位置，值取最后一次）。
+        const auto [it, inserted] = ini.m_kv.insert_or_assign(fullKey, value);
+        (void)it;
+        if (inserted) { ini.m_order.push_back(fullKey); }
     }
     return ini;
 }

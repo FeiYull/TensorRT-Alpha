@@ -68,6 +68,10 @@ public:
     //! 引擎 I/O 张量描述（调试用）。
     [[nodiscard]] virtual const std::vector<core::TensorDesc>& describe() const noexcept = 0;
 
+    //! init() 之后【实际生效】的配置（引擎解析后的 batch / dstH / dstW 等）。
+    //! 与传入 init() 的 cfg 可能不同：静态形状会被纠正为引擎声明值。
+    [[nodiscard]] virtual const core::ModelConfig& config() const noexcept = 0;
+
 protected:
     IModel() = default;
 };

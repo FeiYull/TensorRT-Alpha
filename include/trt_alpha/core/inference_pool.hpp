@@ -97,6 +97,17 @@ public:
     //! 数据源攒批必须用它，才能与模型 / 引擎一致。
     [[nodiscard]] int resolvedBatch() const noexcept { return m_resolvedBatch; }
 
+    //! 第一个 worker 的引擎 I/O 张量描述（构造期已 init，之后只读）。
+    //! 供配置展示（logConfigBox 的 [resolved] 段）使用。
+    //! 返回的是内部【副本】，外部不会持有指向 worker 模型的引用。
+    [[nodiscard]] const std::vector<TensorDesc>& ioDesc() const noexcept { return m_ioDesc; }
+
+    //! 模型实际使用的配置（= 传给 init 的 workerCfg，已按引擎能力修正 batch）。
+    //! 注意是"喂给模型的那份"而非调用方传进来的那份：
+    //! 模型 init 时的 getXxx 读取会在它身上留下 readKeys 痕迹，
+    //! 因此 logConfigBox 必须用它才能正确判定哪些键真生效。
+    [[nodiscard]] const ModelConfig& modelConfig() const noexcept { return m_cfg; }
+
 private:
     struct Worker
     {
@@ -107,10 +118,11 @@ private:
     void workerLoop(std::size_t workerIndex);
     BatchResult runBatch(std::size_t workerIndex, Batch batch);
 
-    ModelConfig m_cfg;
+    ModelConfig m_cfg;               //!< 模型实际使用的配置（引擎修正后）
     Factory m_factory;
     std::size_t m_maxQueueSize;
     int m_resolvedBatch = 1;         //!< 引擎实际能力修正后的 batch
+    std::vector<TensorDesc> m_ioDesc;    //!< worker[0] 的 I/O 描述（构造期快照）
     std::vector<Worker> m_workers;
 
     std::queue<std::pair<Batch, std::promise<BatchResult>>> m_tasks;

@@ -147,6 +147,21 @@ void OpenCVSource::requestStop()
 void OpenCVSource::copyIntoBatch(core::Batch& batch, int index, const cv::Mat& img)
 {
     const core::BufferView& v = batch.views[static_cast<std::size_t>(index)];
+
+    // 批内尺寸必须一致：批 buffer 与 view 的 stride/height 都按【本批首帧】定死，
+    // 混入不同分辨率的帧会写到槽位外（越界），且后处理几何全错。
+    // 分辨率一致性是数据源提供方的责任，这里只做守卫：不一致立即终止，绝不静默带病推理。
+    if (img.cols != v.width || img.rows != v.height)
+    {
+        throw std::runtime_error(
+            "OpenCVSource: frame " + std::to_string(index) +
+            " is " + std::to_string(img.cols) + "x" + std::to_string(img.rows) +
+            " but this batch is " + std::to_string(v.width) + "x" +
+            std::to_string(v.height) + " (from frame 0); "
+            "frames within one batch must share the same resolution - "
+            "fix the source (image dir / stream) instead of mixing sizes");
+    }
+
     const std::size_t oneFrame =
         static_cast<std::size_t>(v.stride) * static_cast<std::size_t>(v.height);
     std::uint8_t* dst = batch.buffer->mutableData() +

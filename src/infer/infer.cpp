@@ -218,11 +218,9 @@ struct Infer::Impl
     std::shared_ptr<core::InferencePool> pool;
     renderer::OpenCVRenderer renderer;
 
-    void print_config() const;
     core::ModelConfig merge_config() const;
     void ensure_pool();
 };
-
 core::ModelConfig Infer::Impl::merge_config() const
 {
     core::ModelConfig cfg = core::loadModelConfig(params.config_path);
@@ -251,31 +249,6 @@ core::ModelConfig Infer::Impl::merge_config() const
 
     cfg.classNames = core::loadClassNamesFile(cfg.classNamesFile);
     return cfg;
-}
-
-void Infer::Impl::print_config() const
-{
-    TRT_LOG_INFO("Infer: final config");
-    TRT_LOG_INFO("  model_type         = " << registry_name(params.model_type));
-    TRT_LOG_INFO("  config_path        = " << params.config_path);
-    TRT_LOG_INFO("  engine             = " << final_cfg.engine
-                 << (params.engine.empty() ? "" : "  (override)"));
-    TRT_LOG_INFO("  class_names_file   = " << final_cfg.classNamesFile
-                 << (params.class_names_file.empty() ? "" : "  (override)"));
-    TRT_LOG_INFO("  batch_size         = " << final_cfg.batchSize
-                 << (params.batch_size > 0 ? "  (override)" : ""));
-    TRT_LOG_INFO("  dst_h / dst_w      = " << final_cfg.dstH << " / " << final_cfg.dstW
-                 << ((params.dst_h > 0 || params.dst_w > 0) ? "  (override)" : ""));
-    TRT_LOG_INFO("  conf_thresh        = " << final_cfg.getFloat("conf_thresh", 0.f)
-                 << (params.conf_thresh >= 0.f ? "  (override)" : ""));
-    TRT_LOG_INFO("  iou_thresh         = " << final_cfg.getFloat("iou_thresh", 0.f)
-                 << (params.iou_thresh >= 0.f ? "  (override)" : ""));
-    TRT_LOG_INFO("  top_k              = " << final_cfg.getInt("top_k", 0)
-                 << (params.top_k > 0 ? "  (override)" : ""));
-    TRT_LOG_INFO("  source             = "
-                 << (params.source.empty() ? "(camera)" : params.source));
-    TRT_LOG_INFO("  camera_id          = " << params.camera_id);
-    TRT_LOG_INFO("  save / show        = " << params.save << " / " << params.show);
 }
 
 void Infer::Impl::ensure_pool()
@@ -311,6 +284,13 @@ void Infer::Impl::ensure_pool()
                      << final_cfg.batchSize << " -> " << pool->resolvedBatch());
     }
     TRT_LOG_INFO("Infer: effective batch = " << pool->resolvedBatch());
+
+    // 本次实际生效的配置（与 CLI run 命令同一套展示口径）。
+    // 放在池建好之后：此时模型已 init（引擎真相可得），且
+    // 模型 init 期间的读取痕迹都落在 pool->modelConfig() 上，
+    // 因此 ini 里的死键能被正确标成 [unused]。
+    core::logConfigBox(pool->modelConfig(), net, params.config_path,
+                       &pool->ioDesc(), pool->resolvedBatch());
 }
 
 // =============================================================================
@@ -322,8 +302,8 @@ Infer::Infer(const InferParams& p)
     p.validate();
     m_impl->params = p;
     m_impl->final_cfg = m_impl->merge_config();
-    m_impl->print_config();
-    // 懒建 pool（首次 run/async 时建）
+    // 配置展示推迟到 ensure_pool()（首次 run/async）：那时才有引擎真相，
+    // 且模型 init 的"读取痕迹"才完整 —— 目的是只打一次、且打的是真生效的口径。
 }
 
 Infer::~Infer() = default;

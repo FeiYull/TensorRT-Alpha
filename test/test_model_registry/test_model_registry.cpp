@@ -54,6 +54,11 @@ public:
         static const std::vector<trt_alpha::core::TensorDesc> kEmpty;
         return kEmpty;
     }
+
+    const trt_alpha::core::ModelConfig& config() const noexcept override { return m_cfg; }
+
+private:
+    trt_alpha::core::ModelConfig m_cfg;
 };
 
 //! 另一个 FakeModel 子类，用于静态注册测试。
@@ -77,6 +82,11 @@ public:
         static const std::vector<trt_alpha::core::TensorDesc> kEmpty;
         return kEmpty;
     }
+
+    const trt_alpha::core::ModelConfig& config() const noexcept override { return m_cfg; }
+
+private:
+    trt_alpha::core::ModelConfig m_cfg;
 };
 
 }  // namespace

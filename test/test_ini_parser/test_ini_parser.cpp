@@ -117,6 +117,24 @@ int main()
         check(threw, "[5] bad int throws");
     }
 
+    // [6] 键顺序（保序：与文件出现顺序一致；重复键保持首次位置，值取最后一次）
+    {
+        IniParser ini = IniParser::parseString(
+            "[model]\n"
+            "z_first = 1\n"
+            "a_second = 2\n"
+            "z_first = 99\n"        // 同一节内重复：位置不变，值取最后一次
+            "[input]\n"
+            "m_third = 3\n");
+
+        const auto& ks = ini.keys();
+        check(ks.size() == 3, "[6] keys size == 3 (dup not duplicated)");
+        check(ks.size() == 3 && ks[0] == "model.z_first",  "[6] order[0] == model.z_first");
+        check(ks.size() == 3 && ks[1] == "model.a_second", "[6] order[1] == model.a_second");
+        check(ks.size() == 3 && ks[2] == "input.m_third",  "[6] order[2] == input.m_third");
+        check(ini.getInt("model.z_first", 0) == 99, "[6] dup key keeps last value");
+    }
+
     std::cout << "=======================\n";
     if (g_failures == 0) { std::cout << "ALL PASS\n"; return 0; }
     std::cout << g_failures << " FAILED\n";

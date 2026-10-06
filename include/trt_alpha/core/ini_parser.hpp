@@ -69,9 +69,18 @@ public:
         return m_kv;
     }
 
+    //! 全部 key 的【文件出现顺序】（首次出现；重复键只记一次）。
+    //! 用于按 ini 原样展示配置（unordered_map 本身无序）。
+    [[nodiscard]] const std::vector<std::string>& keys() const noexcept
+    {
+        return m_order;
+    }
+
 private:
     //! 内部 key 格式："section.key" 或 "key"（无节）
     std::unordered_map<std::string, std::string> m_kv;
+    //! m_kv 中 key 的首次出现顺序（与 m_kv 严格同步：只增不改）。
+    std::vector<std::string> m_order;
 
     static std::string makeKey(const std::string& section, const std::string& key);
 };

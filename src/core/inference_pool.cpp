@@ -91,6 +91,19 @@ InferencePool::InferencePool(const ModelConfig& cfg,
             m_workers.push_back(std::move(worker));
         }
 
+        // ---- 阶段 1.5：快照 worker[0] 的 I/O 描述 ----
+        // 此时模型已 init（形状/类型固定），线程尚未启动；
+        // 存副本而非引用，避免外部在 shutdown 后拿到悬垂引用。
+        if (!m_workers.empty())
+        {
+            m_ioDesc = m_workers.front().model->describe();
+        }
+
+        // 记下"最终喂给模型的那份配置"（batch 已修正、读取痕迹已产生）。
+        // 模型 init 期间对 getXxx 的读取会在 workerCfg.readKeys 上留痕，
+        // 所以必须在 init 之后再拷 —— 配置展示（logConfigBox）靠它判定谁真生效。
+        m_cfg = workerCfg;
+
         // ---- 阶段 2：全部就位后，再启动线程 ----
         for (std::size_t i = 0; i < workers; ++i)
         {

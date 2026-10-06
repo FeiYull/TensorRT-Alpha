@@ -4,6 +4,7 @@
 #include "trt_alpha/core/logger.hpp"
 
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -144,6 +145,29 @@ void logAllocBox(const AllocInfo& info)
 #else
     (void)info;   // Release / MinSizeRel: 不编译，零开销
 #endif
+}
+
+void logBox(const std::vector<std::string>& lines, char hLine)
+{
+    // 宽度 = 最长内容行 + 左右各一个空格；至少 24，避免退化成一个窄条。
+    std::size_t inner = 24;
+    for (const auto& l : lines)
+    {
+        inner = std::max(inner, l.size());
+    }
+
+    const std::string rule = "+" + std::string(inner + 2, hLine) + "+\n";
+
+    std::ostringstream oss;
+    oss << rule;
+    for (const auto& l : lines)
+    {
+        oss << "| " << l << std::string(inner - l.size(), ' ') << " |\n";
+    }
+    oss << rule;
+
+    std::lock_guard<std::mutex> lk(logMutex());
+    std::cout << oss.str();
 }
 
 }  // namespace trt_alpha::core::detail

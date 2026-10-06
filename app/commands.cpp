@@ -87,9 +87,9 @@ void printUsage()
         "  --config <ini>    model INI (default: configs/<net>.ini)\n"
         "  --engine <trt>    override INI's engine path\n"
         "  --batch <n>       override INI's batch_size\n"
-        "  --workers <n>     inference pool workers (default: 1)\n"
+        "  --workers <n>     inference pool workers (default: INI [pool].workers)\n"
         "  --save            save result images\n"
-        "  --save-dir <dir>  output dir (default: save)\n"
+        "  --save-dir <dir>  output dir (default: INI [output].save_dir)\n"
         "  --show            show result window\n"
         "  --root <dir>      override project root\n"
         "\n"
@@ -100,6 +100,7 @@ void printUsage()
         "  --batch <n>       override INI's batch_size\n"
         "  --iters <n>       bench iterations (default: 100)\n"
         "  --warmup <n>      warmup iterations (default: 10)\n"
+        "  --src <WxH>       source frame size (default: engine input size)\n"
         "  --root <dir>      override project root\n"
         "\n"
         "Examples:\n"
@@ -138,10 +139,56 @@ int runCommand(const std::vector<std::string>& args)
     const std::string iniPath = opt.resolveConfigPath();
     trt_alpha::core::ModelConfig modelCfg = trt_alpha::core::loadModelConfig(iniPath);
 
-    if (!opt.engine.empty()) { modelCfg.engine = opt.engine; }
-    if (opt.batch > 0)       { modelCfg.batchSize = opt.batch; }
+    // CLI 覆盖：值 / 来源 / 消费痕迹三者一起改。
+    // 只改字段不改 extras 的话，框里会显示"ini 的旧值 + CLI 的来源"，自相矛盾。
+    if (!opt.engine.empty())
+    {
+        modelCfg.engine = opt.engine;
+        modelCfg.extras["model.engine"] = opt.engine;
+        modelCfg.setOrigin("model.engine", "CLI");
+    }
+    if (opt.batch > 0)
+    {
+        modelCfg.batchSize = opt.batch;
+        modelCfg.extras["input.batch_size"] = std::to_string(opt.batch);
+        modelCfg.setOrigin("input.batch_size", "CLI");
+    }
 
     modelCfg.classNames = trt_alpha::core::loadClassNamesFile(modelCfg.classNamesFile);
+
+    // ---- 池 / 输出参数：CLI 优先，否则取 INI（取过就自动登记为"已消费"）----
+    // workers：0 = 交给 InferencePool 自动（hardware_concurrency，上限 8）
+    std::size_t workers = 0;
+    if (opt.workers > 0)
+    {
+        workers = static_cast<std::size_t>(opt.workers);
+        modelCfg.extras["pool.workers"] = std::to_string(opt.workers);
+        modelCfg.setOrigin("pool.workers", "CLI");
+        modelCfg.markRead("pool.workers");
+    }
+    else
+    {
+        const int w = modelCfg.getInt("pool.workers", 1);
+        workers = (w > 0) ? static_cast<std::size_t>(w) : std::size_t{0};
+    }
+
+    // 队列无上限会吃光内存（相机源尤其危险）：<=0 一律退回框架默认值
+    const int qTask   = modelCfg.getInt("pool.max_queue_size", 16);
+    const int qResult = modelCfg.getInt("pool.result_queue_size", 32);
+
+    // 存盘目录：空 = 用 INI；窗口名只有 --show 时才真正用到，但读一下即可见
+    std::string saveDir = opt.saveDir;
+    if (saveDir.empty())
+    {
+        saveDir = modelCfg.getString("output.save_dir", "save");
+    }
+    else
+    {
+        modelCfg.extras["output.save_dir"] = saveDir;
+        modelCfg.setOrigin("output.save_dir", "CLI");
+        modelCfg.markRead("output.save_dir");
+    }
+    const std::string showWindow = modelCfg.getString("output.show_window", "trt_alpha");
 
     // 推理池
     trt_alpha::core::InferencePool pool(
@@ -149,7 +196,16 @@ int runCommand(const std::vector<std::string>& args)
         [name = opt.net]() -> std::unique_ptr<trt_alpha::IModel> {
             return trt_alpha::ModelRegistry::instance().create(name);
         },
-        opt.workers);
+        workers,
+        (qTask > 0) ? static_cast<std::size_t>(qTask) : std::size_t{16});
+
+    // 打印本次实际生效的配置（含引擎真相）。
+    // 放在这里：模型已 init、还没开始推帧 —— 只要模型加载成功就能看到，
+    // 不依赖是否真的跑出第一帧（摄像头打不开时也能看到配置）。
+    // 用 pool.modelConfig()：模型 init 时的读取痕迹留在那一份上，
+    // 用它才能正确标出 ini 里的死键（[unused]）。
+    trt_alpha::core::logConfigBox(pool.modelConfig(), opt.net, iniPath,
+                                  &pool.ioDesc(), pool.resolvedBatch());
 
     // 数据源
     trt_alpha::datasource::SourceConfig srcCfg;
@@ -194,9 +250,11 @@ int runCommand(const std::vector<std::string>& args)
     pcfg.pools = { &pool };
     pcfg.renderer = &renderer;
     pcfg.classNames = modelCfg.classNames;
+    pcfg.resultQueueSize = (qResult > 0) ? static_cast<std::size_t>(qResult) : std::size_t{32};
     pcfg.saveEnabled = opt.save;
-    pcfg.saveDir = opt.saveDir;
+    pcfg.saveDir = saveDir;
     pcfg.showEnabled = opt.show;
+    pcfg.showWindow = showWindow;
 
     trt_alpha::pipeline::Pipeline p(std::move(pcfg));
     p.start();
@@ -228,10 +286,19 @@ int benchCommand(const std::vector<std::string>& args)
     auto model = trt_alpha::ModelRegistry::instance().create(opt.net);
     model->init(cfg);
 
-    // 固定输入
-    const int W = cfg.dstW;
-    const int H = cfg.dstH;
-    const int B = cfg.batchSize;
+    // 固定输入：batch / H / W 一律取【模型实际生效的配置】
+    //   - 传入的 cfg 是 const 引用，init 无法回写；引擎解析结果落在 model->config() 里。
+    //   - H/W 默认 = 引擎声明的输入尺寸（与真实推理完全一致）。
+    //   - 显式 --src WxH 时用该源帧尺寸，让 letterbox 也参与计时（更接近相机帧）。
+    const trt_alpha::core::ModelConfig& rc = model->config();
+    const int B = rc.batchSize;
+    const int W = (opt.srcW > 0) ? opt.srcW : rc.dstW;
+    const int H = (opt.srcH > 0) ? opt.srcH : rc.dstH;
+    if (W <= 0 || H <= 0)
+    {
+        throw std::runtime_error("bench: cannot determine input size (engine has dynamic "
+                                 "H/W and no --src given); pass --src WxH");
+    }
     trt_alpha::core::Batch batch = makeBenchBatch(B, W, H);
 
     const auto now = [] { return std::chrono::steady_clock::now(); };
@@ -293,9 +360,11 @@ int benchCommand(const std::vector<std::string>& args)
     std::cout << "=== bench: " << opt.net << " ===\n";
     std::cout << "engine  : " << cfg.engine << "\n";
     std::cout << "batch   : " << B << "\n";
+    std::cout << "input   : " << W << "x" << H
+              << (opt.srcW > 0 ? " (--src)" : " (engine)") << "\n";
     std::cout << "iters   : " << opt.iters << " (warmup " << opt.warmup << ")\n";
     std::cout << "\n";
-    std::cout << "Latency (ms):\n";
+    std::cout << "Latency (ms, per batch of " << B << "):\n";
     std::cout << "  mean : " << mean << "\n";
     std::cout << "  p50  : " << pct(0.50) << "\n";
     std::cout << "  p90  : " << pct(0.90) << "\n";
@@ -304,7 +373,10 @@ int benchCommand(const std::vector<std::string>& args)
     std::cout << "  max  : " << lat.back() << "\n";
     std::cout << "\n";
     std::cout << "Throughput:\n";
-    std::cout << "  FPS  : " << (1000.0 / mean) << "\n";
+    // 吞吐按【每批耗时】换算成【每秒张数】：一批 B 张，一次迭代平均 mean 毫秒。
+    // （原先漏乘 B，batch>1 时会被低估 B 倍。）
+    std::cout << "  FPS  : " << (static_cast<double>(B) * 1000.0 / mean)
+              << "  (images/s)\n";
     std::cout << "\n";
     std::cout << "Per-step (mean, ms):\n";
     std::cout << "  setBatch    : " << (sumSetBatch / static_cast<double>(n)) << "\n";

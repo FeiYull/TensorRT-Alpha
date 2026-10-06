@@ -84,3 +84,4 @@ build/
 *.log
 *.txt
 *logs/
+*z_demo_dead_key.ini

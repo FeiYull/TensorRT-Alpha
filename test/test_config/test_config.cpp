@@ -8,6 +8,8 @@
 //    [4] TXT 格式错误抛异常（少字段 / RGB 越界）
 //    [5] 空 TXT / 只有注释 → 返回空 vector
 //    [6] input.layout：缺省为空 / 合法解析（含 5D） / 非法报错
+//    [7] origins：每个键的来源 + 保序
+//    [8] readKeys：区分"被读到的键"与死键（供 logConfigBox 标 [unused]）
 //
 //  临时文件用绝对路径（Paths::resolve 对绝对路径原样返回，不走工程根）
 // =============================================================================
@@ -336,6 +338,118 @@ int main()
         catch (const std::runtime_error&) { threw = true; }
         check(threw, "[6c] invalid input.layout -> throws");
         removeTempFile(p2);
+    }
+
+    // ---------------------------------------------------------------
+    // [7] origins：每个键的来源 + 保序（供 logConfigBox 展示用）
+    // ---------------------------------------------------------------
+    {
+        const auto indexOf = [](const ModelConfig& c, const std::string& k) {
+            for (std::size_t i = 0; i < c.origins.size(); ++i)
+            {
+                if (c.origins[i].first == k) { return static_cast<int>(i); }
+            }
+            return -1;
+        };
+
+        const std::string ini =
+            "[model]\n"
+            "engine = a.trt\n"
+            "class_names_file = data/classes/coco80.txt\n"
+            "input_output_names = images,output0\n"
+            "\n"
+            "[normalize]\n"
+            "scale = 2.0\n";          // 覆盖 base.ini 的同名键
+
+        const fs::path p = writeTempFile("test_origins.ini", ini);
+        try
+        {
+            ModelConfig cfg = loadModelConfig(p.string());
+
+            check(cfg.originOf("model.engine") == "test_origins.ini",
+                  "[7a] model.engine -> 模型 ini");
+            check(cfg.originOf("normalize.scale") == "test_origins.ini",
+                  "[7b] 被模型 ini 覆盖的键 -> 模型 ini");
+            check(cfg.originOf("input.batch_size") == "base.ini",
+                  "[7c] input.batch_size -> base.ini");
+            check(cfg.originOf("postprocess.conf_thresh") == "base.ini",
+                  "[7d] postprocess.conf_thresh -> base.ini");
+            check(cfg.originOf("no.such.key") == "-",
+                  "[7e] 未知键 -> fallback");
+
+            const int posEngine = indexOf(cfg, "model.engine");
+            const int posBatch  = indexOf(cfg, "input.batch_size");
+            check(posEngine >= 0 && posBatch >= 0 && posEngine > posBatch,
+                  "[7f] 模型 ini 新增的键排在 base 的键之后（保序）");
+
+            // setOrigin：已存在的键就地改写来源，位置不变
+            cfg.setOrigin("model.engine", "CLI");
+            check(cfg.originOf("model.engine") == "CLI", "[7g] setOrigin 改写来源");
+            check(indexOf(cfg, "model.engine") == posEngine,
+                  "[7h] setOrigin 不改变出现位置");
+
+            // 首尾键都在（short 名不应混进 origins）
+            check(indexOf(cfg, "batch_size") < 0,
+                  "[7i] origins 只记长名（无 section 的短名不入表）");
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "[FAIL] [7] threw: " << e.what() << "\n";
+            ++g_failures;
+        }
+        removeTempFile(p);
+    }
+
+    // ---------------------------------------------------------------
+    // [8] readKeys：区分"被真正读到的键"与"ini 里的死键"（logConfigBox 标 [unused] 的依据）
+    // ---------------------------------------------------------------
+    {
+        const std::string ini =
+            "[model]\n"
+            "engine = a.trt\n"
+            "class_names_file = data/classes/coco80.txt\n"
+            "input_output_names = images,output0\n"
+            "num_class = 80\n"
+            "batch_size = 8\n"          // 放错节：框架读的是 input.batch_size → 本键是死键
+            "\n"
+            "[postprocess]\n"
+            "conf_thresh = 0.25\n";
+
+        const fs::path p = writeTempFile("test_readkeys.ini", ini);
+        try
+        {
+            ModelConfig cfg = loadModelConfig(p.string());
+
+            // loadModelConfig 直接消费的键
+            check(cfg.wasRead("model.engine"),          "[8a] model.engine read");
+            check(cfg.wasRead("input.batch_size"),      "[8a] input.batch_size read");
+            check(cfg.wasRead("model.num_class") == false,
+                  "[8b] model.num_class NOT read yet (模型还没 init)");
+
+            // 放错节的键：没有任何消费者 → 会被标 [unused]
+            check(cfg.wasRead("model.batch_size") == false,
+                  "[8c] 放错节的 batch_size -> NOT read（会标 [unused]）");
+
+            // 短名唯一入口：getXxx 一读，长名即可命中
+            (void)cfg.getFloat("conf_thresh", 0.f);
+            check(cfg.wasRead("postprocess.conf_thresh"),
+                  "[8d] 短名 conf_thresh -> 长名 postprocess.conf_thresh 命中");
+
+            (void)cfg.getInt("num_class", 0);
+            check(cfg.wasRead("model.num_class"),
+                  "[8e] 短名 num_class -> 长名 model.num_class 命中");
+
+            // 拷贝不丢痕迹（pool 内部会拷一份 workerCfg，LogConfigBox 用的就是那份）
+            const ModelConfig copy = cfg;
+            check(copy.wasRead("model.engine") && copy.wasRead("model.num_class"),
+                  "[8f] 拷贝后 readKeys 保留");
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "[FAIL] [8] threw: " << e.what() << "\n";
+            ++g_failures;
+        }
+        removeTempFile(p);
     }
 
     std::cout << "====================\n";
