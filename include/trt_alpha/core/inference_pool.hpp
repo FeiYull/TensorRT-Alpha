@@ -93,7 +93,7 @@ public:
     [[nodiscard]] std::size_t size() const noexcept { return m_workers.size(); }
     [[nodiscard]] std::size_t pending() const;
 
-    //! 依据引擎实际能力修正后的输入 batch（静态=固定值；动态=clamp 到 [min,max]）。
+    //! 依据引擎实际能力修正后的输入 batch（静态=固定值；动态须在 [min,max] 内，越界已在构造期抛出）。
     //! 数据源攒批必须用它，才能与模型 / 引擎一致。
     [[nodiscard]] int resolvedBatch() const noexcept { return m_resolvedBatch; }
 

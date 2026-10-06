@@ -348,14 +348,12 @@ void logConfigBox(const ModelConfig& cfg,
     {
         Block b;
         b.header = "[resolved]   engine truth (shape = engine declaration; -1 = dynamic axis)";
+        // 能走到这里说明 batch 已通过 resolveBatch 校验（不符在池构造期就抛了），
+        // 因此它既不是"被引擎纠正"，也不可能与请求值不同 —— 就是引擎确认的值。
         if (resolvedBatch > 0)
         {
-            const int iniBatch = cfg.getInt("input.batch_size", 0);
-            const std::string note =
-                (iniBatch > 0 && iniBatch != resolvedBatch)
-                    ? "(ini " + std::to_string(iniBatch) + ", corrected by engine)"
-                    : "(engine-confirmed)";
-            b.rows.push_back({ "batch", std::to_string(resolvedBatch), note, "" });
+            b.rows.push_back({ "batch", std::to_string(resolvedBatch),
+                               "(engine-confirmed)", "" });
         }
         for (const auto& t : *io)
         {
@@ -410,7 +408,8 @@ void logConfigBox(const ModelConfig& cfg,
     if (hasUnused)
     {
         lines.emplace_back();
-        lines.push_back("  [unused] = 该键写在 ini 里，但本次路径没有任何消费者（写了不生效）");
+        lines.push_back("  [unused] = key is written in the ini but never consumed "
+                        "on this path (no effect)");
     }
 
     // ---- 6. 标题行：左 = [CONFIG] <net>，右 = ini 路径 ----

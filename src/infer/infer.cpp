@@ -293,12 +293,8 @@ void Infer::Impl::ensure_pool()
         workers,
         max_q);
 
-    // 池已按引擎实际能力修正 batch（静态固定 / 动态钳制）
-    if (pool->resolvedBatch() != final_cfg.batchSize)
-    {
-        TRT_LOG_INFO("Infer: batch corrected by engine: config "
-                     << final_cfg.batchSize << " -> " << pool->resolvedBatch());
-    }
+    // 能走到这里说明 batch 已通过引擎 profile 校验（不符在池构造期就抛了），
+    // 所以它必然等于请求值 —— 不再需要"被纠正"提示。
     TRT_LOG_INFO("Infer: effective batch = " << pool->resolvedBatch());
 
     // 本次实际生效的配置（与 CLI run 命令同一套展示口径）。

@@ -59,18 +59,20 @@ InferencePool::InferencePool(const ModelConfig& cfg,
         core::ModelConfig workerCfg = cfg;
         workerCfg.sharedEngine = sharedEngine;
 
-        // ---- 阶段 0.5：依据引擎实际能力解析输入 batch ----
-        // 静态引擎 → 固定值；动态引擎 → clamp 到 [min, max]。
-        // 可选：配置声明的 max_batch_size 作为上界契约参与校验。
-        // 修正后写回 workerCfg，保证模型 / 引擎 / 数据源三者 batch 一致。
+        // ---- 阶段 0.5：池级 batch 预检 ----
+        // 与模型侧的 core::applyInputShape 调的是同一个 resolveBatch（逻辑零重复，
+        // 报错措辞也完全一致），这里先跑一遍只为两件事：
+        //   ① 失败点提前到"还没为 N 个 worker 分配显存之前"；
+        //   ② 拿到 m_resolvedBatch 供数据源攒批（数据源必须与模型 batch 一致）。
+        // 另：模型侧的 applyInputShape 覆盖 13 个模型，yunet 因输入尺寸取自原图不走它
+        // （自带一行，见 yunet.cpp）；本预检与 applyInputShape 一起构成完整覆盖。
+        // resolveBatch 只判定、不改值 —— 不符即抛，因此 m_resolvedBatch 恒等于请求值。
         for (const auto& t : sharedEngine->ioTensors())
         {
             if (!t.isInput) { continue; }
-            const core::ResolvedBatch rb =
-                core::resolveBatch(t, workerCfg.batchSize, "[InferencePool]",
-                                   workerCfg.maxBatchSize);
-            workerCfg.batchSize = rb.batch;
-            m_resolvedBatch = rb.batch;
+            m_resolvedBatch = core::resolveBatch(t, workerCfg.batchSize,
+                                                 "[InferencePool]",
+                                                 workerCfg.maxBatchSize).batch;
             break;
         }
 

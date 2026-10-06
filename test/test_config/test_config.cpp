@@ -367,30 +367,30 @@ int main()
             ModelConfig cfg = loadModelConfig(p.string());
 
             check(cfg.originOf("model.engine") == "test_origins.ini",
-                  "[7a] model.engine -> 模型 ini");
+                  "[7a] model.engine -> model ini");
             check(cfg.originOf("normalize.scale") == "test_origins.ini",
-                  "[7b] 被模型 ini 覆盖的键 -> 模型 ini");
+                  "[7b] key overridden by model ini -> model ini");
             check(cfg.originOf("input.batch_size") == "base.ini",
                   "[7c] input.batch_size -> base.ini");
             check(cfg.originOf("postprocess.conf_thresh") == "base.ini",
                   "[7d] postprocess.conf_thresh -> base.ini");
             check(cfg.originOf("no.such.key") == "-",
-                  "[7e] 未知键 -> fallback");
+                  "[7e] unknown key -> fallback");
 
             const int posEngine = indexOf(cfg, "model.engine");
             const int posBatch  = indexOf(cfg, "input.batch_size");
             check(posEngine >= 0 && posBatch >= 0 && posEngine > posBatch,
-                  "[7f] 模型 ini 新增的键排在 base 的键之后（保序）");
+                  "[7f] keys added by model ini come after base keys (order preserved)");
 
             // setOrigin：已存在的键就地改写来源，位置不变
             cfg.setOrigin("model.engine", "CLI");
-            check(cfg.originOf("model.engine") == "CLI", "[7g] setOrigin 改写来源");
+            check(cfg.originOf("model.engine") == "CLI", "[7g] setOrigin rewrites the origin");
             check(indexOf(cfg, "model.engine") == posEngine,
-                  "[7h] setOrigin 不改变出现位置");
+                  "[7h] setOrigin keeps the appearance position");
 
             // 首尾键都在（short 名不应混进 origins）
             check(indexOf(cfg, "batch_size") < 0,
-                  "[7i] origins 只记长名（无 section 的短名不入表）");
+                  "[7i] origins records long names only (bare short names excluded)");
         }
         catch (const std::exception& e)
         {
@@ -424,25 +424,25 @@ int main()
             check(cfg.wasRead("model.engine"),          "[8a] model.engine read");
             check(cfg.wasRead("input.batch_size"),      "[8a] input.batch_size read");
             check(cfg.wasRead("model.num_class") == false,
-                  "[8b] model.num_class NOT read yet (模型还没 init)");
+                  "[8b] model.num_class NOT read yet (model not inited)");
 
             // 放错节的键：没有任何消费者 → 会被标 [unused]
             check(cfg.wasRead("model.batch_size") == false,
-                  "[8c] 放错节的 batch_size -> NOT read（会标 [unused]）");
+                  "[8c] misplaced-section batch_size -> NOT read (would be flagged [unused])");
 
             // 短名唯一入口：getXxx 一读，长名即可命中
             (void)cfg.getFloat("conf_thresh", 0.f);
             check(cfg.wasRead("postprocess.conf_thresh"),
-                  "[8d] 短名 conf_thresh -> 长名 postprocess.conf_thresh 命中");
+                  "[8d] short conf_thresh -> long postprocess.conf_thresh matched");
 
             (void)cfg.getInt("num_class", 0);
             check(cfg.wasRead("model.num_class"),
-                  "[8e] 短名 num_class -> 长名 model.num_class 命中");
+                  "[8e] short num_class -> long model.num_class matched");
 
             // 拷贝不丢痕迹（pool 内部会拷一份 workerCfg，LogConfigBox 用的就是那份）
             const ModelConfig copy = cfg;
             check(copy.wasRead("model.engine") && copy.wasRead("model.num_class"),
-                  "[8f] 拷贝后 readKeys 保留");
+                  "[8f] readKeys preserved after copy");
         }
         catch (const std::exception& e)
         {

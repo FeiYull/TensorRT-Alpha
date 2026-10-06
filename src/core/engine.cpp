@@ -143,38 +143,59 @@ ResolvedBatch resolveBatch(const TensorDesc& input, int requested,
             );
     }
 
+    // 引擎侧的合法值描述 —— 每条报错都必须带上它：
+    //   静态引擎 → 明确"要求多少"；动态引擎 → 明确"区间 + 最大是多少"。
+    const std::string limit =
+        r.isDynamic
+            ? "engine batch range [" + std::to_string(br.min) + ", " +
+                  std::to_string(br.max) + "], max batch " + std::to_string(br.max)
+            : "engine batch is fixed at " + std::to_string(br.max);
+    const std::string hint =
+        r.isDynamic
+            ? "use --batch within that range, or re-export the engine with a"
+              " larger --maxShapes to raise the limit"
+            : "set [input] batch_size = " + std::to_string(br.max) +
+              ", or re-export the engine with a dynamic batch";
+
+    // 所有拒绝路径共用一份措辞：ERROR 日志 + 抛异常（调用方一路向上，最终退出码 1）。
+    const auto reject = [&](const std::string& why) {
+        TRT_LOG_ERROR(who << ": input '" << input.name << "': " << why
+                      << "; " << limit);
+        throw std::runtime_error(who + ": input '" + input.name + "': " + why +
+                                 "; " + limit + "; " + hint);
+    };
+
+    // 非法请求值：ini 写 0 / 负数（CLI 侧由 options 层拦，ini 侧没有前置校验，
+    // 所以这里必须兜住）—— 报错仍按引擎能力给出该填多少。
+    if (requested <= 0)
+    {
+        reject("invalid batch " + std::to_string(requested) + " (batch must be > 0)");
+    }
+
     if (!r.isDynamic)
     {
-        // 静态引擎：batch 由引擎写死，忽略请求值
+        // 静态引擎：batch 由引擎（onnx 导出时）写死，请求值无法生效。
+        // 口径与动态越界一致 —— 配置与引擎能力不符就是错误，显式失败；
+        // 静默纠正会让人以为配置生效，把 ini / CLI 里写错的值掩盖掉。
         if (requested != br.max)
         {
-            TRT_LOG_WARN(who << ": static input batch is fixed at " << br.max
-                         << ", requested " << requested
-                         << " -> corrected to " << br.max);
-            r.corrected = true;
+            reject("requested batch " + std::to_string(requested) +
+                   " does not match the static engine");
         }
         r.batch = br.max;
         return r;
     }
 
-    // 动态引擎：clamp 到 [min, max]
+    // 动态引擎：batch 必须落在 [min, max] 内
     if (requested < br.min)
     {
-        TRT_LOG_ERROR(who << ": requested batch " << requested
-                      << " < engine min " << br.min);
-        throw std::runtime_error(
-            who + ": requested batch " + std::to_string(requested) +
-            " is below engine min " + std::to_string(br.min) +
-            " (engine batch range [" + std::to_string(br.min) + ", " +
-            std::to_string(br.max) + "])");
+        reject("requested batch " + std::to_string(requested) +
+               " is below engine min " + std::to_string(br.min));
     }
     if (requested > br.max)
     {
-        TRT_LOG_WARN(who << ": requested batch " << requested
-                     << " > engine max " << br.max
-                     << " -> clamped to " << br.max);
-        r.corrected = true;
-        requested = br.max;
+        reject("requested batch " + std::to_string(requested) +
+               " exceeds engine max " + std::to_string(br.max));
     }
     r.batch = requested;
     return r;
@@ -274,6 +295,13 @@ void applyInputShape(TrtEngine& engine, const std::string& tensorName,
         throw std::runtime_error("applyInputShape: input tensor '" + tensorName +
                                  "' not found in engine");
     }
+
+    // batch 与空间维同口径：引擎 profile 是唯一真相源，配置不符一律抛（不静默改值）。
+    // 落定之后再构造 dims，N 轴就用这个已过校验的值。
+    // 放在这里 = 所有走 applyInputShape 的模型（13 个）+ bench + sample + 单测
+    // 共用同一道护栏，不必各写一遍（yunet 因 H/W 取自原图不走这里，自带一行，见 yunet.cpp）。
+    cfg.batchSize = resolveBatch(*input, cfg.batchSize, "InputShape",
+                                 cfg.maxBatchSize).batch;
 
     // 布局优先级：INI 的 input.layout（覆盖）> 模型规范布局（默认）
     const Layout& layout = cfg.layout.empty() ? modelLayout : cfg.layout;

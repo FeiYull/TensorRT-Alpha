@@ -193,7 +193,7 @@ int runCommand(const std::vector<std::string>& args)
     {
         saveDir = trt_alpha::core::Paths::resolveSaveDir("", opt.net);
         modelCfg.extras["output.save_dir"] = saveDir;
-        modelCfg.setOrigin("output.save_dir", "默认");
+        modelCfg.setOrigin("output.save_dir", "default");
     }
     else if (saveDirFromCli)
     {
@@ -224,7 +224,10 @@ int runCommand(const std::vector<std::string>& args)
 
     // 数据源
     trt_alpha::datasource::SourceConfig srcCfg;
-    srcCfg.batchSize = modelCfg.batchSize;
+    // batch 必须取【引擎解析后】的值，不能用 ini / CLI 的原值：
+    // 静态引擎会忽略请求值、动态引擎越界直接报错 —— 若按原值攒批，
+    // 数据源的批大小会与模型实际 batch 不一致 → 越界写。
+    srcCfg.batchSize = pool.resolvedBatch();
     srcCfg.sourceId = 0;
 
     if (!opt.image.empty())

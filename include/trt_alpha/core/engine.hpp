@@ -65,22 +65,22 @@ private:
 //! 引擎输入 batch 的解析结果（统一静态 / 动态语义）。
 struct ResolvedBatch
 {
-    int  batch     = 1;      //!< 修正后实际使用的 batch
+    int  batch     = 1;      //!< 实际使用的 batch（== 请求值；不符时不会返回，直接抛异常）
     bool isDynamic = false;  //!< 引擎输入是否为动态 batch
-    bool corrected = false;  //!< 是否被框架修正过（与请求值不同）
     int  min = 1;            //!< 引擎 profile 最小 batch
     int  opt = 1;            //!< 引擎 profile 最优 batch
     int  max = 1;            //!< 引擎 profile 最大 batch
 };
 
-//! 依据引擎实际能力，解析 / 修正调用方请求的 batch：
-//!   * 静态引擎（onnx 固定 batch）：batch 由引擎写死；
-//!     请求值 != 引擎固定值 → WARN 并修正为引擎值。
-//!   * 动态引擎（onnx -1 + trtexec min/opt/max）：clamp 到 [min, max]；
-//!     请求值 > max → WARN 并修正为 max；
-//!     请求值 < min → 抛 std::runtime_error（无法修正到合法值）。
+//! 依据引擎实际能力，校验调用方请求的 batch —— 不符一律抛 std::runtime_error：
+//!   * 静态引擎（onnx 固定 batch）：batch 由引擎写死，请求值必须等于该固定值；
+//!     不等 → 抛（**不静默纠正** —— 纠正会让人以为 ini / CLI 里的值生效了）。
+//!   * 动态引擎（onnx -1 + trtexec min/opt/max）：batch 必须落在 [min, max] 内；
+//!     请求值 > max 或 < min → 抛（**不静默钳制** —— 配置超出引擎能力是错误，
+//!     静默降级会让人以为设置生效，且数据源可能仍按原值打包）。
 //!   * 可选上界契约：declaredMax > 0 时，必须与引擎 profile max 一致，
 //!     否则抛 std::runtime_error（配置声明的能力与引擎不符）。
+//! 一句话：配置只表达"意图"，引擎 profile 是唯一真相源；冲突时显式失败，绝不静默改值。
 //! @param input       引擎输入张量描述（需已填 profile 形状）
 //! @param requested   调用方请求的 batch
 //! @param who         调用方名字（用于日志与异常信息）
@@ -231,7 +231,9 @@ private:
     std::unique_ptr<Context> m_context;
 };
 
-//! 一步到位：解析输入布局 / 空间维并下发 setInputShape，结果就地写回 cfg.dstH / cfg.dstW。
+//! 一步到位：落定输入 batch、解析输入布局 / 空间维并下发 setInputShape，
+//! 结果就地写回 cfg.batchSize / cfg.dstH / cfg.dstW。
+//!   * batch：先过 resolveBatch（引擎 profile 为唯一真相源，不符即抛）
 //!   * 布局优先级：cfg.layout（INI 的 input.layout）> modelLayout（模型规范布局）
 //!   * 目标形状按 layout 逐轴构造 → 天然支持 3~8 维的任意排列（NCHW/NHWC/NCDHW/CHWN/…）
 //!   * 配置里的 dst_h / dst_w 降级为"意图值"：仅在引擎对应维为动态（-1）时生效；

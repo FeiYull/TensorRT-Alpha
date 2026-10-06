@@ -191,6 +191,11 @@ void YuNet::discoverEngineIo()
     }
     core::validateInputTensor(*in, core::Layout::NCHW, 3, "YuNet");
 
+    // batch 与其余模型同口径（引擎 profile 为唯一真相源，不符即抛）。
+    // YuNet 的 H/W 取自原图、不走 core::applyInputShape，故在此单独落定。
+    m_cfg.batchSize = core::resolveBatch(*in, m_cfg.batchSize, "YuNet",
+                                         m_cfg.maxBatchSize).batch;
+
     TRT_LOG_INFO("YuNet: io names: input='" << m_inputName
                  << "' loc='" << m_locName
                  << "' conf='" << m_confName
@@ -226,7 +231,7 @@ void YuNet::rebuildForSize(int W, int H)
             throw std::runtime_error(
                 "yunet: setInputShape failed for " + std::to_string(m_batch) + "x3x" +
                 std::to_string(H) + "x" + std::to_string(W) +
-                " (超出引擎 profile 范围?)");
+                " (outside engine profile range?)");
         }
     }
     else
@@ -236,7 +241,7 @@ void YuNet::rebuildForSize(int W, int H)
             throw std::runtime_error(
                 "yunet: input " + std::to_string(W) + "x" + std::to_string(H) +
                 " != engine " + (in ? shapeOf(in->shape) : std::string("(unknown)")) +
-                " (该引擎 H/W 为静态维，而 YuNet 不做 resize)");
+                " (engine H/W are static dims and YuNet does no resize)");
         }
     }
 

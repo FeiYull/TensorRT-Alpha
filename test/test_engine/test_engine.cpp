@@ -7,7 +7,7 @@
 //    [3] 加载空文件抛异常
 //    [4] 加载内容非法的文件抛异常
 //    [5] buildFromOnnx 抛 logic_error（未实现）
-//    [6] resolveBatch：静态纠正 / 动态钳制 / 越下界报错 / 上界契约校验
+//    [6] resolveBatch：静态不符报错 / 动态越界报错 / 非法值 / 上界契约校验
 //    [8] Layout：轴字母串解析（任意排列 / 任意秩 / 大小写 / 非法输入）
 //    [9] validateInputTensor：秩 / 通道轴 / 物理格式 三重护栏
 //    [10] resolveInputShape：静态维按引擎纠正、动态维取意图值、5D / NHWC / CHWN
@@ -16,6 +16,7 @@
 //    用法：test_engine [<engine.trt>]
 //    有参数时：测成功加载 + 列出 io tensors + [7] setInputShape 守卫
 //              + [11] 物理格式必须线性 + [12] 真实引擎上的布局解析
+//              + [13] applyInputShape 的 batch 护栏（bench / sample 走的路径）
 //    [7] 对第一个 input 张量验证 setInputShape：
 //        静态引擎 → 形状一致放行、形状不符必须抛异常（杜绝静默越界）；
 //        动态引擎 → profile 内的 min/max 形状必须被接受。
@@ -37,7 +38,9 @@ using trt_alpha::core::DataType;
 using trt_alpha::core::Layout;
 using trt_alpha::core::ResolvedInputShape;
 using trt_alpha::core::TensorDesc;
+using trt_alpha::core::ModelConfig;
 using trt_alpha::core::TrtEngine;
+using trt_alpha::core::applyInputShape;
 using trt_alpha::core::resolveBatch;
 using trt_alpha::core::resolveInputShape;
 using trt_alpha::core::validateInputTensor;
@@ -200,14 +203,15 @@ int main(int argc, char** argv)
                   "[6b] static batchRange == {8,8,8}");
         }
         {
-            const auto rb = resolveBatch(st, 1, "[t]", 0);
-            check(rb.batch == 8 && rb.corrected && !rb.isDynamic,
-                  "[6c] static: requested 1 -> corrected to 8");
+            bool threw = false;
+            try { (void)resolveBatch(st, 1, "[t]", 0); }
+            catch (const std::runtime_error&) { threw = true; }
+            check(threw, "[6c] static: requested 1 != fixed 8 -> throws");
         }
         {
             const auto rb = resolveBatch(st, 8, "[t]", 0);
-            check(rb.batch == 8 && !rb.corrected,
-                  "[6d] static: requested 8 -> no correction");
+            check(rb.batch == 8 && !rb.isDynamic,
+                  "[6d] static: requested 8 == fixed 8 -> ok");
         }
 
         // ---- 动态引擎：shape=[-1,3,640,640]，profile min/opt/max = 1/2/4 ----
@@ -226,13 +230,14 @@ int main(int argc, char** argv)
         }
         {
             const auto rb = resolveBatch(dy, 2, "[t]", 0);
-            check(rb.batch == 2 && !rb.corrected && rb.isDynamic,
+            check(rb.batch == 2 && rb.isDynamic,
                   "[6g] dynamic: requested 2 (in range) -> 2");
         }
         {
-            const auto rb = resolveBatch(dy, 6, "[t]", 0);
-            check(rb.batch == 4 && rb.corrected,
-                  "[6h] dynamic: requested 6 > max -> clamped to 4");
+            bool threw = false;
+            try { (void)resolveBatch(dy, 6, "[t]", 0); }
+            catch (const std::runtime_error&) { threw = true; }
+            check(threw, "[6h] dynamic: requested 6 > max -> throws");
         }
         {
             bool threw = false;
@@ -259,6 +264,20 @@ int main(int argc, char** argv)
             try { (void)resolveBatch(st, 8, "[t]", 4); }   // 静态引擎上界契约不符
             catch (const std::runtime_error&) { threw = true; }
             check(threw, "[6l] declared max 4 != static fixed 8 -> throws");
+        }
+
+        // ---- 非法请求值（ini 侧没有前置校验，必须在这里兜住）----
+        {
+            bool threwStatic = false;
+            try { (void)resolveBatch(st, 0, "[t]", 0); }
+            catch (const std::runtime_error&) { threwStatic = true; }
+            check(threwStatic, "[6m] static: requested 0 -> throws");
+        }
+        {
+            bool threwNeg = false;
+            try { (void)resolveBatch(dy, -3, "[t]", 0); }
+            catch (const std::runtime_error&) { threwNeg = true; }
+            check(threwNeg, "[6n] dynamic: requested -3 -> throws");
         }
     }
 
@@ -497,10 +516,12 @@ int main(int argc, char** argv)
                     }
 
                     // 真实静态引擎的 TensorDesc 喂进 resolveBatch：
-                    // 请求值 != 固定值 → 应纠正为引擎固定 batch。
-                    const auto rb = resolveBatch(*in, in->shape.d[0] + 2, "[t]", 0);
-                    check(rb.batch == in->shape.d[0] && rb.corrected && !rb.isDynamic,
-                          "[7d] static: resolveBatch(requested+2) -> corrected to engine batch");
+                    // 请求值 != 固定值 → 抛异常（不静默纠正）。
+                    bool threwRb = false;
+                    try { (void)resolveBatch(*in, in->shape.d[0] + 2, "[t]", 0); }
+                    catch (const std::runtime_error&) { threwRb = true; }
+                    check(threwRb,
+                          "[7d] static: resolveBatch(requested+2) -> throws");
                 }
                 else if (in->minShape.nbDims == in->shape.nbDims)
                 {
@@ -572,6 +593,40 @@ int main(int argc, char** argv)
                               resolveInputShape(*in, l, 7, {}, "[t]", r3);
                           }),
                           "[12c] real engine: wrong channel count -> throws");
+
+                    // -------------------------------------------------------
+                    // [13] applyInputShape 的 batch 护栏（真实引擎）
+                    //   这是 bench / sample / 单测等"直连 model->init、不经过
+                    //   InferencePool"路径的护栏；与池路径调同一个 resolveBatch，
+                    //   报错措辞一致，不再退化成 TRT 的 satisfyProfile 原话。
+                    // -------------------------------------------------------
+                    std::cout << "\n--- [13] applyInputShape batch guard ---\n";
+                    {
+                        ModelConfig over;
+                        over.batchSize = in->batchRange().max + 2;   // 必越界
+                        check(throwsRuntime([&] {
+                                  applyInputShape(eng, in->name, l, 3, over);
+                              }),
+                              "[13a] applyInputShape: batch over max -> throws");
+                    }
+                    {
+                        ModelConfig zero;
+                        zero.batchSize = 0;                          // ini 写 0 / 负数
+                        check(throwsRuntime([&] {
+                                  applyInputShape(eng, in->name, l, 3, zero);
+                              }),
+                              "[13b] applyInputShape: batch <= 0 -> throws");
+                    }
+                    {
+                        // 合法值必须放行，且写回值 == 请求值（只判定、不改值）
+                        ModelConfig ok;
+                        ok.batchSize = in->batchRange().max;
+                        bool passed = true;
+                        try { applyInputShape(eng, in->name, l, 3, ok); }
+                        catch (...) { passed = false; }
+                        check(passed && ok.batchSize == in->batchRange().max,
+                              "[13c] applyInputShape: batch == max -> ok, echo-back unchanged");
+                    }
                 }
             }
         }
