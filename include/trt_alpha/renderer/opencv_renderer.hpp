@@ -28,8 +28,7 @@ public:
                     const std::vector<core::ClassInfo>& classNames) const override;
 
     void save(const core::BatchResult& result,
-              const std::string& outputDir,
-              const std::string& prefix = "result_") const override;
+              const std::string& outputDir) const override;
 
     void show(const core::BatchResult& result,
               const std::string& windowName) const override;

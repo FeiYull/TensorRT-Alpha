@@ -24,6 +24,13 @@ struct Batch
     std::vector<BufferView> views;
     int validCount = 0;
 
+    //! 每帧的"来源名主干"（不含扩展名 / 序号），长度 == validCount。
+    //!   * 图片源：原文件名（bus.jpg → "bus"）—— 存盘时按原文件名落盘
+    //!   * 视频源：源文件主干（demo.mp4 → "demo"），同批多帧同名，序号由渲染层补
+    //!   * 摄像头：cam<id>
+    //! 数据源不填时为空，渲染层回退为 frame_<帧号>。
+    std::vector<std::string> frameNames;
+
     [[nodiscard]] bool validate(std::string* errorMsg = nullptr) const;
 
     [[nodiscard]] bool empty() const noexcept

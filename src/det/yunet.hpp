@@ -69,8 +69,8 @@ private:
     int m_srcW = 0;
     int m_srcH = 0;
 
-    int m_numCandidates = 0;         // N，每次 setBatch 重算
-    int m_objectsRow = 17;           // 7 + 10（5 关键点）
+    int m_numCandidates = 0;         // N，每次 setBatch 重算（以引擎声明为准）
+    int m_objectsRow = kernels::kYuNetObjectsRow;  // 7 + 10（5 关键点）
 
     // 常量（Device）
     core::DeviceBuffer m_minSizes;   // [4*3] = [10,16,24,32,48,FLT_MAX,64,96,FLT_MAX,128,192,256]

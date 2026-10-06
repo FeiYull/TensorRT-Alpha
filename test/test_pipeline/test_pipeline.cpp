@@ -4,12 +4,18 @@
 //  Pipeline 集成测试（真推理 + 详细日志）：
 //    [1] 图片 / 视频 + YOLOv8 + 渲染 → 结果存盘
 //    [2] 输出诊断信息（views / detections / validCount）
+//    [3] 正常跑完 → failed() == false（失败标记不误报）
+//    [4] 正常跑完 → firstError() 为空
+//    [5] 数据源抛异常 → failed() == true（线程内错误能被记下）
+//    [6] firstError() 带上下文（源下标 + 阶段名）
 //
 //  用法：
 //    test_pipeline <engine.trt> <image_or_video>
+//    不带参数时用默认探针 engines/yolov8n.trt + data/bus.jpg（缺则跳过）
 // =============================================================================
 #include "trt_alpha/core/model_registry.hpp"
 #include "trt_alpha/core/paths.hpp"
+#include "trt_alpha/datasource/i_data_source.hpp"
 #include "trt_alpha/datasource/opencv_source.hpp"
 #include "trt_alpha/datasource/source_config.hpp"
 #include "trt_alpha/core/inference_pool.hpp"
@@ -52,21 +58,49 @@ void step(const char* msg)
     std::cout << "[STEP] " << msg << std::endl;   // 强制 flush
 }
 
+//! 一读就抛的数据源：用来验证 Pipeline 的失败标记（failed / firstError）。
+//! 对应"图超出引擎 profile""批内分辨率不一致"这类真实故障 —— 错误发生在工作线程里，
+//! 异常被线程吞掉，只能靠 failed() 报回调用方。
+class ThrowingSource : public trt_alpha::datasource::IDataSource
+{
+public:
+    [[nodiscard]] bool next(trt_alpha::core::Batch& /*out*/) override
+    {
+        throw std::runtime_error("ThrowingSource: simulated read failure");
+    }
+    void requestStop() override {}
+    [[nodiscard]] const char* typeName() const noexcept override { return "throwing"; }
+};
+
 }  // namespace
 
 int main(int argc, char** argv)
 {
     std::cout << "=== Pipeline tests ===\n";
 
+    std::string enginePath;
+    std::string inputPath;
+
     if (argc < 3)
     {
-        std::cout << "usage: test_pipeline <engine.trt> <image_or_video>\n";
-        std::cout << "(skipped: no engine+input args)\n";
-        return 0;
+        // 无参数 → 用仓库自带探针（有则跑，无则跳过）。
+        // 这样本测试在全量回归里是真的在跑，而不是只打印一行 usage。
+        enginePath = "engines/yolov8n.trt";
+        inputPath  = "data/bus.jpg";
+        if (!fs::exists(enginePath) || !fs::exists(inputPath))
+        {
+            std::cout << "usage: test_pipeline <engine.trt> <image_or_video>\n";
+            std::cout << "(skipped: no args, and default probe "
+                      << enginePath << " + " << inputPath << " not found)\n";
+            return 0;
+        }
+        std::cout << "(default probe: " << enginePath << " + " << inputPath << ")\n";
     }
-
-    const std::string enginePath = argv[1];
-    const std::string inputPath = argv[2];
+    else
+    {
+        enginePath = argv[1];
+        inputPath  = argv[2];
+    }
 
     std::cout << "engine : " << enginePath << "\n";
     std::cout << "input  : " << inputPath << "\n";
@@ -178,6 +212,30 @@ int main(int argc, char** argv)
         }
         std::cout << "       output files: " << count << "\n";
         check(count > 0, "[2] at least one result image saved");
+
+        // ---- 8. 失败标记：正常跑完必须 failed() == false ----
+        step("10. failure flag: happy path");
+        check(!pipeline.failed(), "[3] happy path -> failed() == false");
+        check(pipeline.firstError().empty(), "[4] happy path -> firstError() is empty");
+
+        // ---- 9. 失败标记：工作线程里抛异常必须被记下来 ----
+        step("11. failure flag: throwing source");
+        PipelineConfig badCfg;
+        badCfg.sources.push_back(std::make_unique<ThrowingSource>());
+        badCfg.pools = { &pool };
+        badCfg.renderer = &renderer;
+        badCfg.resultQueueSize = 8;
+        badCfg.saveEnabled = false;
+        badCfg.showEnabled = false;
+
+        Pipeline bad(std::move(badCfg));
+        bad.start();
+        bad.waitForCompletion();
+        std::cout << "       failed=" << bad.failed()
+                  << " firstError=" << bad.firstError() << "\n";
+        check(bad.failed(), "[5] source throw -> failed() == true");
+        check(bad.firstError().find("next") != std::string::npos,
+              "[6] firstError() carries source context");
     }
     catch (const std::exception& e)
     {

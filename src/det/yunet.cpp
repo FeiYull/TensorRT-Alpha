@@ -29,6 +29,62 @@ const int kMinSizesDim[4] = { 3, 2, 2, 3 };
 const float kSteps[4] = { 8.f, 16.f, 32.f, 64.f };
 const float kVariancesHost[2] = { 0.1f, 0.2f };
 
+//! 三个输出的行宽：定义在 kernels/postprocess.hpp（kernel 与形状校验共用的单一来源）。
+using kernels::kYuNetConfRow;
+using kernels::kYuNetIouRow;
+using kernels::kYuNetLocRow;
+using kernels::kYuNetObjectsRow;
+
+//! nvinfer1::Dims → "[B, N, C]"（异常信息用）。
+std::string shapeOf(const nvinfer1::Dims& d)
+{
+    if (d.nbDims <= 0) { return "scalar"; }
+    std::string s = "[";
+    for (int i = 0; i < d.nbDims; ++i)
+    {
+        if (i > 0) { s += ", "; }
+        s += std::to_string(d.d[i]);
+    }
+    return s + "]";
+}
+
+//! 抛输出形状不符。
+[[noreturn]] void failShape(const std::string& name, const std::string& why,
+                            const nvinfer1::Dims& d)
+{
+    throw std::runtime_error("yunet: output '" + name + "' " + why +
+                             " (engine shape " + shapeOf(d) + ")");
+}
+
+//! 校验一个输出的 [B, N, C] 契约，返回引擎声明的 N。
+//! N / 行宽 / batch 任一不符都会让 kernel 越界读写 —— 宁可报错，不静默跑。
+//! 形状来源是 context（已下发输入形状后）的**推导值**，即引擎真相。
+int checkOutputShape(const nvinfer1::IExecutionContext& ctx, const std::string& name,
+                     int batch, int rowWidth)
+{
+    const nvinfer1::Dims d = ctx.getTensorShape(name.c_str());
+
+    if (d.nbDims != 3)
+    {
+        failShape(name, "expected rank 3 [B, N, C]", d);
+    }
+    if (d.d[2] != rowWidth)
+    {
+        failShape(name, "row width " + std::to_string(d.d[2]) +
+                        " != expected " + std::to_string(rowWidth), d);
+    }
+    if (d.d[1] <= 0)
+    {
+        failShape(name, "candidate count is not statically derivable", d);
+    }
+    if (d.d[0] > 0 && d.d[0] != batch)
+    {
+        failShape(name, "batch " + std::to_string(d.d[0]) +
+                        " != " + std::to_string(batch), d);
+    }
+    return d.d[1];
+}
+
 //! 计算 4 个尺度的 feature map 尺寸（照 legacy calFeatureMapSize）。
 void calFeatureMapSize(int srcW, int srcH, float* out /* [4*3] */)
 {
@@ -103,7 +159,7 @@ void YuNet::loadConfig(const core::ModelConfig& cfg)
     if (cfg.getString("conf_thresh", "").empty()) m_confThreshold = 0.3f;
     if (cfg.getString("top_k",       "").empty()) m_topK          = 1000;
 
-    m_objectsRow = 17;
+    m_objectsRow = kernels::kYuNetObjectsRow;
 
     TRT_LOG_INFO("YuNet: config num_class=" << m_numClass
                  << " conf=" << m_confThreshold
@@ -155,16 +211,71 @@ void YuNet::allocateConstBuffers()
 
 void YuNet::rebuildForSize(int W, int H)
 {
+    nvinfer1::IExecutionContext* ctx = m_engine->context();
+    const core::TensorDesc* in = m_engine->find(m_inputName);
+
+    // ---- 1. 下发输入形状 ----
+    // 引擎 H/W 为动态维时下发原图尺寸；静态维时原图尺寸必须与引擎一致
+    // （YuNet 不 resize，直接喂原图，尺寸不符只能报错）。
+    const bool dynHw = (in != nullptr) && (in->shape.nbDims >= 4) &&
+                       (in->shape.d[2] < 0 || in->shape.d[3] < 0);
+    if (dynHw)
+    {
+        if (!ctx->setInputShape(m_inputName.c_str(), nvinfer1::Dims4(m_batch, 3, H, W)))
+        {
+            throw std::runtime_error(
+                "yunet: setInputShape failed for " + std::to_string(m_batch) + "x3x" +
+                std::to_string(H) + "x" + std::to_string(W) +
+                " (超出引擎 profile 范围?)");
+        }
+    }
+    else
+    {
+        if (in == nullptr || in->shape.d[2] != H || in->shape.d[3] != W)
+        {
+            throw std::runtime_error(
+                "yunet: input " + std::to_string(W) + "x" + std::to_string(H) +
+                " != engine " + (in ? shapeOf(in->shape) : std::string("(unknown)")) +
+                " (该引擎 H/W 为静态维，而 YuNet 不做 resize)");
+        }
+    }
+
+    // ---- 2. 输出形状守门（引擎声明为唯一真相源）----
+    // loc/conf/iou 均为 [B, N, C]；N 以 loc 为准，conf / iou 必须与之一致。
+    const int nLoc  = checkOutputShape(*ctx, m_locName,  m_batch, kYuNetLocRow);
+    const int nConf = checkOutputShape(*ctx, m_confName, m_batch, kYuNetConfRow);
+    const int nIou  = checkOutputShape(*ctx, m_iouName,  m_batch, kYuNetIouRow);
+    if (nConf != nLoc || nIou != nLoc)
+    {
+        throw std::runtime_error("yunet: loc/conf/iou candidate count mismatch (" +
+                                 std::to_string(nLoc) + " / " + std::to_string(nConf) +
+                                 " / " + std::to_string(nIou) + ")");
+    }
+
+    // ---- 3. 先验框（Host 公式）：其候选数必须与引擎一致 ----
+    // 先验框由 kMinSizes / kSteps / feature-map 公式决定；引擎 N 与它不符
+    // 说明 kernel 假设与该模型不匹配 —— 无解，直接报错（不静默跑出错误框）。
     std::vector<float> featHw(4 * 3);
     calFeatureMapSize(W, H, featHw.data());
+    const int formulaN = calNumCandidates(featHw.data());
+    if (formulaN <= 0)
+    {
+        throw std::runtime_error("yunet: numCandidates <= 0 at input size " +
+                                 std::to_string(W) + "x" + std::to_string(H));
+    }
+    if (formulaN != nLoc)
+    {
+        throw std::runtime_error(
+            "yunet: engine declares N=" + std::to_string(nLoc) +
+            " but prior-box formula gives N=" + std::to_string(formulaN) +
+            " at " + std::to_string(W) + "x" + std::to_string(H) +
+            " (kernel assumptions do not match this engine)");
+    }
+    m_numCandidates = nLoc;
+
+    // ---- 4. 分配 / 上传（尺寸全部以引擎确认的 N 为准）----
     cudaMemcpyAsync(m_featHw.data(), featHw.data(), featHw.size() * sizeof(float),
                     cudaMemcpyHostToDevice, m_stream.get());
-
-    m_numCandidates = calNumCandidates(featHw.data());
-    if (m_numCandidates <= 0)
-    {
-        throw std::runtime_error("yunet: numCandidates <= 0, invalid input size");
-    }
 
     std::vector<float> priorBoxes(std::size_t(m_numCandidates) * 4);
     calPriorBox(featHw.data(), W, H, priorBoxes.data());
@@ -175,16 +286,15 @@ void YuNet::rebuildForSize(int W, int H)
 
     m_inputNchw.allocate(std::size_t(m_batch) * 3 * m_srcH * m_srcW * sizeof(float));
 
-    m_outputLoc.allocate(std::size_t(m_batch) * m_numCandidates * 14 * sizeof(float));
-    m_outputConf.allocate(std::size_t(m_batch) * m_numCandidates * 2 * sizeof(float));
-    m_outputIou.allocate(std::size_t(m_batch) * m_numCandidates * 1 * sizeof(float));
+    const std::size_t cand = std::size_t(m_batch) * std::size_t(m_numCandidates);
+    m_outputLoc.allocate(cand * kYuNetLocRow * sizeof(float));
+    m_outputConf.allocate(cand * kYuNetConfRow * sizeof(float));
+    m_outputIou.allocate(cand * kYuNetIouRow * sizeof(float));
 
     const std::size_t objectsPerImage = 1 + std::size_t(m_topK) * m_objectsRow;
     m_objects.allocate(std::size_t(m_batch) * objectsPerImage * sizeof(float));
     m_objectsHost.allocate(std::size_t(m_batch) * objectsPerImage * sizeof(float));
 
-    nvinfer1::IExecutionContext* ctx = m_engine->context();
-    ctx->setInputShape(m_inputName.c_str(), nvinfer1::Dims4(m_batch, 3, H, W));
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
         !ctx->setTensorAddress(m_locName.c_str(), m_outputLoc.data()) ||
         !ctx->setTensorAddress(m_confName.c_str(), m_outputConf.data()) ||
@@ -195,7 +305,8 @@ void YuNet::rebuildForSize(int W, int H)
     m_stream.synchronize();
 
     TRT_LOG_INFO("YuNet: resized to " << W << "x" << H
-                 << " -> numCandidates=" << m_numCandidates);
+                 << " -> numCandidates=" << m_numCandidates
+                 << " (engine-confirmed)");
 }
 
 void YuNet::init(const core::ModelConfig& cfg)

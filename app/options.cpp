@@ -126,10 +126,18 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
         else if (a == "--engine")   { opt.engine = nextArg(args, i, a); }
         else if (a == "--net")      { opt.net = nextArg(args, i, a); }
         else if (a == "--batch")    { opt.batch = parseInt(nextArg(args, i, a), a); }
-        else if (a == "--save-dir") { opt.saveDir = nextArg(args, i, a); }
         else if (a == "--workers")  { opt.workers = parseInt(nextArg(args, i, a), a); }
         else if (a == "--root")     { opt.root = nextArg(args, i, a); }
-        else if (a == "--save")     { opt.save = true; }
+        else if (a == "--save")
+        {
+            opt.save = true;
+            // --save [dir]：下一个参数存在且不以 '-' 开头时，才当作显式输出目录
+            if (i + 1 < args.size() && !args[i + 1].empty() && args[i + 1][0] != '-')
+            {
+                opt.saveDir = args[i + 1];
+                ++i;
+            }
+        }
         else if (a == "--show")     { opt.show = true; }
         else
         {

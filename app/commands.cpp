@@ -23,12 +23,16 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace trt_alpha::app {
 namespace {
+
+namespace fs = std::filesystem;
 
 //! 造一个固定输入（灰色），用于 bench。尺寸 = 网络输入尺寸。
 trt_alpha::core::Batch makeBenchBatch(int batchSize, int width, int height)
@@ -79,17 +83,16 @@ void printUsage()
         "  build  Convert ONNX to engine (TODO)\n"
         "\n"
         "Run options:\n"
-        "  --image <path>    single image\n"
-        "  --images <dir>    image directory\n"
-        "  --video <path>    video file\n"
+        "  --image <path>    single image (a directory is also accepted: scanned, one level)\n"
+        "  --images <dir>    image directory (one level)\n"
+        "  --video <path|url>  video file, or stream URL (rtsp / rtmp / http / https)\n"
         "  --camera <id>     camera device id\n"
         "  --net <name>      model name (default: yolov8)\n"
         "  --config <ini>    model INI (default: configs/<net>.ini)\n"
         "  --engine <trt>    override INI's engine path\n"
         "  --batch <n>       override INI's batch_size\n"
         "  --workers <n>     inference pool workers (default: INI [pool].workers)\n"
-        "  --save            save result images\n"
-        "  --save-dir <dir>  output dir (default: INI [output].save_dir)\n"
+        "  --save [dir]      save result images (default dir: save/<net>)\n"
         "  --show            show result window\n"
         "  --root <dir>      override project root\n"
         "\n"
@@ -107,6 +110,7 @@ void printUsage()
         "  trt_alpha list\n"
         "  trt_alpha run --image data/bus.jpg --net yolov8 --save\n"
         "  trt_alpha run --video data/people.mp4 --net yolor --show\n"
+        "  trt_alpha run --video rtsp://192.168.1.10:554/stream1 --net yolov8 --show\n"
         "  trt_alpha run --camera 0 --net yolov8_pose --show\n"
         "  trt_alpha bench --net yolov8 --iters 100 --warmup 10\n"
         "  trt_alpha run --image data/bus.jpg --net yolov8 --engine D:/models/yolov8n.trt\n";
@@ -176,18 +180,29 @@ int runCommand(const std::vector<std::string>& args)
     const int qTask   = modelCfg.getInt("pool.max_queue_size", 16);
     const int qResult = modelCfg.getInt("pool.result_queue_size", 32);
 
-    // 存盘目录：空 = 用 INI；窗口名只有 --show 时才真正用到，但读一下即可见
+    // 存盘目录：CLI --save <dir> > ini output.save_dir > 默认 save/<net>。
+    // 谁显式给了目录就用谁的（原样，不拼子目录）。base.ini 不再写死 save_dir，
+    // 否则 --save 无路径时会被它顶成 "save"，拿不到 save/<net> 的默认结构。
     std::string saveDir = opt.saveDir;
+    const bool saveDirFromCli = !saveDir.empty();
     if (saveDir.empty())
     {
-        saveDir = modelCfg.getString("output.save_dir", "save");
+        saveDir = modelCfg.getString("output.save_dir", "");
     }
-    else
+    if (saveDir.empty())
+    {
+        saveDir = trt_alpha::core::Paths::resolveSaveDir("", opt.net);
+        modelCfg.extras["output.save_dir"] = saveDir;
+        modelCfg.setOrigin("output.save_dir", "默认");
+    }
+    else if (saveDirFromCli)
     {
         modelCfg.extras["output.save_dir"] = saveDir;
         modelCfg.setOrigin("output.save_dir", "CLI");
-        modelCfg.markRead("output.save_dir");
     }
+    modelCfg.markRead("output.save_dir");   // 框里显示最终生效目录，来源如实标注
+
+    // 窗口名只有 --show 时才真正用到，但读一下即可见
     const std::string showWindow = modelCfg.getString("output.show_window", "trt_alpha");
 
     // 推理池
@@ -237,6 +252,29 @@ int runCommand(const std::vector<std::string>& args)
         throw std::runtime_error("run: no source (should not happen)");
     }
 
+    // 安全守卫：结果按"原文件名"存盘 ⇒ 输出目录 == 输入图片目录会覆盖原图。
+    // 只有目录源（--image <目录> / --images）可能撞上；视频 / 相机 / 流无此风险。
+    if (opt.save && !trt_alpha::core::Paths::isUrl(srcCfg.path))
+    {
+        std::error_code ec;
+        const fs::path inPath = trt_alpha::core::Paths::resolve(srcCfg.path);
+        if (fs::is_directory(inPath, ec))
+        {
+            std::error_code ec2;
+            const fs::path inCanon  = fs::weakly_canonical(inPath, ec);
+            const fs::path outCanon = fs::weakly_canonical(
+                trt_alpha::core::Paths::resolve(saveDir), ec2);
+            if (!ec && !ec2 && inCanon == outCanon)
+            {
+                throw std::runtime_error(
+                    "run: save dir equals the input image dir (" +
+                    trt_alpha::core::Paths::toDisplay(outCanon) +
+                    "); results are named after the source files and would "
+                    "overwrite the originals - pass another dir to --save");
+            }
+        }
+    }
+
     std::vector<std::unique_ptr<trt_alpha::datasource::IDataSource>> sources;
     sources.push_back(
         std::make_unique<trt_alpha::datasource::OpenCVSource>(srcCfg));
@@ -259,6 +297,15 @@ int runCommand(const std::vector<std::string>& args)
     trt_alpha::pipeline::Pipeline p(std::move(pcfg));
     p.start();
     p.waitForCompletion();
+
+    // 线程内的错误没有异常出口（join 会吞掉），靠 Pipeline 记的失败标记报出来。
+    // 否则"图超出引擎 profile / 批内分辨率不一致"这类错误只留一行 ERROR 日志，
+    // 退出码却是 0 —— 脚本和 CI 会当成跑成功。
+    if (p.failed())
+    {
+        TRT_LOG_ERROR("run: aborted, reason: " << p.firstError());
+        return 1;
+    }
 
     return 0;
 }

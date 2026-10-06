@@ -12,6 +12,18 @@
 #include <iostream>
 #include <string>
 
+namespace {
+
+int g_failures = 0;
+
+void check(bool cond, const char* what)
+{
+    if (cond) { std::cout << "[PASS] " << what << "\n"; }
+    else      { std::cout << "[FAIL] " << what << "\n"; ++g_failures; }
+}
+
+}  // namespace
+
 int main(int argc, char** argv)
 {
     trt_alpha::InferParams p;
@@ -67,5 +79,35 @@ int main(int argc, char** argv)
     stream.stop();
 
     std::cout << "total batches: " << batchCount << "\n";
-    return 0;
+
+    // ---- [1] Stream 生命周期：Infer 先析构，Stream 必须仍可用 ----
+    // Pipeline 持有 pool / renderer 的**裸指针**（都挂在 Infer::Impl 上），
+    // 因此 Stream 必须保活 Impl —— 否则这里就是 use-after-free
+    // （崩溃，或静默拿到垃圾结果）。
+    {
+        trt_alpha::Stream s;
+        {
+            trt_alpha::InferParams q;
+            q.model_type  = p.model_type;
+            q.config_path = p.config_path;
+            q.source      = "data/bus.jpg";
+            q.show        = false;    // 不渲染，get() 才会真的产出 Result
+            q.save        = false;
+            trt_alpha::Infer inner(q);
+            s = inner.async();
+        }   // inner 在此析构：pool / renderer 若被释放，下面的 get() 即悬垂
+
+        int batches = 0;
+        trt_alpha::Result r;
+        while (s.get(r)) { ++batches; }
+        s.stop();
+
+        std::cout << "       batches after Infer dtor = " << batches << "\n";
+        check(batches >= 1, "[1] Stream outlives Infer (no use-after-free)");
+    }
+
+    std::cout << "====================\n";
+    if (g_failures == 0) { std::cout << "ALL PASS\n"; return 0; }
+    std::cout << g_failures << " FAILED\n";
+    return 1;
 }

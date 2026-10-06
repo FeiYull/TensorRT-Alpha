@@ -3,10 +3,14 @@
 // -----------------------------------------------------------------------------
 //  OpenCVSource 测试：
 //    [1] 图片模式：读一张图 → Batch{validCount=1}
-//    [2] 图片目录模式：扫目录 → 读多张 → 攒批
-//    [3] batchSize=4 但只有 2 张图 → 第二个 batch validCount=2
-//    [4] 视频模式：读前 N 帧
-//    [5] 构造失败（文件不存在）抛异常
+//    [2] batchSize=4 但只有 1 张图 → views=4 / validCount=1，第二次 next() 结束
+//    [3] 构造失败（文件不存在）抛异常
+//    [4] requestStop 后 next() 返回 false
+//    [5] 视频模式：读前 N 帧
+//    [6] type=Image 但传目录 → 自动降级为目录模式（仅扫一层）
+//    [7] 目录里没有图片 → 构造抛异常
+//    [8] URL（流）→ 跳过本地文件校验，失败信息是 "cannot open stream"
+//    [9] URL 传成 Image → 明确拒绝
 //
 //  用法：
 //    test_datasource                          # 用 data/bus.jpg
@@ -200,6 +204,93 @@ int main(int argc, char** argv)
             ++g_failures;
         }
     }
+    // ---------------------------------------------------------------
+    // [6] type=Image 但传的是目录 → 自动降级为目录模式（仅扫一层）
+    //     batchSize=1：目录内混尺寸时每批一帧，永远安全（批内一致性另有用例）
+    // ---------------------------------------------------------------
+    {
+        try
+        {
+            SourceConfig cfg;
+            cfg.type = SourceType::Image;   // 故意用 Image
+            cfg.path = "data";              // 传目录
+            cfg.batchSize = 1;
+
+            OpenCVSource source(cfg);
+            check(std::string(source.typeName()) == "images",
+                  "[6] Image + directory downgrades to 'images'");
+
+            Batch batch;
+            const bool ok = source.next(batch);
+            check(ok, "[6] next() true in downgraded mode");
+            check(batch.validCount == 1, "[6] validCount == 1");
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "[FAIL] [6] exception: " << e.what() << "\n";
+            ++g_failures;
+        }
+    }
+    // ---------------------------------------------------------------
+    // [7] 目录里没有图片 → 构造抛异常（configs/ 只有 ini）
+    // ---------------------------------------------------------------
+    {
+        bool threw = false;
+        try
+        {
+            SourceConfig cfg;
+            cfg.type = SourceType::Image;   // 走降级路径，最终由 openImages 报错
+            cfg.path = "configs";
+            cfg.batchSize = 1;
+            OpenCVSource source(cfg);
+        }
+        catch (const std::runtime_error&) { threw = true; }
+        check(threw, "[7] directory without images throws");
+    }
+    // ---------------------------------------------------------------
+    // [8] URL（流）：跳过本地文件校验，失败点是"连不上"而不是"文件不存在"
+    //     用 127.0.0.1:1（保留端口，必然拒绝连接）保证不会真的联网；
+    //     超时压到 400ms —— 否则后端默认要等约 30s
+    // ---------------------------------------------------------------
+    {
+        std::string msg;
+        try
+        {
+            SourceConfig cfg;
+            cfg.type = SourceType::Video;
+            cfg.path = "rtsp://127.0.0.1:1/none";
+            cfg.batchSize = 1;
+            cfg.openTimeoutMs = 400;
+            cfg.readTimeoutMs = 400;
+            OpenCVSource source(cfg);
+        }
+        catch (const std::runtime_error& e) { msg = e.what(); }
+
+        check(msg.find("cannot open stream") != std::string::npos,
+              "[8] unreachable URL -> 'cannot open stream'");
+        check(msg.find("not found") == std::string::npos,
+              "[8] URL skipped local file check (no 'not found')");
+    }
+
+    // ---------------------------------------------------------------
+    // [9] URL 传成 Image → 明确拒绝（URL 是流，cv::imread 只认本地文件）
+    // ---------------------------------------------------------------
+    {
+        std::string msg;
+        try
+        {
+            SourceConfig cfg;
+            cfg.type = SourceType::Image;
+            cfg.path = "rtsp://127.0.0.1:1/none";
+            cfg.batchSize = 1;
+            OpenCVSource source(cfg);
+        }
+        catch (const std::runtime_error& e) { msg = e.what(); }
+
+        check(msg.find("is a URL (stream)") != std::string::npos,
+              "[9] URL + Image type rejected with clear message");
+    }
+
     std::cout << "============================\n";
     if (g_failures == 0) { std::cout << "ALL PASS\n"; return 0; }
     std::cout << g_failures << " FAILED\n";

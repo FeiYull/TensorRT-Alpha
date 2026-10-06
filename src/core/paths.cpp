@@ -4,6 +4,7 @@
 #include "trt_alpha/core/paths.hpp"
 #include "trt_alpha/core/logger.hpp"   //  新增
 
+#include <cctype>
 #include <cstdlib>
 #include <mutex>
 #include <stdexcept>
@@ -253,6 +254,30 @@ fs::path Paths::resolve(const std::string& text)
     return joined;
 }
 
+bool Paths::isUrl(const std::string& text)
+{
+    // scheme 与 "://" 之间必须有内容，且 scheme 至少 2 字符（RFC 3986 里没有单字母 scheme，
+    // 这条同时挡住 Windows 的 "C://foo"）。
+    const std::size_t sep = text.find("://");
+    if (sep < 2 || sep + 3 >= text.size())
+    {
+        return false;
+    }
+    if (!std::isalpha(static_cast<unsigned char>(text[0])))
+    {
+        return false;
+    }
+    for (std::size_t i = 1; i < sep; ++i)
+    {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        if (!(std::isalnum(c) || c == '+' || c == '-' || c == '.'))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 fs::path Paths::requireFile(const std::string& text, const std::string& role)
 {
     const fs::path path = resolve(text);
@@ -272,6 +297,17 @@ fs::path Paths::requireFile(const std::string& text, const std::string& role)
 std::string Paths::toDisplay(const fs::path& path)
 {
     return path.string();
+}
+
+std::string Paths::resolveSaveDir(const std::string& dir, const std::string& modelName)
+{
+    // 显式目录优先（CLI --save <dir> / ini output.save_dir），原样使用；
+    // 只有"谁都没给"时才用 默认根/模型名 兜底。
+    if (!dir.empty())
+    {
+        return dir;
+    }
+    return modelName.empty() ? std::string("save") : ("save/" + modelName);
 }
 
 }  // namespace trt_alpha::core

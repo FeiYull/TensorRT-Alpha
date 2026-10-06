@@ -252,7 +252,10 @@ public:
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    //! 共享所有权：async() 返回的 Stream 会借走 Impl 里的 pool / renderer
+    //! （Pipeline 以裸指针引用），因此 Stream 必须保活 Impl —— 否则
+    //! Infer 先析构而 Stream 还在用时就是悬垂（UB）。
+    std::shared_ptr<Impl> m_impl;
 };
 
 }  // namespace trt_alpha

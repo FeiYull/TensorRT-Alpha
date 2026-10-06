@@ -108,7 +108,7 @@ int main(int argc, char** argv)
         pcfg.renderer = &renderer;
         pcfg.classNames = cfg.classNames;
         pcfg.saveEnabled = saveEnabled;
-        pcfg.saveDir = "save";
+        pcfg.saveDir = trt_alpha::core::Paths::resolveSaveDir("", "yolov3");
         pcfg.showEnabled = false;
 
         trt_alpha::pipeline::Pipeline pipeline(std::move(pcfg));

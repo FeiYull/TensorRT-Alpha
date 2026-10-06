@@ -49,6 +49,15 @@ private:
     //! 把 cv::Mat 填到 Batch 的第 i 帧。
     void copyIntoBatch(core::Batch& batch, int index, const cv::Mat& img);
 
+    //! "下一帧"的输出文件名主干（不含扩展名），由渲染层直接拼 .jpg：
+    //!   * 图片 = 原文件名（bus.jpg -> "bus"）
+    //!   * 视频 = 源文件主干 + 帧号（demo.mp4 -> "demo_000123"）
+    //!   * 流(URL) = URL 末段主干 + 帧号（rtsp://cam/live -> "live_000123"）
+    //!   * 摄像头 = cam<id> + 帧号（"cam0_000123"）
+    //! frameIndex 用绝对帧号（批内第 i 帧传 firstFrameIndex + i），保证视频/相机唯一。
+    //! 无下一帧（图片读完）返回空串，渲染层回退 frame_<帧号>。
+    [[nodiscard]] std::string nameForNextFrame(std::uint64_t frameIndex) const;
+
    
 
     SourceConfig m_cfg;
@@ -57,8 +66,11 @@ private:
     std::vector<std::string> m_imagePaths;
     std::size_t m_imageIndex = 0;
 
-    // 视频 / 摄像头
+    // 视频 / 摄像头 / 网络流
     cv::VideoCapture m_capture;
+
+    //! 是否网络流（URL）：流不做本地路径校验、不能 loop 回绕
+    bool m_isStream = false;
 
     // 帧号
     std::uint64_t m_nextFrameIndex = 0;

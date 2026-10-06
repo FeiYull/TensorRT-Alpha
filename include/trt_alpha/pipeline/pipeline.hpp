@@ -20,8 +20,11 @@
 //
 //  错误处理：
 //    * 构造 / start 失败抛异常
-//    * 源线程内部错误 → 打 ERROR log，该源退出
-//    * 渲染线程内部错误 → 打 ERROR log，继续
+//    * 源线程内部错误（next / submit）→ 打 ERROR log，该源退出，并记入 failed()
+//    * 渲染线程内部错误（推理 / 画 / 存 / 显）→ 打 ERROR log，继续，并记入 failed()
+//    * 线程内的错误拿不到异常出口（join 会吞掉），因此用 failed() / firstError()
+//      把"跑过但没跑成"这件事交回调用方 —— 通常用来决定进程退出码。
+//      口径：**线程里任一步失败 ⇒ failed() == true**（只看有没有错，不看错在哪一步）。
 // =============================================================================
 #pragma once
 
@@ -35,6 +38,7 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -73,9 +77,19 @@ public:
 
     [[nodiscard]] bool running() const noexcept { return m_running.load(); }
 
+    //! 本次运行是否出现过错误（源读取 / 提交、推理、画 / 存 / 显任一步失败）。
+    //! 只在 waitForCompletion() 之后读取才完整。
+    [[nodiscard]] bool failed() const noexcept { return m_failed.load(); }
+
+    //! 第一条错误描述（无错误时为空串）。用于在调用方汇总成一行报出。
+    [[nodiscard]] std::string firstError() const;
+
 private:
     void sourceLoop(std::size_t sourceIndex);
     void renderLoop();
+
+    //! 记录一条错误：置 failed 标记 + 记住首条描述（线程安全、幂等）。
+    void markFailed(const std::string& what);
 
     void validateConfig();
 
@@ -91,6 +105,10 @@ private:
     // 生命周期
     std::atomic<bool> m_running{false};
     std::atomic<bool> m_stopRequested{false};
+
+    // 错误记录：标记用 atomic（热路径无锁判断），首条描述串受 m_mutex 保护
+    std::atomic<bool> m_failed{false};
+    std::string m_firstError;   //!< 受 m_mutex 保护
 
     // 等待所有源结束 + 队列处理完
     mutable std::mutex m_mutex;

@@ -43,12 +43,14 @@ public:
     virtual void drawResult(core::BatchResult& result,
                             const std::vector<core::ClassInfo>& classNames) const = 0;
 
-    //! 存盘：每张有效图存成 <outputDir>/<prefix><index>.jpg
-    //! index = result.firstFrameIndex + i
+    //! 存盘：每张有效图存成 <outputDir>/<帧来源名>.jpg
+    //!   * 图片源 = 原文件名（data/bus.jpg -> <outputDir>/bus.jpg）
+    //!   * 视频 / 相机 = <主干>_<帧号>（demo_000123.jpg / cam0_000123.jpg）
+    //!   * result.frameNames 缺失或为空时回退 frame_<帧号>
+    //!   * 同名文件直接覆盖，覆盖前打一条 WARN
     //! 自动创建 outputDir（如不存在）。
     virtual void save(const core::BatchResult& result,
-                      const std::string& outputDir,
-                      const std::string& prefix = "result_") const = 0;
+                      const std::string& outputDir) const = 0;
 
     //! 显示：cv::imshow + cv::waitKey(1)（不阻塞），只显示第一张有效图。
     //! 实时场景"每帧一张"用这个。批量场景请用 save()。

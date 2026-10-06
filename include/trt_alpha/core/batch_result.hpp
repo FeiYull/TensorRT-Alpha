@@ -26,6 +26,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace trt_alpha::core {
@@ -41,6 +42,10 @@ struct BatchResult
     std::shared_ptr<Buffer> buffer;              //!< 原图所有者（一整块连续内存）
     std::vector<BufferView> views;               //!< 每张图的视图
     int validCount = 0;                          //!< 有效帧数（<= views.size()）
+
+    //! 每帧的"来源名主干"（不含扩展名 / 序号），长度 == validCount。
+    //! 存盘时按它命名（图片源 = 原文件名）；为空时渲染层回退 frame_<帧号>。
+    std::vector<std::string> frameNames;
 
     // ---- 各任务结果（按模型类型填，未命中的保持空）----
     std::vector<std::vector<det::Detection>> detections;          //!< 每张图的检测结果

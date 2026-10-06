@@ -37,6 +37,14 @@ constexpr int kObjectWidth = 7;
 void decodeYoloNasHead(cudaStream_t stream, const YoloDecodeParams& p,
                        const float* src, int anchors, float* objects);
 
+//! YuNet 三个输出的固定行宽（decode kernel 与 yunet.cpp 的引擎形状校验共用）。
+//! ⚠️ 这是 kernel 的硬假设：与引擎声明不符时 kernel 会越界读写，
+//! 因此由 yunet.cpp 在 setInputShape 之后拿引擎形状对这里做校验 —— 单一来源，不许各写一份。
+constexpr int kYuNetLocRow     = 14;   //!< 4 bbox + 10 landmark
+constexpr int kYuNetConfRow    = 2;    //!< 背景 / 人脸
+constexpr int kYuNetIouRow     = 1;    //!< IoU 分支
+constexpr int kYuNetObjectsRow = 17;   //!< 4 bbox + conf + label + keep + 10 landmark
+
 //! 解码 YuNet（libfacedetection）检测头。
 //! 输入 3 个张量：loc [B, N, 14] / conf [B, N, 2] / iou [B, N, 1]。
 //! 输出每行 17 个 float：

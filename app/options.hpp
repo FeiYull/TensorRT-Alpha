@@ -29,7 +29,7 @@ struct RunOptions
     // ---- 渲染 ----
     bool show = false;
     bool save = false;
-    std::string saveDir;        //!< --save-dir <dir>（空 = 用 INI [output].save_dir）
+    std::string saveDir;        //!< --save [dir]：显式输出目录；空 = 默认 save/<net>
 
     // ---- 池 ----
     int workers = -1;           //!< --workers <n>（<=0 = 用 INI [pool].workers）

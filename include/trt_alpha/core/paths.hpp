@@ -49,6 +49,12 @@ public:
     //! 相对路径以 root() 为基准展开；绝对路径原样返回；空串返回空路径。
     [[nodiscard]] static std::filesystem::path resolve(const std::string& text);
 
+    //! 是否为网络 URL（形如 <scheme>://<host>...），如 rtsp / rtmp / http(s) / udp。
+    //! 判定依据是 RFC 3986 的 scheme 形态（字母开头 + [A-Za-z0-9+.-]，且至少 2 字符），
+    //! 因此 Windows 盘符 "D:/a.jpg" 与 "C://x" 都不会被误判。
+    //! 用途：URL 不是本地文件 —— 必须跳过 requireFile / 目录扫描这类本地校验。
+    [[nodiscard]] static bool isUrl(const std::string& text);
+
     //! resolve() + 存在性校验。缺失时抛出带"根目录来源 + 修复建议"的可读错误。
     //! role 用于错误消息（如 "config file" / "input image"）。
     [[nodiscard]] static std::filesystem::path requireFile(const std::string& text,
@@ -56,6 +62,14 @@ public:
 
     //! 把绝对路径转成便于打印/日志的字符串（Windows 下为原生编码）。
     [[nodiscard]] static std::string toDisplay(const std::filesystem::path& path);
+
+    //! 解析"结果存盘目录"。规则一句话：谁显式给了目录就用谁的（原样，不再拼子目录）；
+    //! 都没给才回退 <默认根>/<模型名>（默认根 = "save"）。
+    //!   resolveSaveDir("out", "yolov8") -> "out"
+    //!   resolveSaveDir("",    "yolov8") -> "save/yolov8"
+    //!   resolveSaveDir("",    "")       -> "save"
+    [[nodiscard]] static std::string resolveSaveDir(const std::string& dir,
+                                                    const std::string& modelName);
 };
 
 }  // namespace trt_alpha::core

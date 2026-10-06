@@ -40,6 +40,22 @@ Pipeline::~Pipeline()
     }
 }
 
+void Pipeline::markFailed(const std::string& what)
+{
+    m_failed.store(true);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_firstError.empty())
+    {
+        m_firstError = what;
+    }
+}
+
+std::string Pipeline::firstError() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_firstError;
+}
+
 void Pipeline::validateConfig()
 {
     if (m_cfg.sources.empty())
@@ -153,6 +169,7 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
         {
             TRT_LOG_ERROR("Pipeline: source[" << sourceIndex << "] next() failed: "
                           << e.what());
+            markFailed("source[" + std::to_string(sourceIndex) + "] next: " + e.what());
             break;
         }
 
@@ -175,6 +192,7 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
         {
             TRT_LOG_ERROR("Pipeline: source[" << sourceIndex
                           << "] submit failed: " << e.what());
+            markFailed("source[" + std::to_string(sourceIndex) + "] submit: " + e.what());
             break;
         }
 
@@ -250,6 +268,7 @@ void Pipeline::renderLoop()
         catch (const std::exception& e)
         {
             TRT_LOG_ERROR("Pipeline: inference failed: " << e.what());
+            markFailed(std::string("inference: ") + e.what());
             continue;
         }
 
@@ -282,6 +301,7 @@ void Pipeline::renderLoop()
         catch (const std::exception& e)
         {
             TRT_LOG_ERROR("Pipeline: drawResult failed: " << e.what());
+            markFailed(std::string("draw: ") + e.what());
             continue;
         }
 
@@ -295,6 +315,7 @@ void Pipeline::renderLoop()
             catch (const std::exception& e)
             {
                 TRT_LOG_ERROR("Pipeline: save failed: " << e.what());
+                markFailed(std::string("save: ") + e.what());
             }
         }
         if (m_cfg.showEnabled)
@@ -307,6 +328,7 @@ void Pipeline::renderLoop()
             catch (const std::exception& e)
             {
                 TRT_LOG_ERROR("Pipeline: show failed: " << e.what());
+                markFailed(std::string("show: ") + e.what());
             }
         }
 
@@ -400,6 +422,7 @@ bool Pipeline::popResult(core::BatchResult& out)
     catch (const std::exception& e)
     {
         TRT_LOG_ERROR("Pipeline::popResult: inference failed: " << e.what());
+        markFailed(std::string("inference: ") + e.what());
         return false;
     }
     return true;

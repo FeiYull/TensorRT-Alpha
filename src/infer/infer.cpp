@@ -7,14 +7,19 @@
 #include "trt_alpha/core/inference_pool.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/core/paths.hpp"
 #include "trt_alpha/datasource/opencv_source.hpp"
 #include "trt_alpha/pipeline/pipeline.hpp"
 #include "trt_alpha/pipeline/pipeline_config.hpp"
 #include "trt_alpha/renderer/opencv_renderer.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace trt_alpha {
 
@@ -53,6 +58,27 @@ to_full_policy(QueuePolicy p)
     }
 }
 
+//! 是否为视频文件后缀（小写比较；先剥离 URL 的查询串/锚点）。
+//! 按后缀而非子串判定：目录名 "a.mp4_backup" 里的图不该被当成视频。
+bool hasVideoExt(const std::string& src)
+{
+    const std::string path = src.substr(0, src.find_first_of("?#"));
+    const std::size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos)
+    {
+        return false;
+    }
+    std::string ext = path.substr(dot);
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    static const std::vector<std::string> kExts = {
+        ".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v",
+        ".ts", ".flv", ".mpg", ".mpeg", ".wmv",
+    };
+    return std::find(kExts.begin(), kExts.end(), ext) != kExts.end();
+}
+
 //! 构造数据源（根据 source / camera_id 推断类型）。
 datasource::SourceConfig build_source_config(const InferParams& p, int batch_size)
 {
@@ -63,23 +89,13 @@ datasource::SourceConfig build_source_config(const InferParams& p, int batch_siz
 
     if (!p.source.empty())
     {
-        // 判断源类型：视频 / URL / 图片
+        // 判断源类型：URL（流）/ 视频文件 / 图片（也可能是目录，openImage 内部再降级）。
+        // URL 一律当流：cv::imread 只认本地文件，远程资源只能走 FFmpeg 后端。
         const std::string& s = p.source;
-        const bool is_video =
-            s.find(".mp4") != std::string::npos ||
-            s.find(".avi") != std::string::npos ||
-            s.find(".mov") != std::string::npos ||
-            s.find("rtsp://") == 0 ||
-            s.find("http://") == 0  ||
-            s.find("https://") == 0;
-
-        if (is_video) {
-            cfg.type = datasource::SourceType::Video;
-            cfg.path = s;
-        } else {
-            cfg.type = datasource::SourceType::Image;
-            cfg.path = s;
-        }
+        cfg.path = s;
+        cfg.type = (core::Paths::isUrl(s) || hasVideoExt(s))
+                       ? datasource::SourceType::Video
+                       : datasource::SourceType::Image;
     }
     else if (p.camera_id >= 0)
     {
@@ -297,7 +313,7 @@ void Infer::Impl::ensure_pool()
 //  Infer
 // =============================================================================
 Infer::Infer(const InferParams& p)
-    : m_impl(std::make_unique<Impl>())
+    : m_impl(std::make_shared<Impl>())
 {
     p.validate();
     m_impl->params = p;
@@ -316,6 +332,10 @@ Infer& Infer::operator=(Infer&&) noexcept = default;
 struct Stream::Impl
 {
     std::unique_ptr<pipeline::Pipeline> pipeline;
+    //! 保活 Infer::Impl：Pipeline 持有 pool / renderer 的**裸指针**，
+    //! 它们都是 Infer::Impl 的成员（或成员持有的），所以 Stream 只要
+    //! 抓住 Impl 的强引用，就能保证"Stream 活着 → 这些资源活着"。
+    std::shared_ptr<void> owner;
 };
 
 Stream::Stream() = default;
@@ -388,7 +408,14 @@ Stream Infer::async()
         pcfg.renderer = &m_impl->renderer;
         pcfg.saveEnabled = m_impl->params.save;
         pcfg.showEnabled = m_impl->params.show;
-        if (!m_impl->params.save_dir.empty())    pcfg.saveDir = m_impl->params.save_dir;
+        // 存盘目录：params.save_dir > ini output.save_dir > 默认 save/<net>。
+        // 谁显式给了就用谁的（原样，不拼子目录）。
+        std::string saveDir = m_impl->params.save_dir;
+        if (saveDir.empty()) {
+            saveDir = m_impl->pool->modelConfig().getString("output.save_dir", "");
+        }
+        pcfg.saveDir = core::Paths::resolveSaveDir(
+            saveDir, registry_name(m_impl->params.model_type));
         if (!m_impl->params.show_window.empty()) pcfg.showWindow = m_impl->params.show_window;
     } else {
         pcfg.renderer = nullptr;
@@ -398,6 +425,9 @@ Stream Infer::async()
 
     Stream s;
     s.m_impl = std::make_unique<Stream::Impl>();
+    // 先保活再建 Pipeline：Pipeline 会记下 pool / renderer 的裸指针，
+    // 之后即使 Infer 析构，只要 Stream 还在，这些资源就不会被释放。
+    s.m_impl->owner = m_impl;
     s.m_impl->pipeline = std::make_unique<pipeline::Pipeline>(std::move(pcfg));
     s.m_impl->pipeline->start();
     return s;

@@ -337,8 +337,7 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
 }
 
 void OpenCVRenderer::save(const core::BatchResult& result,
-                          const std::string& outputDir,
-                          const std::string& prefix) const
+                          const std::string& outputDir) const
 {
     if (outputDir.empty())
     {
@@ -364,9 +363,25 @@ void OpenCVRenderer::save(const core::BatchResult& result,
         {
             continue;
         }
+
+        // 文件名：优先用数据源给的"帧来源名"（图片=原文件名）；
+        // 缺失时回退 frame_<绝对帧号>，保证永不写出空名。
         const std::uint64_t index = result.firstFrameIndex + i;
-        const fs::path out = fs::path(outputDir) /
-                             (prefix + std::to_string(index) + ".jpg");
+        const std::string stem =
+            (i < result.frameNames.size() && !result.frameNames[i].empty())
+                ? result.frameNames[i]
+                : ("frame_" + std::to_string(index));
+
+        const fs::path out = fs::path(outputDir) / (stem + ".jpg");
+
+        // 同名直接覆盖（用户口径），但必须留痕，绝不静默丢数据
+        std::error_code existsEc;
+        if (fs::exists(out, existsEc))
+        {
+            TRT_LOG_WARN("OpenCVRenderer::save: overwriting existing file: "
+                         << out.string());
+        }
+
         if (!cv::imwrite(out.string(), image))
         {
             TRT_LOG_ERROR("OpenCVRenderer::save: imwrite failed: " << out.string());

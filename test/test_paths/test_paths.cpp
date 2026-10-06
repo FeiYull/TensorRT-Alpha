@@ -7,6 +7,7 @@
 //    [3] requireFile()：存在 OK；不存在抛异常
 //    [4] setOverride 时序规则（必须在首次 root() 前）
 //    [5] toPath / toDisplay 基本行为
+//    [6] isUrl：URL 判定（scheme 形态），Windows 盘符不误判
 // =============================================================================
 #include "trt_alpha/core/paths.hpp"
 
@@ -115,6 +116,21 @@ int main()
 
         const std::string disp = Paths::toDisplay(fs::path("abc/def"));
         check(!disp.empty(), "[5] toDisplay non-empty");
+    }
+
+    // [6] isUrl：只认 <scheme>:// 形态；Windows 盘符 / 相对路径不误判
+    {
+        check( Paths::isUrl("rtsp://192.168.1.10:554/stream1"), "[6] rtsp:// is url");
+        check( Paths::isUrl("RTSP://cam/live"),                  "[6] uppercase scheme is url");
+        check( Paths::isUrl("https://example.com/a.mp4?t=1"),    "[6] https:// with query is url");
+        check( Paths::isUrl("udp://239.0.0.1:1234"),             "[6] udp:// is url");
+        check(!Paths::isUrl("data/bus.jpg"),                     "[6] relative path is not url");
+        check(!Paths::isUrl("D:/data/bus.jpg"),                  "[6] windows drive is not url");
+        check(!Paths::isUrl("D:\\data\\bus.jpg"),                "[6] windows backslash path is not url");
+        check(!Paths::isUrl("C://foo"),                          "[6] 1-letter scheme rejected");
+        check(!Paths::isUrl("http://"),                          "[6] empty host rejected");
+        check(!Paths::isUrl("://host/x"),                        "[6] empty scheme rejected");
+        check(!Paths::isUrl("data/bus.jpg://x"),                 "[6] scheme not at start rejected");
     }
 
     std::cout << "===================\n";

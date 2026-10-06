@@ -3,7 +3,8 @@
 // -----------------------------------------------------------------------------
 //  OpenCVRenderer 测试（不依赖 engine，手工造数据）：
 //    [1] drawResult：画框后，对应像素颜色变了
-//    [2] save：存盘后文件存在
+//    [2] save：按 result.frameNames 命名（图片源 = 原文件名）
+//    [2b] frameNames 缺失 → 回退 frame_<帧号>
 //    [3] show：调用不崩（不检查窗口）
 //    [4] 空 result：不崩
 // =============================================================================
@@ -109,22 +110,42 @@ int main()
     }
 
     // ---------------------------------------------------------------
-    // [2] save 存盘
+    // [2] save 存盘：文件名取 result.frameNames（图片源 = 原文件名）
     // ---------------------------------------------------------------
     {
         BatchResult r = makeTestResult(100, 100);
+        r.frameNames = { "bus" };          // 模拟图片源：原文件名主干
         renderer.drawResult(r, classNames);
 
         const std::string outDir = "test_renderer_out";
         std::error_code ec;
         fs::remove_all(outDir, ec);   // 清掉旧文件
 
-        renderer.save(r, outDir, "img_");
+        renderer.save(r, outDir);
 
-        const fs::path expected = fs::path(outDir) / "img_0.jpg";
-        check(fs::exists(expected), "[2] saved file exists (img_0.jpg)");
+        const fs::path expected = fs::path(outDir) / "bus.jpg";
+        check(fs::exists(expected), "[2] saved file uses source name (bus.jpg)");
 
-        // 清理
+        fs::remove_all(outDir, ec);
+    }
+
+    // ---------------------------------------------------------------
+    // [2b] frameNames 缺失 → 回退 frame_<帧号>.jpg
+    // ---------------------------------------------------------------
+    {
+        BatchResult r = makeTestResult(100, 100);
+        r.firstFrameIndex = 7;             // frameNames 为空
+        renderer.drawResult(r, classNames);
+
+        const std::string outDir = "test_renderer_out_fb";
+        std::error_code ec;
+        fs::remove_all(outDir, ec);
+
+        renderer.save(r, outDir);
+
+        const fs::path expected = fs::path(outDir) / "frame_7.jpg";
+        check(fs::exists(expected), "[2b] missing frameNames falls back (frame_7.jpg)");
+
         fs::remove_all(outDir, ec);
     }
 
@@ -145,7 +166,7 @@ int main()
     {
         BatchResult empty;
         renderer.drawResult(empty, classNames);
-        renderer.save(empty, "test_renderer_out_empty", "x_");
+        renderer.save(empty, "test_renderer_out_empty");
         renderer.show(empty, "test_renderer_empty");
         check(true, "[4] empty result handled without crash");
 

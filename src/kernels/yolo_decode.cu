@@ -546,10 +546,11 @@ void decodeYuNetHead(cudaStream_t stream,
                      const float* variances,
                      float* objects)
 {
-    const int dstRow = 17;
-    const int locRow  = 14;
-    const int confRow = 2;
-    const int iouRow  = 1;
+    // 行宽来自公共契约（postprocess.hpp），yunet.cpp 会拿引擎声明形状校验它。
+    const int dstRow  = kYuNetObjectsRow;
+    const int locRow  = kYuNetLocRow;
+    const int confRow = kYuNetConfRow;
+    const int iouRow  = kYuNetIouRow;
 
     const dim3 block = block2D();
     const dim3 grid = gridSize2D(static_cast<std::size_t>(numCandidates), batch);

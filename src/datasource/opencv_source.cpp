@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <stdexcept>
@@ -33,6 +34,41 @@ bool isImageFile(const fs::path& p)
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return std::find(kExts.begin(), kExts.end(), ext) != kExts.end();
+}
+
+//! 从流 URL 里取末段路径当存盘名主干（去查询串 / 扩展名 / 非法文件名字符）。
+//! 例：rtsp://cam/live/main -> "main"；http://x/v/a.mp4?t=1 -> "a"；取不到 -> "stream"。
+std::string urlStem(const std::string& url)
+{
+    std::string s = url.substr(0, url.find_first_of("?#"));
+    while (!s.empty() && s.back() == '/')
+    {
+        s.pop_back();
+    }
+    const std::size_t slash = s.find_last_of('/');
+    std::string name = (slash == std::string::npos) ? s : s.substr(slash + 1);
+
+    const std::size_t dot = name.find_last_of('.');
+    if (dot != std::string::npos && dot != 0)
+    {
+        name.resize(dot);
+    }
+    // 纯点（"." / ".."）无意义，且会生成隐藏文件名
+    if (name.find_first_not_of('.') == std::string::npos)
+    {
+        name.clear();
+    }
+
+    // 文件名不允许 : * ? " < > | / \ —— 非 [0-9A-Za-z._-] 一律换成 '_'
+    for (char& c : name)
+    {
+        const unsigned char u = static_cast<unsigned char>(c);
+        if (!(std::isalnum(u) || c == '.' || c == '_' || c == '-'))
+        {
+            c = '_';
+        }
+    }
+    return name.empty() ? std::string("stream") : name;
 }
 
 }  // namespace
@@ -70,8 +106,33 @@ OpenCVSource::~OpenCVSource()
 
 void OpenCVSource::openImage()
 {
-    const fs::path p = core::Paths::requireFile(m_cfg.path, "image");
-    m_imagePaths = { p.string() };
+    // URL 是流，不是本地图片（cv::imread 只认本地文件）。
+    // 明确报错，避免用户拿 --image 传流后收到误导的 "image not found"。
+    if (core::Paths::isUrl(m_cfg.path))
+    {
+        throw std::runtime_error(
+            "OpenCVSource: '" + m_cfg.path +
+            "' is a URL (stream), not an image; use the video/stream source "
+            "instead (CLI: --video <url>, InferParams.source = <url>)");
+    }
+
+    const fs::path p = core::Paths::resolve(m_cfg.path);
+
+    // 传目录 = 目录批量。判定放在这里（而不是各调用方）：
+    // Infer 的 source / CLI 的 --image / sample 传目录都能自动生效。
+    // 口径：只扫一层，不递归子目录；目录里没有图片由 openImages() 抛错。
+    std::error_code ec;
+    if (fs::is_directory(p, ec))
+    {
+        m_cfg.type = SourceType::Images;   // 让 typeName() / 日志反映真实模式
+        TRT_LOG_INFO("OpenCVSource: '" << core::Paths::toDisplay(p)
+                     << "' is a directory -> images mode (single level)");
+        openImages();
+        return;
+    }
+
+    const fs::path file = core::Paths::requireFile(m_cfg.path, "image");
+    m_imagePaths = { file.string() };
     m_imageIndex = 0;
 }
 
@@ -106,6 +167,40 @@ void OpenCVSource::openImages()
 
 void OpenCVSource::openVideo()
 {
+    // 网络流（rtsp / rtmp / http(s) / udp ...）：没有本地文件可校验，
+    // 跳过 requireFile，交给 FFmpeg 后端直连。
+    // 显式指定 CAP_FFMPEG：Windows 上 MSMF 会抢先接管 http(s)，且不支持 rtsp。
+    if (core::Paths::isUrl(m_cfg.path))
+    {
+        m_isStream = true;
+
+        // 打开 / 读取超时（毫秒，仅 FFmpeg/GStreamer 后端支持）：
+        // 没有它，不可达的流会按后端默认值长时间阻塞（实测 rtsp 默认约 30s）。
+        std::vector<int> params;
+        if (m_cfg.openTimeoutMs > 0)
+        {
+            params.push_back(cv::CAP_PROP_OPEN_TIMEOUT_MSEC);
+            params.push_back(m_cfg.openTimeoutMs);
+        }
+        if (m_cfg.readTimeoutMs > 0)
+        {
+            params.push_back(cv::CAP_PROP_READ_TIMEOUT_MSEC);
+            params.push_back(m_cfg.readTimeoutMs);
+        }
+
+        if (!m_capture.open(m_cfg.path, cv::CAP_FFMPEG, params))
+        {
+            throw std::runtime_error(
+                "OpenCVSource: cannot open stream: " + m_cfg.path +
+                "\n  hint: check the URL is reachable and the scheme is one of "
+                "rtsp / rtmp / http / https / udp");
+        }
+        TRT_LOG_INFO("OpenCVSource: opened stream " << m_cfg.path
+                     << " (openTimeout=" << m_cfg.openTimeoutMs
+                     << "ms readTimeout=" << m_cfg.readTimeoutMs << "ms)");
+        return;
+    }
+
     const fs::path p = core::Paths::requireFile(m_cfg.path, "video");
     if (!m_capture.open(p.string()))
     {
@@ -185,6 +280,35 @@ void OpenCVSource::copyIntoBatch(core::Batch& batch, int index, const cv::Mat& i
     }
 }
 
+std::string OpenCVSource::nameForNextFrame(std::uint64_t frameIndex) const
+{
+    char suffix[32];
+    std::snprintf(suffix, sizeof(suffix), "%06llu",
+                  static_cast<unsigned long long>(frameIndex));
+
+    switch (m_cfg.type)
+    {
+    case SourceType::Image:
+    case SourceType::Images:
+        // 图片：原文件名主干（bus.jpg -> "bus"），存盘时按原名落盘
+        if (m_imageIndex < m_imagePaths.size())
+        {
+            return fs::path(m_imagePaths[m_imageIndex]).stem().string();
+        }
+        return {};
+
+    case SourceType::Video:
+        // 视频：源文件主干 + 帧号（同批多帧互不覆盖）；
+        // 流（URL）没有本地文件名，从 URL 末段取主干。
+        return (m_isStream ? urlStem(m_cfg.path)
+                           : fs::path(m_cfg.path).stem().string()) + "_" + suffix;
+
+    case SourceType::Camera:
+        return "cam" + std::to_string(m_cfg.cameraId) + "_" + suffix;
+    }
+    return {};
+}
+
 bool OpenCVSource::readOneImage(cv::Mat& out)
 {
     if (m_imageIndex >= m_imagePaths.size())
@@ -200,7 +324,8 @@ bool OpenCVSource::readOneFrame(cv::Mat& out)
 {
     if (!m_capture.read(out))
     {
-        if (m_cfg.loop && m_cfg.type == SourceType::Video)
+        // 循环仅对本地视频文件有效：流不能回绕（CAP_PROP_POS_FRAMES 对流无效）。
+        if (m_cfg.loop && m_cfg.type == SourceType::Video && !m_isStream)
         {
             // 循环：回到开头
             m_capture.set(cv::CAP_PROP_POS_FRAMES, 0);
@@ -218,7 +343,8 @@ bool OpenCVSource::next(core::Batch& out)
         return false;
     }
 
-    // 读第一帧（决定尺寸）
+    // 读第一帧（决定尺寸）—— 名字要在读之前取（readOneImage 会推进索引）
+    const std::string firstName = nameForNextFrame(m_nextFrameIndex);
     cv::Mat first;
     bool gotFirst = false;
     if (m_cfg.type == SourceType::Image || m_cfg.type == SourceType::Images)
@@ -245,6 +371,7 @@ bool OpenCVSource::next(core::Batch& out)
                                           core::DataType::UInt8);
     out.views.clear();
     out.validCount = 0;
+    out.frameNames.clear();
 
     const std::size_t oneFrame = static_cast<std::size_t>(W) * H * 3;
     for (int i = 0; i < m_cfg.batchSize; ++i)
@@ -263,6 +390,7 @@ bool OpenCVSource::next(core::Batch& out)
     // 填第一帧
     copyIntoBatch(out, 0, first);
     out.validCount = 1;
+    out.frameNames.push_back(firstName);
 
     // 继续填剩余帧
     for (int i = 1; i < m_cfg.batchSize; ++i)
@@ -271,6 +399,7 @@ bool OpenCVSource::next(core::Batch& out)
         {
             break;
         }
+        const std::string name = nameForNextFrame(m_nextFrameIndex + static_cast<std::uint64_t>(i));
         cv::Mat img;
         bool ok = false;
         if (m_cfg.type == SourceType::Image || m_cfg.type == SourceType::Images)
@@ -286,7 +415,8 @@ bool OpenCVSource::next(core::Batch& out)
             break;
         }
         copyIntoBatch(out, i, img);
-        ++out.validCount;
+        out.validCount += 1;
+        out.frameNames.push_back(name);
     }
 
     // 不满的帧填 0（垃圾）

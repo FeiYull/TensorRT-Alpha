@@ -291,6 +291,7 @@ BatchResult InferencePool::runBatch(std::size_t workerIndex, Batch batch)
     result.buffer = std::move(batch.buffer);
     result.views = std::move(batch.views);
     result.validCount = batch.validCount;
+    result.frameNames = std::move(batch.frameNames);
 
     // 模型把结果 move 进 result（基类实现，无 dynamic_cast）
     model.commitResult(result);
