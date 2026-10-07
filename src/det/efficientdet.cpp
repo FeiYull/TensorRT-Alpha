@@ -166,7 +166,7 @@ void EfficientDet::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("efficientdet: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "efficientdet");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 

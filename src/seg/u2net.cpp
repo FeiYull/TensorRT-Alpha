@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: det :: U2Net（实现）
+//  trt_alpha :: seg :: U2Net（实现）
 // =============================================================================
 #include "u2net.hpp"
 #include "trt_alpha/core/buffer.hpp"
@@ -58,10 +58,11 @@ void U2Net::loadConfig(const core::ModelConfig& cfg)
 
 void U2Net::discoverEngineIo()
 {
+    // 口径：第一个输入 + 第一个非输入输出（与其他模型一致；多输出引擎请显式指定）
     for (const auto& t : m_engine->ioTensors())
     {
-        if (t.isInput)  { m_inputName = t.name;  continue; }
-        if (!t.isInput) { m_outputName = t.name; continue; }
+        if (t.isInput)  { if (m_inputName.empty())  { m_inputName  = t.name; } }
+        else            { if (m_outputName.empty()) { m_outputName = t.name; } }
     }
     if (m_inputName.empty() || m_outputName.empty())
     {
@@ -99,15 +100,9 @@ void U2Net::allocateBuffers()
     m_inputSrc.allocate(std::size_t(B) * 3 * DH * DW * sizeof(float));
     logBox("u2net.input_src", B, 3, DH, DW, core::DataType::Float32,
            m_inputSrc.bytes(), core::MemorySpace::Device);
-    m_inputRgb.allocate(std::size_t(B) * 3 * DH * DW * sizeof(float));
-    logBox("u2net.input_rgb", B, 3, DH, DW, core::DataType::Float32,
-           m_inputRgb.bytes(), core::MemorySpace::Device);
     m_inputResize.allocate(std::size_t(B) * 3 * DH * DW * sizeof(float));
     logBox("u2net.input_resize", B, 3, DH, DW, core::DataType::Float32,
            m_inputResize.bytes(), core::MemorySpace::Device);
-    m_inputNorm.allocate(std::size_t(B) * 3 * DH * DW * sizeof(float));
-    logBox("u2net.input_norm", B, 3, DH, DW, core::DataType::Float32,
-           m_inputNorm.bytes(), core::MemorySpace::Device);
     m_inputNchw.allocate(std::size_t(B) * 3 * DH * DW * sizeof(float));
     logBox("u2net.input_nchw", B, 3, DH, DW, core::DataType::Float32,
            m_inputNchw.bytes(), core::MemorySpace::Device);
@@ -123,7 +118,6 @@ void U2Net::allocateBuffers()
     // output_resize 依赖 srcH/srcW，setBatch 里再分配
     m_outputResize.allocate(std::size_t(B) * 1 * DH * DW * sizeof(float));
     m_outputResizeHost.allocate(std::size_t(B) * 1 * DH * DW * sizeof(float));
-    m_maskHost.allocate(std::size_t(DH) * DW * sizeof(float));
 
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
@@ -152,21 +146,17 @@ void U2Net::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("u2net: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "u2net");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
     buildU2NetAffine(m_srcW, m_srcH, m_cfg.dstW, m_cfg.dstH, m_src2dst, m_dst2src);
 
-    // src 尺寸的 buffer（m_inputSrc / m_inputRgb 要覆盖 srcH*srcW）
+    // src 尺寸的 buffer（m_inputSrc 要覆盖 srcH*srcW）
     const std::size_t oneSrc = std::size_t(m_srcH) * m_srcW * 3;
     if (m_inputSrc.bytes() < std::size_t(m_batch) * oneSrc * sizeof(float))
     {
         m_inputSrc.allocate(std::size_t(m_batch) * oneSrc * sizeof(float));
-    }
-    if (m_inputRgb.bytes() < std::size_t(m_batch) * oneSrc * sizeof(float))
-    {
-        m_inputRgb.allocate(std::size_t(m_batch) * oneSrc * sizeof(float));
     }
 
     // output_resize（src 尺寸）
@@ -178,10 +168,6 @@ void U2Net::setBatch(const core::Batch& batch)
     if (m_outputResizeHost.bytes() < std::size_t(m_batch) * oneSrcGray * sizeof(float))
     {
         m_outputResizeHost.allocate(std::size_t(m_batch) * oneSrcGray * sizeof(float));
-    }
-    if (m_maskHost.bytes() < oneSrcGray * sizeof(float))
-    {
-        m_maskHost.allocate(oneSrcGray * sizeof(float));
     }
 
     // batch.buffer 是 uint8：H2D uint8 -> GPU kernel -> float
@@ -307,6 +293,6 @@ void U2Net::reset()
     m_batch = 0;
 }
 
-}  // namespace trt_alpha::det
+}  // namespace trt_alpha::seg
 
 TRT_ALPHA_REGISTER_MODEL("u2net", trt_alpha::seg::U2Net);

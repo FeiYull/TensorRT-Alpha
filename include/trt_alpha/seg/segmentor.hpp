@@ -10,6 +10,7 @@
 #include "trt_alpha/seg/types.hpp"
 
 #include <cstdio>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -51,6 +52,9 @@ protected:
             float v[3];
             if (std::sscanf(meanStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3) {
                 m_normMean[0] = v[0]; m_normMean[1] = v[1]; m_normMean[2] = v[2];
+            } else {
+                throw std::runtime_error(
+                    "cfg 'mean' expects 3 comma-separated floats, got '" + meanStr + "'");
             }
         }
         const std::string stdStr = cfg.getString("std", "");
@@ -58,6 +62,9 @@ protected:
             float v[3];
             if (std::sscanf(stdStr.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]) == 3) {
                 m_normStd[0] = v[0]; m_normStd[1] = v[1]; m_normStd[2] = v[2];
+            } else {
+                throw std::runtime_error(
+                    "cfg 'std' expects 3 comma-separated floats, got '" + stdStr + "'");
             }
         }
     }

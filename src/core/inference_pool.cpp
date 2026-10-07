@@ -70,9 +70,25 @@ InferencePool::InferencePool(const ModelConfig& cfg,
         for (const auto& t : sharedEngine->ioTensors())
         {
             if (!t.isInput) { continue; }
+
+            // batch 轴由布局决定。配置里给了 input.layout 就用它；
+            // 没给则按"秩 >= 4 ⇒ N 在轴 0"这一当前所有模型的规范约定取值。
+            // 秩 < 4 且没有布局声明时（CHW / HWC 这类）无法可靠判断，
+            // 跳过本预检 —— 权威判定在模型侧的 applyInputShape，那里拿得到布局。
+            const int rank = t.shape.nbDims;
+            const bool axisKnown = !workerCfg.layout.empty() || rank >= 4;
+            if (!axisKnown)
+            {
+                TRT_LOG_DEBUG("[InferencePool] batch precheck skipped for '"
+                              << t.name << "' (rank " << rank
+                              << ", no input.layout declared)");
+                break;
+            }
+            const int batchAxis = t.batchAxisIndex(workerCfg.layout);
             m_resolvedBatch = core::resolveBatch(t, workerCfg.batchSize,
                                                  "[InferencePool]",
-                                                 workerCfg.maxBatchSize).batch;
+                                                 workerCfg.maxBatchSize,
+                                                 batchAxis).batch;
             break;
         }
 
@@ -136,18 +152,34 @@ std::future<BatchResult> InferencePool::submit(Batch batch)
         throw std::invalid_argument("[InferencePool] batch is empty");
     }
 
+    // 容量护栏：显存是按【引擎解析后的 batch】分配的，多喂一批就是对 kernel
+    // 越界写（P1-2）。submit 是公开 API，且是外部 Batch 进入系统的唯一入口，
+    // 因此这里是最靠前、覆盖最全的收口点 —— 越界一律显式失败，不截断不静默。
+    if (m_resolvedBatch > 0 &&
+        static_cast<int>(batch.views.size()) > m_resolvedBatch)
+    {
+        const std::string msg =
+            "[InferencePool] batch of " + std::to_string(batch.views.size()) +
+            " images exceeds the resolved batch " + std::to_string(m_resolvedBatch) +
+            " (buffers are sized by the engine profile; raise [input] batch_size"
+            " within the engine range instead)";
+        TRT_LOG_ERROR(msg);
+        throw std::invalid_argument(msg);
+    }
+
     std::promise<BatchResult> promise;
     auto future = promise.get_future();
 
     const int batchN = batch.validCount;
     const std::uint64_t taskId = g_taskCounter.fetch_add(1);
 
-    TRT_LOG_DEBUG("[InferencePool] submit task #" << taskId
-                 << ": validCount=" << batchN << "/" << batch.views.size()
-                 << ", queue=" << m_tasks.size() << "/" << m_maxQueueSize);
-
     {
+        // 所有对 m_tasks 的读（含日志里的 size()）都必须在锁内 ——
+        // 锁外读一个正被 worker 线程 pop 的 std::queue 是 data race。
         std::unique_lock<std::mutex> lock(m_mutex);
+        TRT_LOG_DEBUG("[InferencePool] submit task #" << taskId
+                     << ": validCount=" << batchN << "/" << batch.views.size()
+                     << ", queue=" << m_tasks.size() << "/" << m_maxQueueSize);
         if (m_stop)
         {
             TRT_LOG_ERROR("[InferencePool] submit rejected: pool stopped");
@@ -170,15 +202,12 @@ std::future<BatchResult> InferencePool::submit(Batch batch)
                 TRT_LOG_ERROR("[InferencePool] submit rejected after wait: pool stopped");
                 throw ThreadPoolStopped();
             }
-            TRT_LOG_DEBUG("[InferencePool] submit task #" << taskId
-                         << " unblocked, queue=" << m_tasks.size());
         }
         m_tasks.emplace(std::move(batch), std::move(promise));
+        TRT_LOG_DEBUG("[InferencePool] submit task #" << taskId << " queued, queue="
+                     << m_tasks.size());
     }
     m_cvTask.notify_one();
-
-    TRT_LOG_DEBUG("[InferencePool] submit task #" << taskId << " queued, queue="
-                 << m_tasks.size());
 
     return future;
 }
@@ -321,9 +350,12 @@ void InferencePool::waitIdle()
 void InferencePool::shutdown()
 {
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::unique_lock<std::mutex> lock(m_mutex);
         if (m_stop)
         {
+            // 已有线程在关停：等它 join 完再返回。否则本线程可能在 worker
+            // 仍被使用时就析构池对象 → use-after-free。
+            m_cvShutdown.wait(lock, [this] { return m_shutdownDone; });
             return;
         }
         m_stop = true;
@@ -342,6 +374,12 @@ void InferencePool::shutdown()
         }
     }
     m_workers.clear();
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_shutdownDone = true;
+    }
+    m_cvShutdown.notify_all();
 
     TRT_LOG_INFO("[InferencePool] shutdown complete");
 }

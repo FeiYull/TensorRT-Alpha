@@ -22,13 +22,14 @@ Pipeline::Pipeline(PipelineConfig cfg)
 {
     validateConfig();
 
+    // 两个队列都用配置里的策略（默认 Block：批处理不丢帧）。
+    // 注意 Block 的安全性由 stop() / waitForCompletion() 保证 —— 它们会在 join
+    // 之前 close() 队列，让阻塞在 push 上的线程有出口（否则会挂死）。
     m_resultQueue = std::make_unique<core::BoundedQueue<std::future<core::BatchResult>>>(
-        m_cfg.resultQueueSize,
-        core::BoundedQueue<std::future<core::BatchResult>>::FullPolicy::DropOldest);
+        m_cfg.resultQueueSize, m_cfg.queueFullPolicy);
 
     m_processedQueue = std::make_unique<core::BoundedQueue<core::BatchResult>>(
-        m_cfg.resultQueueSize,
-        core::BoundedQueue<core::BatchResult>::FullPolicy::DropOldest);
+        m_cfg.resultQueueSize, m_cfg.queueFullPolicy);
 }
 
 Pipeline::~Pipeline()
@@ -96,6 +97,15 @@ void Pipeline::validateConfig()
     {
         TRT_LOG_WARN("Pipeline: resultQueueSize == 0 -> unbounded (not recommended)");
     }
+
+    // Block 策略下没有消费者会直接挂死（源线程写到满就永远等下去）。
+    // 渲染线程存在时它自己就是消费者；否则责任在调用方（必须持续 popResult）。
+    if (m_cfg.queueFullPolicy == core::QueueFullPolicy::Block &&
+        m_cfg.renderer == nullptr)
+    {
+        TRT_LOG_WARN("Pipeline: queueFullPolicy=Block without a renderer; the caller "
+                     "must keep draining popResult() or the source thread will block");
+    }
 }
 
 void Pipeline::start()
@@ -133,8 +143,10 @@ void Pipeline::start()
     }
     TRT_LOG_INFO("Pipeline: all source threads launched");
 
-    TRT_LOG_INFO("Pipeline: started (N sources + 1 render = "
-                 << (m_cfg.sources.size() + 1) << " threads)");
+    const std::size_t renderThreads = (m_cfg.renderer != nullptr) ? 1 : 0;
+    TRT_LOG_INFO("Pipeline: started (" << m_cfg.sources.size() << " source + "
+                 << renderThreads << " render = "
+                 << (m_cfg.sources.size() + renderThreads) << " threads)");
 }
 
 void Pipeline::sourceLoop(std::size_t sourceIndex)
@@ -208,8 +220,15 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
         }
         if (dropped)
         {
-            TRT_LOG_DEBUG("Pipeline: result queue full (" << m_cfg.resultQueueSize
-                           << "), dropped oldest future");
+            // 丢帧必须留痕，且必须是默认可见的 WARN 级（DEBUG 在 Release 被编译掉）。
+            // 逐帧刷屏没意义：首次报一条，之后每 100 条报一次，末尾再汇总一次。
+            const std::size_t total = m_resultQueue->droppedTotal();
+            if (total == 1 || total % 100 == 0)
+            {
+                TRT_LOG_WARN("Pipeline: result queue full (size=" << m_cfg.resultQueueSize
+                             << "), dropped the oldest result(s); total dropped=" << total
+                             << " - set queue_full_policy=block to never drop");
+            }
         }
         TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
                      << "] pushed future, loop again");
@@ -229,7 +248,6 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
             m_resultQueue->close();
         }
     }
-    m_cvDone.notify_all();
 }
 
 void Pipeline::renderLoop()
@@ -332,8 +350,10 @@ void Pipeline::renderLoop()
             }
         }
 
-        // ★ 把处理完的结果推给"渲染后队列"（供用户 popProcessed 取）
-        if (m_processedQueue != nullptr)
+        // 把处理完的结果推给"渲染后队列"（供用户 popProcessed 取）。
+        // 仅当调用方声明要消费时才推：没人消费还推，Block 策略下渲染线程会
+        // 写满队列后永久阻塞（Drop 策略下则纯属白丢）。
+        if (m_cfg.exposeProcessed && m_processedQueue != nullptr)
         {
             m_processedQueue->push(std::move(result));
         }
@@ -365,6 +385,11 @@ void Pipeline::stop()
     {
         s->requestStop();
     }
+
+    // 关掉结果队列：Block 策略下源线程可能正阻塞在 push 上，
+    // 不 close 它就没机会回到 while 顶部看到 m_stopRequested → join 会挂死。
+    // close 之后队列里已有的元素仍可被渲染线程排空，不会丢。
+    m_resultQueue->close();
 }
 
 void Pipeline::waitForCompletion()
@@ -382,20 +407,38 @@ void Pipeline::waitForCompletion()
     // 源都结束了 → 确保队列关闭
     m_resultQueue->close();
 
+    // 渲染线程可能在 Block 策略下阻塞于 m_processedQueue 的 push（消费者跟不上）。
+    // 必须在 join 之前 close，否则会永久挂死。
+    if (m_processedQueue != nullptr)
+    {
+        m_processedQueue->close();
+    }
+
     // 等渲染线程结束
     if (m_renderThread.joinable())
     {
         m_renderThread.join();
     }
 
-    // 渲染线程退出时会关 m_processedQueue；这里再兜一次（防没起渲染线程）
-    if (m_processedQueue != nullptr)
-    {
-        m_processedQueue->close();
-    }
-
     m_running.store(false);
+
+    const std::size_t dropped = droppedResults();
+    if (dropped > 0)
+    {
+        TRT_LOG_WARN("Pipeline: finished with " << dropped
+                     << " dropped result(s) - queue_full_policy="
+                     << (m_cfg.queueFullPolicy == core::QueueFullPolicy::Block
+                             ? "block"
+                             : (m_cfg.queueFullPolicy == core::QueueFullPolicy::DropNewest
+                                    ? "drop_newest" : "drop_oldest"))
+                     << ", result_queue_size=" << m_cfg.resultQueueSize);
+    }
     TRT_LOG_INFO("Pipeline: all threads joined");
+}
+
+std::size_t Pipeline::droppedResults() const noexcept
+{
+    return m_resultQueue ? m_resultQueue->droppedTotal() : 0;
 }
 
 bool Pipeline::popResult(core::BatchResult& out)

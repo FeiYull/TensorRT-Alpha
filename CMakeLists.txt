@@ -42,6 +42,10 @@ else()
     endif()
 
     if(TRT_ALPHA_GPU_CC)
+        # 多 GPU 时 nvidia-smi 返回多行（compute_cap 一行一张卡）；取第一张即可。
+        string(REPLACE "\n" ";" TRT_ALPHA_GPU_CC_LIST "${TRT_ALPHA_GPU_CC}")
+        list(GET TRT_ALPHA_GPU_CC_LIST 0 TRT_ALPHA_GPU_CC)
+        string(STRIP "${TRT_ALPHA_GPU_CC}" TRT_ALPHA_GPU_CC)
         string(REPLACE "." "" TRT_ALPHA_CUDA_ARCH "${TRT_ALPHA_GPU_CC}")
         set(CMAKE_CUDA_ARCHITECTURES "${TRT_ALPHA_CUDA_ARCH}"
             CACHE STRING "CUDA architectures" FORCE)
@@ -130,11 +134,8 @@ target_compile_definitions(trt_alpha_core PUBLIC
     $<$<CONFIG:MinSizeRel>:TRT_ALPHA_LOG_MIN_LEVEL=2>
 )
 
-# Release 构建：TRT_LOG_DEBUG 变成 do {} while(0)，零开销
-# Debug 构建：全开（调试方便）
-target_compile_definitions(trt_alpha_core PRIVATE
-    $<$<CONFIG:Release>:TRT_ALPHA_LOG_MIN_LEVEL=1>
-)
+# 上面的 PUBLIC 定义已覆盖本 target 自身及其依赖者；
+# Release 下 TRT_LOG_DEBUG 变成 do {} while(0)，零开销；Debug 全开。
 
 
 set_target_properties(trt_alpha_core PROPERTIES
@@ -153,6 +154,7 @@ target_link_libraries(trt_alpha_core
 # =============================================================================
 # 测试
 # =============================================================================
+enable_testing()          # 顶层开启 CTest，注册的各 test_* 可 `ctest -C Release` 一键跑
 add_subdirectory(test)
 add_subdirectory(app)
 add_subdirectory(samples)

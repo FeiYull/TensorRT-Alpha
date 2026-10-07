@@ -47,18 +47,19 @@ void YoloNas::loadConfig(const core::ModelConfig& cfg)
     }
 
     // YOLO-NAS 特有字段
+    // 注意：pad 依赖 m_cfg.dstW/dstH，而这两个值是引擎真相 —— 要等
+    // discoverEngineIo() 里的 applyInputShape() 按引擎声明写回后才有效。
+    // 此处（loadConfig）dst 仍为 0，若在这里算 pad 会得到 (0-resize)/2 的负值，
+    // 让 copyWithPaddingKernel 把 letterbox 结果静默错位（不越界、不报错）。
+    // pad 的求值因此收口在 discoverEngineIo()：引擎形状落定后立即派生。
     m_resizeW = cfg.getInt("resize_w", 636);
     m_resizeH = cfg.getInt("resize_h", 636);
-    m_padTop  = (m_cfg.dstH - m_resizeH) / 2;
-    m_padLeft = (m_cfg.dstW - m_resizeW) / 2;
 
     TRT_LOG_INFO("YoloNas: config num_class=" << m_numClass
                  << " conf=" << m_confThreshold
                  << " iou=" << m_iouThreshold
                  << " top_k=" << m_topK
-                 << " resize=" << m_resizeW << "x" << m_resizeH
-                 << " dst=" << m_cfg.dstW << "x" << m_cfg.dstH
-                 << " pad=(" << m_padTop << "," << m_padLeft << ")");
+                 << " resize=" << m_resizeW << "x" << m_resizeH);
 }
 
 void YoloNas::discoverEngineIo()
@@ -78,6 +79,30 @@ void YoloNas::discoverEngineIo()
     m_outputName = output->name;
 
     core::applyInputShape(*m_engine, m_inputName, core::Layout::NCHW, 3, m_cfg);
+
+    // 此刻 m_cfg.dstW/dstH 已被引擎声明写回，是 letterbox 目标尺寸的唯一真相源。
+    // 在这里（且只在这里）派生 pad：
+    //   * resize 必须为正；
+    //   * resize 不得大于 dst —— 否则 pad 为负，copyWithPaddingKernel 的判据
+    //     (dstY >= padTop && dstY < srcH + padTop) 会退化成"只写左上角一块"，
+    //     数学上不越界、不崩溃，于是静默给错结果。按"配置与引擎能力不符即显式失败"。
+    if (m_resizeW <= 0 || m_resizeH <= 0)
+    {
+        throw std::runtime_error("yolo_nas: resize_w/resize_h must be > 0");
+    }
+    if (m_resizeW > m_cfg.dstW || m_resizeH > m_cfg.dstH)
+    {
+        throw std::runtime_error(
+            "yolo_nas: resize " + std::to_string(m_resizeW) + "x" +
+            std::to_string(m_resizeH) + " exceeds engine input " +
+            std::to_string(m_cfg.dstW) + "x" + std::to_string(m_cfg.dstH) +
+            " (would yield negative pad)");
+    }
+    m_padTop  = (m_cfg.dstH - m_resizeH) / 2;
+    m_padLeft = (m_cfg.dstW - m_resizeW) / 2;
+    TRT_LOG_INFO("YoloNas: resize=" << m_resizeW << "x" << m_resizeH
+                 << " dst=" << m_cfg.dstW << "x" << m_cfg.dstH
+                 << " pad=(" << m_padTop << "," << m_padLeft << ")");
 
     const nvinfer1::Dims outDims = m_engine->contextShape(m_outputName);
     if (outDims.nbDims != 3)
@@ -171,7 +196,7 @@ void YoloNas::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("yolo_nas: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "yolo_nas");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
@@ -238,8 +263,9 @@ void YoloNas::postprocess()
     p.confThreshold = m_confThreshold;
     p.iouThreshold = m_iouThreshold;
 
+    // 清零范围与 D2H 拷贝范围同源（都用 m_batch），不做两套口径。
     cudaMemsetAsync(m_objects.data(), 0,
-                    static_cast<std::size_t>(m_objectsPerImage) * m_cfg.batchSize * sizeof(float),
+                    static_cast<std::size_t>(m_objectsPerImage) * m_batch * sizeof(float),
                     m_stream.get());
 
     kernels::decodeYoloNasHead(m_stream.get(), p, m_outputSrc.asFloat(),

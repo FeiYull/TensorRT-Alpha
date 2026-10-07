@@ -92,7 +92,7 @@ int main(int argc, char** argv)
             std::cout << "usage: test_pipeline <engine.trt> <image_or_video>\n";
             std::cout << "(skipped: no args, and default probe "
                       << enginePath << " + " << inputPath << " not found)\n";
-            return 0;
+            return 77;   // CTest: SKIP（不是 FAIL，也不是假绿的 PASS）
         }
         std::cout << "(default probe: " << enginePath << " + " << inputPath << ")\n";
     }

@@ -11,8 +11,10 @@
 //  【安全设计】
 //    * 线程安全：每个 Kind 一把互斥锁，全部状态变更都在锁内
 //    * 归还凭据：Block{ptr, capacity} 必须原样来自 allocate() 的返回值
-//    * Debug 双重归还检测：非 NDEBUG 构建维护在用指针登记表，重复归还
-//      / 非法指针归还会被拒绝并打日志（Release 零开销）
+//    * 双重归还检测：**所有构建**都维护在用指针登记表，重复归还 / 非法指针
+//      归还会被拒绝并打日志。这道护栏不能在 Release 关掉 —— 一旦同一指针
+//      进两次空闲链，两个调用方就会拿到同一块显存（数据踩踏），而 Release
+//      恰好是发布/bench 用的那个构建。开销是一次哈希插入/删除，可忽略。
 //    * 生命周期：instance() 返回 shared_ptr，RAII 容器持 weak_ptr；
 //      进程退出时池先销毁则容器退化为直接 cudaFree，无 use-after-free
 //    * 缓存上限：device / pinned 各有字节上限（默认 512 MiB / 256 MiB），
@@ -75,8 +77,8 @@ public:
     };
 
     //! 全局池单例。
-    //! 返回 shared_ptr；调用方应存 weak_ptr 以感知池生命周期。
-    static std::shared_ptr<MemoryPool> instance();
+    //! 返回常引用（进程级单例，生命周期同程序）；调用方应存 weak_ptr 以感知池生命周期。
+    static const std::shared_ptr<MemoryPool>& instance();
 
     //! 构造（一般用 instance()；直接构造便于测试）。
     explicit MemoryPool(std::size_t deviceCacheLimitBytes = 512ULL << 20,
@@ -91,7 +93,7 @@ public:
     [[nodiscard]] Block allocate(Kind kind, std::size_t bytes);
 
     //! 归还块。noexcept —— 在 RAII 析构里调用。
-    //! Debug 构建下检测并拒绝双重归还。
+    //! 双重归还 / 非法指针一律拒绝并打 ERROR（所有构建都生效）。
     void release(Kind kind, Block block) noexcept;
 
     //! 立即释放该种类全部空闲缓存（显存紧张时手动调用）。
@@ -109,9 +111,7 @@ private:
         std::map<std::size_t, std::vector<void*>> freeBlocks;   // capacity -> 空闲块栈
         std::size_t cacheLimit = 0;
         Stats stats;
-#ifndef NDEBUG
         std::unordered_set<void*> outstanding;   // 在用指针登记（双重归还检测）
-#endif
     };
 
     static std::size_t roundUp(std::size_t bytes) noexcept;

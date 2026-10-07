@@ -37,17 +37,22 @@
 
 namespace trt_alpha::core {
 
+//! 队列满时的策略。
+//! 与元素类型无关，故定义在模板外 —— 配置层（pipeline::PipelineConfig）需要在
+//! 不知道元素类型的情况下持有它，否则每换一种元素类型就得换一份枚举。
+enum class QueueFullPolicy
+{
+    DropOldest,   //!< 丢最旧，push 新元素（实时场景首选）
+    DropNewest,   //!< 丢新元素（push 失败）
+    Block,        //!< 阻塞直到有空位（批处理首选）
+};
+
 template <typename T>
 class BoundedQueue
 {
 public:
-    //! 队列满时的策略。
-    enum class FullPolicy
-    {
-        DropOldest,   //!< 丢最旧，push 新元素（实时场景首选）
-        DropNewest,   //!< 丢新元素（push 失败）
-        Block,        //!< 阻塞直到有空位（批处理首选）
-    };
+    //! 兼容别名：旧的 BoundedQueue<T>::FullPolicy 写法继续可用。
+    using FullPolicy = QueueFullPolicy;
 
     //! 构造。maxSize == 0 表示"无上限"（不推荐）。
     explicit BoundedQueue(std::size_t maxSize = 32,
@@ -102,6 +107,7 @@ public:
             if (m_policy == FullPolicy::DropOldest)
             {
                 m_queue.pop();   // 丢最旧
+                ++m_dropped;     // 留痕：丢掉的数量必须可被上层报告，绝不静默
                 dropped = true;
             }
         }
@@ -172,6 +178,13 @@ public:
     [[nodiscard]] std::size_t maxSize() const noexcept { return m_maxSize; }
     [[nodiscard]] FullPolicy policy() const noexcept { return m_policy; }
 
+    //! 累计被丢弃的元素个数（仅 DropOldest 会产生）。用于上层报告"丢了几帧"。
+    [[nodiscard]] std::size_t droppedTotal() const
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_dropped;
+    }
+
 private:
     mutable std::mutex m_mutex;
     std::condition_variable m_cvNotEmpty;
@@ -179,6 +192,7 @@ private:
     std::queue<T> m_queue;
     std::size_t m_maxSize;
     FullPolicy m_policy;
+    std::size_t m_dropped = 0;
     bool m_closed = false;
 };
 

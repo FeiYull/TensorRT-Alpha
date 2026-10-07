@@ -75,6 +75,15 @@ IniParser IniParser::parseString(const std::string& content)
 {
     IniParser ini;
     std::istringstream iss(content);
+    // 跳过 UTF-8 BOM：记事本等"UTF-8 带 BOM"保存会让首个 [section] 变成 "\xEF\xBB\xBF[model]"
+    // 从而报出与真正原因无关的 syntax error。
+    if (content.size() >= 3 &&
+        static_cast<unsigned char>(content[0]) == 0xEF &&
+        static_cast<unsigned char>(content[1]) == 0xBB &&
+        static_cast<unsigned char>(content[2]) == 0xBF)
+    {
+        iss.seekg(3);
+    }
     std::string line;
     int lineNo = 0;
     std::string currentSection;

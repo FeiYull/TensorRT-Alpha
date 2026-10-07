@@ -104,30 +104,34 @@ std::size_t TensorDesc::volume() const noexcept
     return v;
 }
 
-int TensorDesc::pick(const nvinfer1::Dims& d, int fallback) const noexcept
+int TensorDesc::pick(const nvinfer1::Dims& d, int axis, int fallback) const noexcept
 {
-    if (d.nbDims > 0 && d.d[0] > 0) { return d.d[0]; }
+    if (axis >= 0 && axis < d.nbDims && d.d[axis] > 0) { return d.d[axis]; }
     return fallback;
 }
 
-BatchRange TensorDesc::batchRange() const noexcept
+BatchRange TensorDesc::batchRange(int axis) const noexcept
 {
-    // 静态引擎（无动态维）：shape.d[0] > 0，作为固定值兜底
-    const int fixed = (shape.nbDims > 0 && shape.d[0] > 0) ? shape.d[0] : 1;
-    return BatchRange{ pick(minShape, fixed),
-                       pick(optShape, fixed),
-                       pick(maxShape, fixed) };
+    if (axis < 0 || axis >= shape.nbDims)
+    {
+        return BatchRange{1, 1, 1};   // 无 batch 轴：batch 恒为 1
+    }
+    // 静态引擎（该轴无动态维）：shape.d[axis] > 0，作为固定值兜底
+    const int fixed = (shape.d[axis] > 0) ? shape.d[axis] : 1;
+    return BatchRange{ pick(minShape, axis, fixed),
+                       pick(optShape, axis, fixed),
+                       pick(maxShape, axis, fixed) };
 }
 
 ResolvedBatch resolveBatch(const TensorDesc& input, int requested,
-                           const std::string& who, int declaredMax)
+                           const std::string& who, int declaredMax, int batchAxis)
 {
     ResolvedBatch r;
-    const BatchRange br = input.batchRange();
+    const BatchRange br = input.batchRange(batchAxis);
     r.min = br.min;
     r.opt = br.opt;
     r.max = br.max;
-    r.isDynamic = input.isDynamicBatch();
+    r.isDynamic = input.isDynamicBatch(batchAxis);
 
     // 可选：配置声明的上界契约，必须与引擎 profile max 一致
     if (declaredMax > 0 && declaredMax != br.max)
@@ -170,6 +174,21 @@ ResolvedBatch resolveBatch(const TensorDesc& input, int requested,
     if (requested <= 0)
     {
         reject("invalid batch " + std::to_string(requested) + " (batch must be > 0)");
+    }
+
+    // 布局里没有 batch 轴（如 CHW / HWC）：batch 概念上恒为 1。
+    // 请求别的值就是"配置与引擎能力不符" → 显式失败（这里以前会去读轴 0 的
+    // 通道数当 batch，报出 "requested batch 1 does not match the static engine"
+    // 这种完全指不到原因的错）。
+    if (batchAxis < 0)
+    {
+        if (requested != 1)
+        {
+            reject("requested batch " + std::to_string(requested) +
+                   " but the input has no batch axis (layout declares no 'N')");
+        }
+        r.batch = 1;
+        return r;
     }
 
     if (!r.isDynamic)
@@ -300,11 +319,15 @@ void applyInputShape(TrtEngine& engine, const std::string& tensorName,
     // 落定之后再构造 dims，N 轴就用这个已过校验的值。
     // 放在这里 = 所有走 applyInputShape 的模型（13 个）+ bench + sample + 单测
     // 共用同一道护栏，不必各写一遍（yunet 因 H/W 取自原图不走这里，自带一行，见 yunet.cpp）。
-    cfg.batchSize = resolveBatch(*input, cfg.batchSize, "InputShape",
-                                 cfg.maxBatchSize).batch;
-
+    //
     // 布局优先级：INI 的 input.layout（覆盖）> 模型规范布局（默认）
     const Layout& layout = cfg.layout.empty() ? modelLayout : cfg.layout;
+
+    // batch 轴由【布局】决定，不硬取轴 0 —— 否则 CHW / HWCN 这类布局会读错轴。
+    // 布局声明里没有 N 轴时 batchAxis == -1，resolveBatch 按"batch 恒为 1"处理。
+    const int batchAxis = input->batchAxisIndex(layout);
+    cfg.batchSize = resolveBatch(*input, cfg.batchSize, "InputShape",
+                                 cfg.maxBatchSize, batchAxis).batch;
 
     ResolvedInputShape intent;
     intent.height = cfg.dstH;
@@ -430,9 +453,11 @@ void Engine::discoverIo()
 
         if (t.isInput)
         {
-            const BatchRange br = t.batchRange();
+            // 诊断日志：此处还不知道模型规范布局，按约定"N 在轴 0"展示。
+            // 权威判定在 applyInputShape（它拿得到布局），这里仅作参考。
+            const BatchRange br = t.batchRange(0);
             TRT_LOG_INFO("Engine: io[" << i << "] input batch "
-                         << (t.isDynamicBatch() ? "dynamic" : "static")
+                         << (t.isDynamicBatch(0) ? "dynamic" : "static")
                          << ", min/opt/max = " << br.min << "/" << br.opt
                          << "/" << br.max);
         }

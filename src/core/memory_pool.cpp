@@ -35,7 +35,7 @@ std::size_t MemoryPool::roundUp(std::size_t bytes) noexcept
     return ((bytes + kGranularity - 1) / kGranularity) * kGranularity;
 }
 
-std::shared_ptr<MemoryPool> MemoryPool::instance()
+const std::shared_ptr<MemoryPool>& MemoryPool::instance()
 {
     // 局部静态 + shared_ptr：
     //   * C++11 起局部静态初始化线程安全
@@ -111,9 +111,7 @@ MemoryPool::Block MemoryPool::allocate(Kind kind, std::size_t bytes)
             st.stats.inUseBytes += cap;
             st.stats.peakInUseBytes = std::max(st.stats.peakInUseBytes,
                                                st.stats.inUseBytes);
-#ifndef NDEBUG
             st.outstanding.insert(ptr);
-#endif
             TRT_LOG_DEBUG("MemoryPool[" << kindName(kind) << "]: allocate "
                           << bytes << " bytes -> hit (cap=" << cap << ")");
             return Block{ptr, cap};
@@ -137,9 +135,7 @@ MemoryPool::Block MemoryPool::allocate(Kind kind, std::size_t bytes)
         ++st.stats.cudaAllocs;
         st.stats.inUseBytes += capacity;
         st.stats.peakInUseBytes = std::max(st.stats.peakInUseBytes, st.stats.inUseBytes);
-#ifndef NDEBUG
         st.outstanding.insert(ptr);
-#endif
     }
     TRT_LOG_DEBUG("MemoryPool[" << kindName(kind) << "]: allocate "
                   << bytes << " bytes -> miss (cuda alloc, cap=" << capacity << ")");
@@ -156,17 +152,17 @@ void MemoryPool::release(Kind kind, Block block) noexcept
     bool realFree = false;
     {
         std::lock_guard<std::mutex> lock(st.mutex);
-#ifndef NDEBUG
+        // 双重归还 / 非法指针：拒绝并打日志，绝不能让同一地址进两次空闲链
+        //（否则两个调用方会拿到同一块显存 = 数据踩踏）。
+        // 这道护栏在所有构建里都生效 —— Release 正是发布/bench 用的那个构建，
+        // 在它上面关掉等于把最需要保护的时候的保护关掉。成本：一次哈希查找。
         if (st.outstanding.erase(block.ptr) == 0)
         {
-            // 双重归还 / 非法指针：拒绝并打日志，绝不能让同一地址
-            // 进两次空闲链（否则两个调用方会拿到同一块显存 = 数据踩踏）
             TRT_LOG_ERROR("MemoryPool[" << kindName(kind)
                           << "]: double/invalid release of pointer "
                           << block.ptr << " rejected");
             return;
         }
-#endif
         st.stats.inUseBytes -= std::min(st.stats.inUseBytes, block.capacity);
         if (st.stats.cachedBytes + block.capacity <= st.cacheLimit)
         {

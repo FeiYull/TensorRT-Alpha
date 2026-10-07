@@ -24,8 +24,10 @@
 #include "trt_alpha/core/batch.hpp"
 #include "trt_alpha/core/batch_result.hpp"
 #include "trt_alpha/core/engine.hpp"
+#include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_config.hpp"
 
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -75,5 +77,37 @@ public:
 protected:
     IModel() = default;
 };
+
+//! setBatch 的容量护栏 —— 所有任务（det / seg / kpt / cls）共用一处。
+//!
+//! 为什么必须有：模型的每一块 staging / 输出显存都按【引擎解析后的 batch】分配，
+//! 而 setBatch 收到的 Batch 来自调用方。views 多于容量时，preprocess / decode
+//! 会按 views.size() 驱动 kernel → 越过已分配的显存写入（UB，且不报错）。
+//! 因此这里按"配置与引擎能力不符 → 显式失败"的口径直接抛，既不截断也不静默。
+//!
+//! 这是**基类收口**：新模型只要用本函数取 batch，就自动获得护栏
+//!（对照 InferencePool::submit —— 生产路径上还有一道更靠前的同款检查）。
+//!
+//! @param model 模型自身（用于取 init() 后的生效配置）
+//! @param batch 本批输入
+//! @param who   模型名（进日志 / 异常信息）
+//! @return 本次实际 batch（== batch.views.size()），便于调用方一行赋值
+inline int requireBatchCapacity(const IModel& model, const core::Batch& batch,
+                                const char* who)
+{
+    const int capacity = model.config().batchSize;
+    const int n = static_cast<int>(batch.views.size());
+    if (capacity > 0 && n > capacity)
+    {
+        const std::string msg =
+            std::string(who) + ": batch of " + std::to_string(n) +
+            " images exceeds model capacity " + std::to_string(capacity) +
+            " (buffers are sized by the engine-resolved batch; raise [input]"
+            " batch_size within the engine profile instead)";
+        TRT_LOG_ERROR(msg);
+        throw std::runtime_error(msg);
+    }
+    return n;
+}
 
 }  // namespace trt_alpha

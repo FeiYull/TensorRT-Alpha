@@ -84,6 +84,10 @@ public:
     //! 第一条错误描述（无错误时为空串）。用于在调用方汇总成一行报出。
     [[nodiscard]] std::string firstError() const;
 
+    //! 结果队列累计丢弃的帧批次数（仅 queueFullPolicy == DropOldest 会 > 0）。
+    //! 口径：**丢数据必须可观测** —— 调用方据此决定是否把"结果不完整"当失败报出。
+    [[nodiscard]] std::size_t droppedResults() const noexcept;
+
 private:
     void sourceLoop(std::size_t sourceIndex);
     void renderLoop();
@@ -110,9 +114,9 @@ private:
     std::atomic<bool> m_failed{false};
     std::string m_firstError;   //!< 受 m_mutex 保护
 
-    // 等待所有源结束 + 队列处理完
+    // 各源共用的"还剩几个源在跑"计数（受 m_mutex 保护）。
+    // 归零即关闭结果队列，让渲染线程得以排空后退出。
     mutable std::mutex m_mutex;
-    std::condition_variable m_cvDone;
     std::size_t m_sourcesRunning = 0;
     std::unique_ptr<core::BoundedQueue<core::BatchResult>> m_processedQueue;
 };

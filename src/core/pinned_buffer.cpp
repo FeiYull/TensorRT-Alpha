@@ -16,7 +16,7 @@ void PinnedBuffer::allocate(std::size_t bytes)
         return;
     }
     release();
-    std::shared_ptr<MemoryPool> pool = MemoryPool::instance();
+    const std::shared_ptr<MemoryPool>& pool = MemoryPool::instance();
     const MemoryPool::Block block =
         pool->allocate(MemoryPool::Kind::PinnedHost, bytes);
     m_pool = pool;

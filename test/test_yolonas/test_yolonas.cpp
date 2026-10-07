@@ -13,6 +13,7 @@
 //    test_yolonas <engine.trt> <image>            # [1][2][3]
 // =============================================================================
 #include "trt_alpha/core/buffer.hpp"
+#include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/data_type.hpp"
 #include "trt_alpha/core/model_registry.hpp"
 #include "trt_alpha/det/detector.hpp"
@@ -35,6 +36,7 @@ using trt_alpha::core::BatchResult;
 using trt_alpha::core::Buffer;
 using trt_alpha::core::BufferView;
 using trt_alpha::core::DataType;
+using trt_alpha::core::loadModelConfig;
 using trt_alpha::core::MemorySpace;
 using trt_alpha::core::ModelConfig;
 using trt_alpha::det::Detection;
@@ -229,13 +231,12 @@ int main(int argc, char** argv)
             {
                 std::cout << "       image loaded: " << img.cols << "x" << img.rows << "\n";
 
-                ModelConfig cfg;
+                // 与 CLI 同源：走 INI 加载。dstH/dstW 由引擎声明写回，pad 在引擎形状
+                // 落定后派生。若在此手填 dstH/dstW，就会把"pad 求值早于引擎形状解析"
+                // 的回归盖住 —— 那正是这个 bug 此前逃过测试的原因。
+                ModelConfig cfg = loadModelConfig("configs/yolo_nas.ini");
                 cfg.engine = enginePath;
                 cfg.batchSize = 1;
-                cfg.dstH = 640;
-                cfg.dstW = 640;
-                cfg.extras["num_class"] = "80";
-                cfg.extras["conf_thresh"] = "0.25";
 
                 auto m = ModelRegistry::instance().create("yolo_nas");
                 m->init(cfg);

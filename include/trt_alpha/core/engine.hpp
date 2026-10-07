@@ -53,13 +53,21 @@ struct TensorDesc
 
     [[nodiscard]] std::size_t volume() const noexcept;
 
-    [[nodiscard]] bool isDynamicBatch() const noexcept
-    { return shape.nbDims > 0 && shape.d[0] < 0; }
+    //! N 轴（batch 轴）在布局里的下标；布局未声明 batch 轴时返回 -1。
+    //! 有了它，"哪根轴是 batch" 才由【布局】决定，而不是硬写轴 0 ——
+    //! CHW（无 N 轴）/ HWCN 这类布局才不会读错轴。
+    [[nodiscard]] int batchAxisIndex(const Layout& layout) const noexcept
+    { return layout.has(Layout::kBatch) ? layout.indexOf(Layout::kBatch) : -1; }
 
-    [[nodiscard]] BatchRange batchRange() const noexcept;   // 见文件
+    //! 指定轴是否为动态维（-1）。axis < 0（无 batch 轴）恒为 false。
+    [[nodiscard]] bool isDynamicBatch(int axis = 0) const noexcept
+    { return axis >= 0 && axis < shape.nbDims && shape.d[axis] < 0; }
+
+    //! 指定轴的 batch 区间（读 profile 的 min/opt/max）。axis < 0 返回 {1,1,1}。
+    [[nodiscard]] BatchRange batchRange(int axis = 0) const noexcept;   // 见文件
 
 private:
-    [[nodiscard]] int pick(const nvinfer1::Dims& d, int fallback) const noexcept;
+    [[nodiscard]] int pick(const nvinfer1::Dims& d, int axis, int fallback) const noexcept;
 };
 
 //! 引擎输入 batch 的解析结果（统一静态 / 动态语义）。
@@ -85,10 +93,13 @@ struct ResolvedBatch
 //! @param requested   调用方请求的 batch
 //! @param who         调用方名字（用于日志与异常信息）
 //! @param declaredMax 配置声明的上界契约；<=0 表示未声明
+//! @param batchAxis   batch 轴下标（由布局决定，见 TensorDesc::batchAxisIndex）；
+//!                    -1 表示该布局没有 batch 轴（如 CHW），此时 batch 概念上恒为 1
 [[nodiscard]] ResolvedBatch resolveBatch(const TensorDesc& input,
                                          int requested,
                                          const std::string& who,
-                                         int declaredMax = 0);
+                                         int declaredMax = 0,
+                                         int batchAxis = 0);
 
 //! 引擎输入【空间维】的解析结果（按语义命名，与布局的排列无关）。
 struct ResolvedInputShape

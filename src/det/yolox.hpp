@@ -4,8 +4,10 @@
 //  YOLOX 检测模型。
 //  输出 [B, 8400, 85]（decode_in_inference 已在模型内解码，含 objectness），
 //  decode 复用 kernels::decodeYoloV5Head。
-//  注意：batch 由引擎 profile 决定（静态引擎固定值 / 动态引擎 [min,max]），
-//  框架在 InferencePool 里统一解析并对齐 config.batch_size，模型侧不再各自校验。
+//  注意：batch 由引擎 profile 决定（静态引擎固定值 / 动态引擎 [min,max]）。
+//  框架在 InferencePool 里统一解析并对齐 config.batch_size；模型侧另有一道
+//  容量护栏（core::requireBatchCapacity），保证 views.size() 不会超过按
+//  batch_size 分配的显存 —— 两层都不可省，前者管"跑多大"，后者管"别越界"。
 // =============================================================================
 #pragma once
 

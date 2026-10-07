@@ -45,16 +45,18 @@ const char* registry_name(ModelType t)
     return kModelNames[idx];
 }
 
-core::BoundedQueue<std::future<core::BatchResult>>::FullPolicy
-to_full_policy(QueuePolicy p)
+//! QueuePolicy（对外）→ QueueFullPolicy（队列实现）。
+core::QueueFullPolicy to_queue_policy(QueuePolicy p, bool realtime)
 {
-    using FP = core::BoundedQueue<std::future<core::BatchResult>>::FullPolicy;
     switch (p) {
-    case QueuePolicy::DropNewest: return FP::DropNewest;
-    case QueuePolicy::Block:      return FP::Block;
-    case QueuePolicy::DropOldest:
+    case QueuePolicy::DropOldest: return core::QueueFullPolicy::DropOldest;
+    case QueuePolicy::DropNewest: return core::QueueFullPolicy::DropNewest;
+    case QueuePolicy::Block:      return core::QueueFullPolicy::Block;
     case QueuePolicy::Unset:
-    default:                      return FP::DropOldest;
+    default:
+        // 未指定 → 按源类型自动：实时源宁可丢旧帧，离线源一帧不落。
+        return realtime ? core::QueueFullPolicy::DropOldest
+                        : core::QueueFullPolicy::Block;
     }
 }
 
@@ -388,10 +390,14 @@ Stream Infer::async()
 
     const bool render = m_impl->params.show || m_impl->params.save;
 
+    datasource::SourceConfig srcCfg =
+        build_source_config(m_impl->params, m_impl->pool->resolvedBatch());
+    const bool realtime =
+        (srcCfg.type == datasource::SourceType::Camera) ||
+        core::Paths::isUrl(m_impl->params.source);
+
     pipeline::PipelineConfig pcfg;
-    pcfg.sources.push_back(
-        std::make_unique<datasource::OpenCVSource>(
-            build_source_config(m_impl->params, m_impl->pool->resolvedBatch())));
+    pcfg.sources.push_back(std::make_unique<datasource::OpenCVSource>(srcCfg));
     pcfg.pools = { m_impl->pool.get() };
     pcfg.sourceToPool = { 0 };
     pcfg.classNames = m_impl->final_cfg.classNames;
@@ -399,9 +405,13 @@ Stream Infer::async()
         (m_impl->params.result_queue_size > 0)
             ? static_cast<std::size_t>(m_impl->params.result_queue_size)
             : std::size_t{32};
+    // 队列满策略：显式指定优先，否则按源类型自动（实时丢旧帧 / 离线不丢帧）
+    pcfg.queueFullPolicy = to_queue_policy(m_impl->params.policy, realtime);
 
     if (render) {
         pcfg.renderer = &m_impl->renderer;
+        // Stream::get() 在有渲染器时走 popProcessed ⇒ 必须先声明要消费
+        pcfg.exposeProcessed = true;
         pcfg.saveEnabled = m_impl->params.save;
         pcfg.showEnabled = m_impl->params.show;
         // 存盘目录：params.save_dir > ini output.save_dir > 默认 save/<net>。
@@ -413,8 +423,15 @@ Stream Infer::async()
         pcfg.saveDir = core::Paths::resolveSaveDir(
             saveDir, registry_name(m_impl->params.model_type));
         if (!m_impl->params.show_window.empty()) pcfg.showWindow = m_impl->params.show_window;
+
+        // 登记输入源：save() 据此拒绝覆盖原图（输出 == 输入的最后一道闸门）
+        if (m_impl->params.save && !core::Paths::isUrl(m_impl->params.source)) {
+            m_impl->renderer.addInputSource(
+                core::Paths::resolve(m_impl->params.source).string());
+        }
     } else {
         pcfg.renderer = nullptr;
+        pcfg.exposeProcessed = false;
         pcfg.saveEnabled = false;
         pcfg.showEnabled = false;
     }

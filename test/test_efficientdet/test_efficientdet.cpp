@@ -89,7 +89,8 @@ int main(int argc, char** argv)
             m->init(cfg);
 
             // 这里只验证 init 成功；真推理通过 sample 跑
-            check(true, "[3] init with real engine OK");
+            check(m != nullptr && m->name() == "efficientdet",
+                  "[3] init with real engine OK");
         }
         catch (const std::exception& e)
         {

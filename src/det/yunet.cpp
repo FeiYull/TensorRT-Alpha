@@ -336,11 +336,12 @@ void YuNet::setBatch(const core::Batch& batch)
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
-    // 输入 HWC buffer
-    if (static_cast<int>(m_inputHwc.bytes()) <
-        m_batch * m_srcH * m_srcW * 3 * static_cast<int>(sizeof(float)))
+    // 输入 HWC buffer（用 size_t 计算，避免大分辨率 × 大 batch 时 int 溢出）
+    const std::size_t needF32 =
+        std::size_t(m_batch) * m_srcH * m_srcW * 3 * sizeof(float);
+    if (m_inputHwc.bytes() < needF32)
     {
-        m_inputHwc.allocate(std::size_t(m_batch) * m_srcH * m_srcW * 3 * sizeof(float));
+        m_inputHwc.allocate(needF32);
     }
     rebuildForSize(m_srcW, m_srcH);
 

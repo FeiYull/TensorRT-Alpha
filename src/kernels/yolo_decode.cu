@@ -142,7 +142,9 @@ __global__ void normPredKernel(int batchSize, float* __restrict__ data,
         return;
     }
     const float v = data[dy * area + dx];
-    data[dy * area + dx] = scale * (v - minVals[dy]) / (maxVals[dy] - minVals[dy]);
+    const float range = maxVals[dy] - minVals[dy];
+    // 整张图同值（range==0）时输出 0，避免除零产生 inf/nan。
+    data[dy * area + dx] = (range > 0.0f) ? scale * (v - minVals[dy]) / range : 0.0f;
 }
 
 __global__ void transposeKernel(int batchSize, const float* __restrict__ src,

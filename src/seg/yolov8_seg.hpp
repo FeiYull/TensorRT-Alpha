@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: det :: YoloV8Seg（私有头文件）
+//  trt_alpha :: seg :: YoloV8Seg（私有头文件）
 // -----------------------------------------------------------------------------
 //  YOLOv8-seg 实例分割。
 //  - 2 个输出：output0 [B, 116, 8400] / output1 [B, 32, 160, 160]
@@ -98,4 +98,4 @@ private:
     void allocateBuffers();
 };
 
-}  // namespace trt_alpha::det
+}  // namespace trt_alpha::seg

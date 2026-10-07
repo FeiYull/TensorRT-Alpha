@@ -25,6 +25,7 @@
 #else
 #    include <csignal>
 #    include <execinfo.h>
+#    include <unistd.h>   // write()：信号上下文里唯一 async-signal-safe 的写日志手段
 #endif
 
 namespace trt_alpha::core::detail {
@@ -211,6 +212,22 @@ void installImpl() noexcept
 
 #else  // POSIX
 
+//! 信号上下文只能用 async-signal-safe 调用：write() 可以，fprintf/fflush 不行
+//! （stdio 内部带锁，崩在持锁点会自死锁，日志反而出不来）。
+void writeFatal(const char* what) noexcept
+{
+    static const char kHead[] = "\n[FATAL] ";
+    static const char kTail[] =
+        "\n[FATAL] crash handler caught a fatal error; "
+        "check the last DEBUG logs above for context.\n";
+    const char* p = what;
+    std::size_t n = 0;
+    while (p[n] != '\0') { ++n; }
+    (void)::write(STDERR_FILENO, kHead, sizeof(kHead) - 1);
+    (void)::write(STDERR_FILENO, what, n);
+    (void)::write(STDERR_FILENO, kTail, sizeof(kTail) - 1);
+}
+
 void signalHandler(int sig) noexcept
 {
     const char* name = "unknown";
@@ -222,7 +239,7 @@ void signalHandler(int sig) noexcept
     case SIGILL:  name = "SIGILL (illegal instruction)"; break;
     case SIGBUS:  name = "SIGBUS (bus error)";           break;
     }
-    onFatal(name);
+    writeFatal(name);
 
     // 还原默认 handler 并重新触发，保留 core dump 行为
     std::signal(sig, SIG_DFL);

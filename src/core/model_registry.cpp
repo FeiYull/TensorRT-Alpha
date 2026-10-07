@@ -5,6 +5,7 @@
 
 #include "trt_alpha/core/logger.hpp"
 
+#include <algorithm>
 #include <sstream>
 
 namespace trt_alpha {
@@ -63,6 +64,9 @@ std::vector<std::string> ModelRegistry::names() const
     {
         result.push_back(key);
     }
+    // 注册表是 unordered_map，遍历顺序不确定；调用方（list 命令 / 文档 / CI）
+    // 依赖稳定输出，故显式排序。
+    std::sort(result.begin(), result.end());
     return result;
 }
 

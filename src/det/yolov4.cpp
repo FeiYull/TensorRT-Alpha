@@ -161,7 +161,7 @@ void YoloV4::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("yolov4: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "yolov4");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
@@ -209,59 +209,6 @@ void YoloV4::infer()
     }
 }
 
-// void YoloV4::postprocess()
-// {
-//     m_detections.assign(static_cast<std::size_t>(m_batch), {});
-
-//     kernels::YoloDecodeParams p;
-//     p.batch = m_batch;
-//     p.numClasses = m_numClass;
-//     p.topK = m_topK;
-//     p.confThreshold = m_confThreshold;
-//     p.iouThreshold = m_iouThreshold;
-
-//     cudaMemsetAsync(m_objects.data(), 0,
-//                     static_cast<std::size_t>(m_objectsPerImage) * m_cfg.batchSize * sizeof(float),
-//                     m_stream.get());
-
-//     // YOLOv4 专用 decode（4 维输入 + 无 objectness + 归一化坐标）
-//     kernels::decodeYoloV4Head(m_stream.get(), p, m_outputSrc.asFloat(),
-//                               m_anchors, m_cfg.dstW, m_cfg.dstH,
-//                               m_objects.asFloat());
-
-//     kernels::nmsFast(m_stream.get(), p, m_objects.asFloat(), kernels::kObjectWidth);
-
-//     cudaMemcpyAsync(m_objectsHost.data(), m_objects.data(),
-//                     static_cast<std::size_t>(m_objectsPerImage) * m_batch * sizeof(float),
-//                     cudaMemcpyDeviceToHost, m_stream.get());
-//     m_stream.synchronize();
-
-//     const float* host = m_objectsHost.asFloat();
-//     for (int b = 0; b < m_batch; ++b)
-//     {
-//         const float* row = host + static_cast<std::size_t>(b) * m_objectsPerImage;
-//         const int count = std::clamp(static_cast<int>(row[0]), 0, m_topK);
-//         m_detections[static_cast<std::size_t>(b)].clear();
-//         for (int i = 0; i < count; ++i)
-//         {
-//             const float* o = row + 1 + i * kernels::kObjectWidth;
-//             if (o[6] < 0.5f)
-//             {
-//                 continue;
-//             }
-//             Detection d;
-//             const float nx = o[0], ny = o[1], nr = o[2], nb = o[3];
-//             d.left   = m_dst2src.v0 * nx + m_dst2src.v1 * ny + m_dst2src.v2;
-//             d.top    = m_dst2src.v3 * nx + m_dst2src.v4 * ny + m_dst2src.v5;
-//             d.right  = m_dst2src.v0 * nr + m_dst2src.v1 * nb + m_dst2src.v2;
-//             d.bottom = m_dst2src.v3 * nr + m_dst2src.v4 * nb + m_dst2src.v5;
-//             d.confidence = o[4];
-//             d.label = static_cast<int>(o[5]);
-//             m_detections[static_cast<std::size_t>(b)].push_back(d);
-//         }
-//     }
-// }
-
 void YoloV4::postprocess()
 {
     m_detections.assign(static_cast<std::size_t>(m_batch), {});
@@ -273,8 +220,9 @@ void YoloV4::postprocess()
     p.confThreshold = m_confThreshold;
     p.iouThreshold = m_iouThreshold;
 
+    // 清零范围与 D2H 拷贝范围同源（都用 m_batch），不做两套口径。
     cudaMemsetAsync(m_objects.data(), 0,
-                    static_cast<std::size_t>(m_objectsPerImage) * m_cfg.batchSize * sizeof(float),
+                    static_cast<std::size_t>(m_objectsPerImage) * m_batch * sizeof(float),
                     m_stream.get());
 
     // YOLOv4 专用 decode（4 维输入 + 无 objectness + 归一化坐标）

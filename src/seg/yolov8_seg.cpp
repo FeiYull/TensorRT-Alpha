@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: det :: YoloV8Seg（实现）
+//  trt_alpha :: seg :: YoloV8Seg（实现）
 // =============================================================================
 #include "yolov8_seg.hpp"
 #include "trt_alpha/core/buffer.hpp"
@@ -194,7 +194,7 @@ void YoloV8Seg::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("yolov8_seg: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "yolov8_seg");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
@@ -252,8 +252,9 @@ void YoloV8Seg::postprocess()
     p.confThreshold = m_confThreshold;
     p.iouThreshold = m_iouThreshold;
 
+    // 清零范围与 D2H 拷贝范围同源（都用 m_batch），不做两套口径。
     cudaMemsetAsync(m_objects.data(), 0,
-                    std::size_t(m_objectsPerImage) * m_cfg.batchSize * sizeof(float),
+                    std::size_t(m_objectsPerImage) * m_batch * sizeof(float),
                     m_stream.get());
 
     // 1. transpose output0: [B, 116, 8400] -> [B, 8400, 116]
@@ -283,6 +284,9 @@ void YoloV8Seg::postprocess()
     const float* objHost = m_objectsHost.asFloat();
     const float* protoHost = m_outputSegHost.asFloat();
 
+    // 掩码工作区：每框完全重写（k==0 时整体覆盖），循环外分配一次，避免逐框堆分配。
+    cv::Mat mask160(m_maskProtoH, m_maskProtoW, CV_32F);
+
     for (int b = 0; b < m_batch; ++b)
     {
         const float* objRow = objHost + std::size_t(b) * m_objectsPerImage;
@@ -305,8 +309,7 @@ void YoloV8Seg::postprocess()
             const float* coeff = o + 7;
 
             // 5.1 mask = sigmoid(sum_k(coeff[k] * proto[k]))
-            // proto 布局: [32, 160, 160]，连续
-            cv::Mat mask160(m_maskProtoH, m_maskProtoW, CV_32F);
+            // proto 布局: [32, 160, 160]，连续。mask160 复用外层工作区（整体重写）。
             for (int k = 0; k < m_numMaskCoeffs; ++k)
             {
                 const float* protoK = protoB + std::size_t(k) * m_maskProtoH * m_maskProtoW;
@@ -398,6 +401,6 @@ void YoloV8Seg::reset()
     m_batch = 0;
 }
 
-}  // namespace trt_alpha::det
+}  // namespace trt_alpha::seg
 
 TRT_ALPHA_REGISTER_MODEL("yolov8_seg", trt_alpha::seg::YoloV8Seg);

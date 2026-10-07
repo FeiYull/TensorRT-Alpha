@@ -131,8 +131,10 @@ private:
     std::condition_variable m_cvTask;      // 任务来了
     std::condition_variable m_cvNotFull;   // 队列有空位
     std::condition_variable m_cvIdle;      // 全空闲
+    std::condition_variable m_cvShutdown;  // shutdown 完成（并发调用者等它）
     std::size_t m_activeCount = 0;
     bool m_stop = false;
+    bool m_shutdownDone = false;
 };
 
 }  // namespace trt_alpha::core

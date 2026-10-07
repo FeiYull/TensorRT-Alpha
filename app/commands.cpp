@@ -255,25 +255,47 @@ int runCommand(const std::vector<std::string>& args)
         throw std::runtime_error("run: no source (should not happen)");
     }
 
-    // 安全守卫：结果按"原文件名"存盘 ⇒ 输出目录 == 输入图片目录会覆盖原图。
-    // 只有目录源（--image <目录> / --images）可能撞上；视频 / 相机 / 流无此风险。
-    if (opt.save && !trt_alpha::core::Paths::isUrl(srcCfg.path))
+    // 安全守卫：结果按"原文件名"存盘 ⇒ 输出路径可能正好是输入文件本身。
+    // 旧判据只处理"输入是目录"，漏掉了最常见的一种：输入是【单张图】而
+    // --save 指向这张图所在目录（--image data/bus.jpg --save data）——
+    // 此时输出 data/bus.jpg == 输入，原图被覆盖成画框版，不可逆。
+    // 新判据：把每个输入文件按渲染器的落盘规则算出输出路径，与输入逐一比对。
+    // 只有图片 / 图片目录源会产出"原文件名"，视频与相机天然无此风险。
+    if (opt.save &&
+        (srcCfg.type == trt_alpha::datasource::SourceType::Image ||
+         srcCfg.type == trt_alpha::datasource::SourceType::Images) &&
+        !trt_alpha::core::Paths::isUrl(srcCfg.path))
     {
         std::error_code ec;
-        const fs::path inPath = trt_alpha::core::Paths::resolve(srcCfg.path);
-        if (fs::is_directory(inPath, ec))
+        const fs::path inRoot  = trt_alpha::core::Paths::resolve(srcCfg.path);
+        const fs::path outRoot = trt_alpha::core::Paths::resolve(saveDir);
+
+        std::vector<fs::path> inputFiles;
+        if (fs::is_directory(inRoot, ec))
         {
-            std::error_code ec2;
-            const fs::path inCanon  = fs::weakly_canonical(inPath, ec);
-            const fs::path outCanon = fs::weakly_canonical(
-                trt_alpha::core::Paths::resolve(saveDir), ec2);
-            if (!ec && !ec2 && inCanon == outCanon)
+            for (const auto& entry : fs::directory_iterator(inRoot, ec))
+            {
+                if (entry.is_regular_file()) { inputFiles.push_back(entry.path()); }
+            }
+        }
+        else if (fs::is_regular_file(inRoot, ec))
+        {
+            inputFiles.push_back(inRoot);
+        }
+
+        for (const fs::path& in : inputFiles)
+        {
+            const fs::path out = outRoot / (in.stem().string() + ".jpg");
+            std::error_code ec1, ec2;
+            const fs::path outCanon = fs::weakly_canonical(out, ec1);
+            const fs::path inCanon  = fs::weakly_canonical(in,  ec2);
+            if (!ec1 && !ec2 && outCanon == inCanon)
             {
                 throw std::runtime_error(
-                    "run: save dir equals the input image dir (" +
-                    trt_alpha::core::Paths::toDisplay(outCanon) +
-                    "); results are named after the source files and would "
-                    "overwrite the originals - pass another dir to --save");
+                    "run: --save would overwrite the input image (" +
+                    trt_alpha::core::Paths::toDisplay(inCanon) +
+                    "); results are named after the source files - pass another "
+                    "dir to --save");
             }
         }
     }
@@ -282,16 +304,59 @@ int runCommand(const std::vector<std::string>& args)
     sources.push_back(
         std::make_unique<trt_alpha::datasource::OpenCVSource>(srcCfg));
 
-    // 渲染
+    // 渲染器：只在真的要存 / 要显时才挂。否则 Pipeline 会为每一帧白跑一遍
+    // drawResult（画框 + 画字 + getTextSize）然后丢弃，纯浪费。
+    const bool needRender = opt.save || opt.show;
     trt_alpha::renderer::OpenCVRenderer renderer;
+
+    // 把输入源登记给渲染器：save() 会拒绝对这些路径的写入（"输出 == 输入"的
+    // 最后一道闸门，任何数据源都躲不过）。
+    if (opt.save && !trt_alpha::core::Paths::isUrl(srcCfg.path))
+    {
+        renderer.addInputSource(trt_alpha::core::Paths::resolve(srcCfg.path).string());
+    }
+
+    // 队列满时策略：ini 的 pool.queue_full_policy 显式指定 > 按源类型自动。
+    //   实时源（摄像头 / RTSP / HTTP 流）→ drop_oldest：宁可丢旧帧，也不让延迟累积
+    //   离线源（单图 / 图片目录 / 视频文件）→ block：一帧不落（备忘录第 9 条的口径）
+    trt_alpha::core::QueueFullPolicy queuePolicy = trt_alpha::core::QueueFullPolicy::Block;
+    {
+        const std::string pol = modelCfg.getString("pool.queue_full_policy", "auto");
+        if (pol == "block")
+        {
+            queuePolicy = trt_alpha::core::QueueFullPolicy::Block;
+        }
+        else if (pol == "drop_oldest")
+        {
+            queuePolicy = trt_alpha::core::QueueFullPolicy::DropOldest;
+        }
+        else if (pol == "drop_newest")
+        {
+            queuePolicy = trt_alpha::core::QueueFullPolicy::DropNewest;
+        }
+        else
+        {
+            if (pol != "auto")
+            {
+                TRT_LOG_WARN("run: unknown pool.queue_full_policy '" << pol
+                             << "', falling back to auto");
+            }
+            const bool realtime =
+                (srcCfg.type == trt_alpha::datasource::SourceType::Camera) ||
+                trt_alpha::core::Paths::isUrl(srcCfg.path);
+            queuePolicy = realtime ? trt_alpha::core::QueueFullPolicy::DropOldest
+                                   : trt_alpha::core::QueueFullPolicy::Block;
+        }
+    }
 
     // Pipeline
     trt_alpha::pipeline::PipelineConfig pcfg;
     pcfg.sources = std::move(sources);
     pcfg.pools = { &pool };
-    pcfg.renderer = &renderer;
+    pcfg.renderer = needRender ? &renderer : nullptr;
     pcfg.classNames = modelCfg.classNames;
     pcfg.resultQueueSize = (qResult > 0) ? static_cast<std::size_t>(qResult) : std::size_t{32};
+    pcfg.queueFullPolicy = queuePolicy;
     pcfg.saveEnabled = opt.save;
     pcfg.saveDir = saveDir;
     pcfg.showEnabled = opt.show;
@@ -299,7 +364,22 @@ int runCommand(const std::vector<std::string>& args)
 
     trt_alpha::pipeline::Pipeline p(std::move(pcfg));
     p.start();
-    p.waitForCompletion();
+
+    if (p.hasRenderer())
+    {
+        // 渲染线程自己消费结果队列
+        p.waitForCompletion();
+    }
+    else
+    {
+        // 没渲染器：结果不需要，但必须被消费 —— Block 策略下没人 pop，
+        // 源线程写满队列后会永久阻塞。主线程在这里排空即可（零绘制开销）。
+        trt_alpha::core::BatchResult discard;
+        while (p.popResult(discard)) {}
+        // 幂等收尾：确保队列关闭，任何阻塞在 push 上的源线程都能退出
+        p.stop();
+        p.waitForCompletion();
+    }
 
     // 线程内的错误没有异常出口（join 会吞掉），靠 Pipeline 记的失败标记报出来。
     // 否则"图超出引擎 profile / 批内分辨率不一致"这类错误只留一行 ERROR 日志，

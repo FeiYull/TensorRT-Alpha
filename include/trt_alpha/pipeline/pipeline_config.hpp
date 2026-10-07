@@ -19,6 +19,7 @@
 // =============================================================================
 #pragma once
 
+#include "trt_alpha/core/bounded_queue.hpp"
 #include "trt_alpha/core/class_info.hpp"
 #include "trt_alpha/datasource/i_data_source.hpp"
 #include "trt_alpha/renderer/i_renderer.hpp"
@@ -54,6 +55,17 @@ struct PipelineConfig
 
     // ---- 结果队列 ----
     std::size_t resultQueueSize = 32;
+
+    //! 队列满时策略。默认 Block —— 批处理（视频文件 / 图片目录）要求一帧不落，
+    //! 宁可让源线程等渲染追上，也不静默丢帧。
+    //! 实时源（摄像头 / RTSP 流）应显式改为 DropOldest：实时场景宁可丢旧帧，
+    //! 也不能让延迟无限累积。
+    core::QueueFullPolicy queueFullPolicy = core::QueueFullPolicy::Block;
+
+    //! 是否把"渲染后的结果"再推给 processedQueue（供 popProcessed 取）。
+    //! 默认 false：没人消费时不该产出，否则 Block 策略下渲染线程会写满队列后
+    //! 永久阻塞。只有确实要调 popProcessed 的调用方（如 Infer::async）才置 true。
+    bool exposeProcessed = false;
 
     // ---- 存盘 / 显示 ----
     bool saveEnabled = false;

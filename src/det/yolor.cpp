@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: det :: YoloV6（实现）
+//  trt_alpha :: det :: YoloR（实现）
 // -----------------------------------------------------------------------------
 //  与 YoloV5 同构：输出 [B, anchors, 5+nc]，复用 decodeYoloV5Head。
 // =============================================================================
@@ -156,7 +156,7 @@ void YoloR::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("yolor: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "yolor");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
@@ -213,8 +213,9 @@ void YoloR::postprocess()
     p.confThreshold = m_confThreshold;
     p.iouThreshold = m_iouThreshold;
 
+    // 清零范围与 D2H 拷贝范围同源（都用 m_batch），不做两套口径。
     cudaMemsetAsync(m_objects.data(), 0,
-                    static_cast<std::size_t>(m_objectsPerImage) * m_cfg.batchSize * sizeof(float),
+                    static_cast<std::size_t>(m_objectsPerImage) * m_batch * sizeof(float),
                     m_stream.get());
 
     // 复用 YOLOv5 的 decode（带 objectness 的 anchor-based YOLO 通用）

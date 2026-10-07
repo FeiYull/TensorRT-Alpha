@@ -382,7 +382,12 @@ __global__ void divByMaxKernel(int batchSize, float* __restrict__ data,
     {
         return;
     }
-    data[dy * volume + dx] /= maxVals[dy];
+    const float m = maxVals[dy];
+    // 整张图全零/负时 maxVals<=0，不做除法，避免 inf/nan 污染下游。
+    if (m > 0.0f)
+    {
+        data[dy * volume + dx] /= m;
+    }
 }
 
 }  // namespace detail

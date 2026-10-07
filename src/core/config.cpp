@@ -131,11 +131,36 @@ ModelConfig loadModelConfig(const std::string& iniPath)
     cfg.dstW = getIntOr(merged, "input.dst_w", cfg.dstW);
 
     // 5. extras：把合并后的 key-value 全存起来（短名 + 长名都存）
-    for (const auto& [k, v] : merged) {
-        cfg.extras[k] = v;
-        const auto dot = k.find('.');
-        if (dot != std::string::npos) {
-            cfg.extras.emplace(k.substr(dot + 1), v);
+    //    迭代顺序必须确定：merged 是 unordered_map，直接遍历时"同一短名
+    //    来自不同 section"谁胜出会随实现而变（不可复现）。故先排序再处理。
+    {
+        std::vector<std::string> keys;
+        keys.reserve(merged.size());
+        for (const auto& kv : merged) { keys.push_back(kv.first); }
+        std::sort(keys.begin(), keys.end());
+
+        for (const std::string& k : keys)
+        {
+            const std::string& v = merged.at(k);
+            cfg.extras[k] = v;
+            const auto dot = k.find('.');
+            if (dot == std::string::npos) { continue; }
+
+            const std::string shortKey = k.substr(dot + 1);
+            const auto it = cfg.extras.find(shortKey);
+            if (it != cfg.extras.end() && it->second != v)
+            {
+                // 两个 section 定义了同名叶子键 → 短名有歧义。保留先到的
+                //（排序后 = 字典序最小），并明确告知用长名消歧，绝不静默。
+                TRT_LOG_WARN("Config: short key '" << shortKey
+                             << "' defined by more than one section; keeping '"
+                             << it->second << "' and ignoring '" << v
+                             << "' from '" << k << "' (use the qualified key)");
+            }
+            else
+            {
+                cfg.extras.emplace(shortKey, v);
+            }
         }
     }
 

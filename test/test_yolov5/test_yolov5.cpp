@@ -1,7 +1,7 @@
 // =============================================================================
 //  test/test_yolov5/test_yolov5.cpp
 // -----------------------------------------------------------------------------
-//  YoloV8 测试：
+//  YoloV5 测试：
 //    [1] 注册中心能创建
 //    [2] init 失败（engine 不存在）抛异常
 //    [3] 真推理（需要 engine + 图片）：
@@ -172,27 +172,27 @@ void drawDetections(cv::Mat& image, const std::vector<Detection>& detections,
 
 int main(int argc, char** argv)
 {
-    std::cout << "=== YoloV8 tests ===\n";
+    std::cout << "=== YoloV5 tests ===\n";
 
     // [1] 注册中心能创建
     {
         bool ok = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8");
-            ok = (m != nullptr) && (m->name() == "yolov8");
+            auto m = ModelRegistry::instance().create("yolov5");
+            ok = (m != nullptr) && (m->name() == "yolov5");
         }
         catch (const std::exception& e)
         {
             std::cout << "[FAIL] create threw: " << e.what() << "\n";
         }
-        check(ok, "[1] 'yolov8' registered and created");
+        check(ok, "[1] 'yolov5' registered and created");
     }
 
     // [2] init 失败（engine 不存在）
     {
         ModelConfig cfg;
-        cfg.engine = "/definitely/not/exist/yolov8_12345.trt";
+        cfg.engine = "/definitely/not/exist/yolov5_12345.trt";
         cfg.batchSize = 1;
         cfg.dstH = 640;
         cfg.dstW = 640;
@@ -200,7 +200,7 @@ int main(int argc, char** argv)
         bool threw = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8");
+            auto m = ModelRegistry::instance().create("yolov5");
             m->init(cfg);
         }
         catch (const std::runtime_error& e)
@@ -238,7 +238,7 @@ int main(int argc, char** argv)
                 cfg.extras["num_class"] = "80";
                 cfg.extras["conf_thresh"] = "0.25";
 
-                auto m = ModelRegistry::instance().create("yolov8");
+                auto m = ModelRegistry::instance().create("yolov5");
                 m->init(cfg);
 
                 auto* detector = dynamic_cast<IDetector*>(m.get());

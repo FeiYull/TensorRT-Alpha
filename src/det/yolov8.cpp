@@ -189,7 +189,7 @@ void YoloV8::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("yolov8: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "yolov8");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
@@ -270,8 +270,9 @@ void YoloV8::postprocess()
     p.confThreshold = m_confThreshold;
     p.iouThreshold = m_iouThreshold;
 
+    // 清零范围与 D2H 拷贝范围同源（都用 m_batch），不做两套口径。
     cudaMemsetAsync(m_objects.data(), 0,
-                    static_cast<std::size_t>(m_objectsPerImage) * m_cfg.batchSize * sizeof(float),
+                    static_cast<std::size_t>(m_objectsPerImage) * m_batch * sizeof(float),
                     m_stream.get());
 
     kernels::transposeAnchors(m_stream.get(), m_batch,

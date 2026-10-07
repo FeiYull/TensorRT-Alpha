@@ -11,6 +11,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <stdexcept>
@@ -27,6 +28,31 @@ constexpr int    kFontFace     = cv::FONT_HERSHEY_DUPLEX;
 constexpr double kFontScale    = 0.5;
 constexpr int    kFontThickness = 1;
 constexpr float  kMaskAlpha    = 0.35f;
+
+//! 路径比较键：规范化 + 统一分隔符（+ Windows 下忽略大小写）。
+//! 为什么要它：输出路径由 outputDir 拼出来，输入路径来自用户给的字符串，
+//! 直接比字符串会把 "data\\bus.jpg" 和 "data/bus.jpg" 当成两个文件。
+std::string pathKey(const fs::path& p)
+{
+    std::error_code ec;
+    fs::path canon = fs::weakly_canonical(p, ec);
+    if (ec) { canon = p; }
+    std::string s = canon.generic_string();
+#ifdef _WIN32
+    for (char& c : s) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+#endif
+    return s;
+}
+
+//! 同上，但不做文件系统解析（用于"已是规范目录 + 单层文件名"的拼接结果）。
+std::string lowerGeneric(const fs::path& p)
+{
+    std::string s = p.generic_string();
+#ifdef _WIN32
+    for (char& c : s) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+#endif
+    return s;
+}
 
 //! label -> 颜色（固定调色板循环）。
 cv::Scalar colorForLabel(int label)
@@ -353,6 +379,11 @@ void OpenCVRenderer::save(const core::BatchResult& result,
         return;
     }
 
+    // 输出目录规范化只做一次（每帧做一次 weakly_canonical 太贵）。
+    // 之后每帧只需把文件名拼上去 —— 目录已规范，拼接结果无需再次解析。
+    fs::path canonDir = fs::weakly_canonical(outputDir, ec);
+    if (ec) { canonDir = fs::path(outputDir); }
+
     const std::size_t n =
         std::min<std::size_t>(result.views.size(),
                               static_cast<std::size_t>(std::max(0, result.validCount)));
@@ -374,7 +405,17 @@ void OpenCVRenderer::save(const core::BatchResult& result,
 
         const fs::path out = fs::path(outputDir) / (stem + ".jpg");
 
-        // 同名直接覆盖（用户口径），但必须留痕，绝不静默丢数据
+        // 同名目标 == 某个输入源文件时拒绝写盘：输出与输入同一路径意味着
+        // 把用户的原图覆盖掉（不可逆）。守卫在 app 层也有一道（按源类型提前
+        // 报错），这里是最靠后的闸门 —— 任何数据源、任何调用方式都躲不过。
+        if (m_inputPaths.count(lowerGeneric(canonDir / (stem + ".jpg"))) != 0)
+        {
+            TRT_LOG_ERROR("OpenCVRenderer::save: refusing to overwrite an input file: "
+                          << out.string() << " (pass another dir to --save)");
+            continue;
+        }
+
+        // 同名已存在（不是本次输入）时允许覆盖（用户口径），但必须留痕
         std::error_code existsEc;
         if (fs::exists(out, existsEc))
         {
@@ -391,6 +432,31 @@ void OpenCVRenderer::save(const core::BatchResult& result,
             TRT_LOG_INFO("OpenCVRenderer: saved " << out.string());
         }
     }
+}
+
+void OpenCVRenderer::addInputSource(const std::string& resolvedPath)
+{
+    if (resolvedPath.empty())
+    {
+        return;
+    }
+    std::error_code ec;
+    const fs::path p(resolvedPath);
+    if (fs::is_directory(p, ec))
+    {
+        for (const auto& entry : fs::directory_iterator(p, ec))
+        {
+            if (entry.is_regular_file())
+            {
+                m_inputPaths.insert(pathKey(entry.path()));
+            }
+        }
+    }
+    else if (fs::is_regular_file(p, ec))
+    {
+        m_inputPaths.insert(pathKey(p));
+    }
+    // 视频 / 相机 / 流：渲染器不产出"原文件名"，无需登记
 }
 
 void OpenCVRenderer::show(const core::BatchResult& result,

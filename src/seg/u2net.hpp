@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: det :: U2Net（私有头文件）
+//  trt_alpha :: seg :: U2Net（私有头文件）
 // -----------------------------------------------------------------------------
 //  U-2-Net 显著性目标检测（salient object detection）。
 //  - 输入 [B, 3, 320, 320]
@@ -10,7 +10,6 @@
 // =============================================================================
 #pragma once
 
-#include "trt_alpha/kernels/cast.hpp"
 #include "trt_alpha/kernels/cast.hpp"
 #include "trt_alpha/core/batch.hpp"
 #include "trt_alpha/core/batch_result.hpp"
@@ -74,10 +73,8 @@ private:
 
     // 预处理
     core::DeviceBuffer m_inputU8;    // [B, 3, srcH, srcW] uint8（H2D 临时）
-    core::DeviceBuffer m_inputSrc;      // [B, 3, srcH, srcW] float（uint8->float 后）
-    core::DeviceBuffer m_inputRgb;      // [B, 3, srcH, srcW] float（BGR->RGB 后）
+    core::DeviceBuffer m_inputSrc;      // [B, 3, srcH, srcW] float（uint8->float 后，BGR->RGB 亦 in-place）
     core::DeviceBuffer m_inputResize;   // [B, 3, dstH, dstW] float（resize 后）
-    core::DeviceBuffer m_inputNorm;     // [B, 3, dstH, dstW] float（归一化后）
     core::DeviceBuffer m_inputNchw;     // [B, 3, dstH, dstW] float（NCHW）
 
     // 预处理：max（每张图 RGB 最大值）
@@ -93,7 +90,6 @@ private:
 
     // Host（D2H 后转 uint8）
     core::PinnedBuffer m_outputResizeHost;  // [B, 1, srcH, srcW] float
-    core::PinnedBuffer m_maskHost;          // [srcH, srcW] float
 
     trt_alpha::kernels::AffineMat m_dst2src{};
     trt_alpha::kernels::AffineMat m_src2dst{};
@@ -103,4 +99,4 @@ private:
     void allocateBuffers();
 };
 
-}  // namespace trt_alpha::det
+}  // namespace trt_alpha::seg

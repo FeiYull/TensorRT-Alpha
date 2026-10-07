@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: det :: YoloV8Pose（实现）
+//  trt_alpha :: kpt :: YoloV8Pose（实现）
 // =============================================================================
 #include "yolov8_pose.hpp"
 #include "trt_alpha/core/logger.hpp"
@@ -52,10 +52,11 @@ void YoloV8Pose::loadConfig(const core::ModelConfig& cfg)
 
 void YoloV8Pose::discoverEngineIo()
 {
+    // 口径：第一个输入 + 第一个非输入输出（与其他模型一致；多输出引擎请显式指定）
     for (const auto& t : m_engine->ioTensors())
     {
-        if (t.isInput)   { m_inputName = t.name;  continue; }
-        if (!t.isInput)  { m_outputName = t.name; continue; }
+        if (t.isInput)  { if (m_inputName.empty())  { m_inputName  = t.name; } }
+        else            { if (m_outputName.empty()) { m_outputName = t.name; } }
     }
     if (m_inputName.empty() || m_outputName.empty())
     {
@@ -151,7 +152,7 @@ void YoloV8Pose::setBatch(const core::Batch& batch)
     {
         throw std::runtime_error("yolov8_pose: empty batch");
     }
-    m_batch = static_cast<int>(batch.views.size());
+    m_batch = requireBatchCapacity(*this, batch, "yolov8_pose");
     m_srcH = batch.views[0].height;
     m_srcW = batch.views[0].width;
 
@@ -208,8 +209,9 @@ void YoloV8Pose::postprocess()
     p.confThreshold = m_confThreshold;
     p.iouThreshold = m_iouThreshold;
 
+    // 清零范围与 D2H 拷贝范围同源（都用 m_batch），不做两套口径。
     cudaMemsetAsync(m_objects.data(), 0,
-                    std::size_t(m_objectsPerImage) * m_cfg.batchSize * sizeof(float),
+                    std::size_t(m_objectsPerImage) * m_batch * sizeof(float),
                     m_stream.get());
 
     // 1. transpose output0: [B, 56, 8400] -> [B, 8400, 56]
@@ -276,6 +278,6 @@ void YoloV8Pose::reset()
     m_batch = 0;
 }
 
-}  // namespace trt_alpha::det
+}  // namespace trt_alpha::kpt
 
 TRT_ALPHA_REGISTER_MODEL("yolov8_pose", trt_alpha::seg::YoloV8Pose);

@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: det :: YoloV8Pose（私有头文件）
+//  trt_alpha :: kpt :: YoloV8Pose（私有头文件）
 // -----------------------------------------------------------------------------
 //  YOLOv8-pose 姿态估计。
 //  - 输入 [B, 3, 640, 640]
@@ -92,4 +92,4 @@ private:
     void allocateBuffers();
 };
 
-}  // namespace trt_alpha::det
+}  // namespace trt_alpha::kpt
