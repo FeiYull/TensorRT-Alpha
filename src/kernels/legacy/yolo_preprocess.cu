@@ -5,7 +5,7 @@
 //  改动：参数化 CUDA 流、加边界检查、统一命名、block size 走 common.cuh。
 // =============================================================================
 #include "trt_alpha/kernels/common.cuh"
-#include "trt_alpha/kernels/yolo_preprocess.cuh"
+#include "trt_alpha/kernels/legacy/yolo_preprocess.cuh"
 
 #include <cmath>
 #include <stdexcept>

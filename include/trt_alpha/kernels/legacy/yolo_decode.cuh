@@ -1,11 +1,11 @@
 // =============================================================================
-//  trt_alpha :: kernels :: yolo_decode（内部）
+//  trt_alpha :: kernels :: yolo_decode (internal)
 // -----------------------------------------------------------------------------
-//  后处理 kernel 声明（仅 .cu 内部使用）。
+//  Post-processing kernel declarations (used only inside the .cu).
 // =============================================================================
 #pragma once
 
-#include "trt_alpha/kernels/postprocess.hpp"
+#include "trt_alpha/kernels/legacy/postprocess.hpp"
 
 namespace trt_alpha::kernels::detail {
 
@@ -48,8 +48,9 @@ __global__ void decodeHeadKernel(int batchSize, int numClasses, int topK,
                                  float* __restrict__ dst, int dstRow,
                                  int numMaskCoeffs);
 
-//! 解码 YOLOv8-seg 头：和 decodeHeadKernel 一样，但额外把 numMaskCoeffs 个 mask 系数
-//! 写进行尾。src 的每行布局 = [4 + numClasses + numMaskCoeffs]。
+//! Decode the YOLOv8-seg head: same as decodeHeadKernel, but it additionally
+//! writes numMaskCoeffs mask coefficients at the end of each row. src row
+//! layout = [4 + numClasses + numMaskCoeffs].
 __global__ void decodeSegHeadKernel(int batchSize, int numClasses, int topK,
                                     float confThresh, const float* __restrict__ src,
                                     int srcRow, int anchors,

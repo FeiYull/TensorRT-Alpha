@@ -1,23 +1,28 @@
 // =============================================================================
 //  trt_alpha :: core :: model
 // -----------------------------------------------------------------------------
-//  IModel —— 所有任务（检测 / 分割 / 分类 / 未来任务）的统一总接口。
+//  IModel -- the unified top-level interface for every task
+//  (detection / segmentation / classification / future tasks).
 //
-//  设计目标：
-//    1. 任务无关：IModel 只约定"一批图像进来、结果在哪里取"，不约定输出
-//       内存布局。具体输出结构体由任务基类（det::IDetector / seg::ISegmentor
-//       / cls::IClassifier）定义
-//    2. 按 batch 设计：setBatch 接收一批同尺寸图像（Batch）
-//    3. 加新模型 = 1 个 .cpp + 1 行 TRT_ALPHA_REGISTER_MODEL，无侵入
+//  Design goals:
+//    1. Task-agnostic: IModel only states "a batch of images goes in and the
+//       results are fetched from here"; it says nothing about the output memory
+//       layout. The concrete output structs are defined by the task base
+//       classes (det::IDetector / seg::ISegmentor / cls::IClassifier).
+//    2. Batch-oriented: setBatch takes a batch of same-sized images (Batch).
+//    3. Adding a model = 1 .cpp + 1 line of TRT_ALPHA_REGISTER_MODEL, with no
+//       invasive changes elsewhere.
 //
-//  调用时序契约（唯一合法顺序）：
+//  Call-sequence contract (the only legal order):
 //    init(cfg) -> [ setBatch(batch) -> preprocess() -> infer() -> postprocess()
-//                   -> commitResult(result) -> reset() ] 循环
-//    postprocess() 返回即本轮 GPU 结果就绪（内部 D2H + 流同步）。
+//                   -> commitResult(result) -> reset() ] loop
+//    postprocess() returning means this round's GPU results are ready
+//    (it performs D2H + stream sync internally).
 //
-//  错误处理契约：
-//    初始化 / 参数 / 设备错误一律抛 std::runtime_error（带上下文）。
-//    init() 内部应校验 ModelConfig（如 numClass 与引擎实际 nc 是否一致）。
+//  Error-handling contract:
+//    Init / argument / device errors always throw std::runtime_error (with
+//    context). init() must validate ModelConfig itself (e.g. whether numClass
+//    matches the engine's actual nc).
 // =============================================================================
 #pragma once
 
@@ -33,7 +38,7 @@
 
 namespace trt_alpha {
 
-//! 所有任务的统一总接口。
+//! Unified top-level interface for every task.
 class IModel
 {
 public:
@@ -42,56 +47,63 @@ public:
     IModel(const IModel&) = delete;
     IModel& operator=(const IModel&) = delete;
 
-    //! 注册名（与 INI 里的 model 字段一致）。
+    //! Registration name (must match the `model` field in the INI file).
     [[nodiscard]] virtual const std::string& name() const noexcept = 0;
 
-    //! 初始化：加载 engine、分配显存。失败抛异常。
-    //! 内部应校验 ModelConfig（如 numClass 与引擎实际 nc）。
+    //! Initialize: load the engine and allocate device memory. Throws on failure.
+    //! Must validate ModelConfig internally (e.g. numClass vs. the engine's nc).
     virtual void init(const core::ModelConfig& cfg) = 0;
 
-    //! 一批图像上载显存。Batch 里 buffer 是连续内存。
+    //! Upload one batch of images to device memory. Buffers in a Batch are contiguous.
     virtual void setBatch(const core::Batch& batch) = 0;
 
-    //! CUDA 预处理（letterbox / 归一化 / HWC→NCHW 等）。模型自己实现。
+    //! CUDA preprocessing (letterbox / normalization / HWC->NCHW, etc.).
+    //! Implemented by each model.
     virtual void preprocess() = 0;
 
-    //! enqueueV3 异步推理。
+    //! Asynchronous inference through enqueueV3.
     virtual void infer() = 0;
 
-    //! 解码 + NMS + D2H；返回即结果就绪。模型自己实现。
+    //! Decode + NMS + D2H; results are ready once this returns.
+    //! Implemented by each model.
     virtual void postprocess() = 0;
 
-    //! 把本轮结果 move 到 out（commit 语义）。
+    //! Move this round's results into `out` (commit semantics).
     virtual void commitResult(core::BatchResult& out) = 0;
 
-    //! 清空本轮状态。
+    //! Clear this round's state.
     virtual void reset() = 0;
 
-    //! 引擎 I/O 张量描述（调试用）。
+    //! Engine I/O tensor descriptions (for debugging).
     [[nodiscard]] virtual const std::vector<core::TensorDesc>& describe() const noexcept = 0;
 
-    //! init() 之后【实际生效】的配置（引擎解析后的 batch / dstH / dstW 等）。
-    //! 与传入 init() 的 cfg 可能不同：静态形状会被纠正为引擎声明值。
+    //! The config actually in effect after init() (batch / dstH / dstW as
+    //! resolved from the engine). May differ from the cfg passed to init():
+    //! static shapes are corrected to the values declared by the engine.
     [[nodiscard]] virtual const core::ModelConfig& config() const noexcept = 0;
 
 protected:
     IModel() = default;
 };
 
-//! setBatch 的容量护栏 —— 所有任务（det / seg / kpt / cls）共用一处。
+//! Batch-capacity guard for setBatch -- shared by all tasks (det / seg / kpt / cls).
 //!
-//! 为什么必须有：模型的每一块 staging / 输出显存都按【引擎解析后的 batch】分配，
-//! 而 setBatch 收到的 Batch 来自调用方。views 多于容量时，preprocess / decode
-//! 会按 views.size() 驱动 kernel → 越过已分配的显存写入（UB，且不报错）。
-//! 因此这里按"配置与引擎能力不符 → 显式失败"的口径直接抛，既不截断也不静默。
+//! Why it is mandatory: every staging / output buffer of a model is sized for
+//! the engine-resolved batch, while the Batch handed to setBatch comes from the
+//! caller. When views outnumber that capacity, preprocess / decode drive their
+//! kernels by views.size() and write past the allocated memory (undefined
+//! behaviour, and silently so). So this throws outright, following the rule
+//! "config disagrees with engine capability -> fail explicitly": it neither
+//! truncates nor stays silent.
 //!
-//! 这是**基类收口**：新模型只要用本函数取 batch，就自动获得护栏
-//!（对照 InferencePool::submit —— 生产路径上还有一道更靠前的同款检查）。
+//! This is the base-class funnel: any new model that takes its batch through
+//! this function inherits the guard (compare InferencePool::submit -- the
+//! production path carries an equivalent check even further upstream).
 //!
-//! @param model 模型自身（用于取 init() 后的生效配置）
-//! @param batch 本批输入
-//! @param who   模型名（进日志 / 异常信息）
-//! @return 本次实际 batch（== batch.views.size()），便于调用方一行赋值
+//! @param model the model itself (used to read the config in effect after init())
+//! @param batch this batch's input
+//! @param who   model name (goes into the log / exception message)
+//! @return the actual batch size (== batch.views.size()), so callers can assign in one line
 inline int requireBatchCapacity(const IModel& model, const core::Batch& batch,
                                 const char* who)
 {

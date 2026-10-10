@@ -11,8 +11,8 @@
 #include "trt_alpha/core/device_buffer.hpp"
 #include "trt_alpha/core/pinned_buffer.hpp"
 #include "trt_alpha/core/cuda_stream.hpp"
-#include "trt_alpha/kernels/postprocess.hpp"
-#include "trt_alpha/kernels/preprocess.hpp"
+#include "trt_alpha/kernels/legacy/postprocess.hpp"
+#include "trt_alpha/kernels/legacy/preprocess.hpp"
 
 #include <cmath>
 #include <cstdint>

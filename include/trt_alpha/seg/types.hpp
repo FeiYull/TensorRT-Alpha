@@ -1,18 +1,19 @@
 // =============================================================================
 //  trt_alpha :: seg :: types
 // -----------------------------------------------------------------------------
-//  Segmentation —— 一个分割结果。
+//  Segmentation -- one segmentation result.
 //
-//  字段说明：
-//    * box      —— 检测框（可选）。
-//                   label == -1 表示"无框"（如 U2Net 显著性检测）。
-//    * mask     —— 掩码视图（CV_8UC1 语义，整图）。
-//                   - YOLOv8-seg: 0/255 二值（255=前景，0=背景），每个实例一张图
-//                   - U2Net:      0~255 显著性
-//    * maskOwner —— 掩码所有者，保证 mask.data 有效。
+//  Fields:
+//    * box       -- detection box (optional). label == -1 means "no box"
+//                   (e.g. U2Net saliency detection).
+//    * mask      -- mask view (CV_8UC1 semantics, full image).
+//                   - YOLOv8-seg: binary 0/255 (255 = foreground, 0 = background),
+//                     one image per instance
+//                   - U2Net:      0~255 saliency
+//    * maskOwner -- owner of the mask; keeps mask.data valid.
 //
-//  渲染器约定：
-//    * box.label >= 0 时画框；否则只叠 mask。
+//  Renderer convention:
+//    * draw a box when box.label >= 0; otherwise only overlay the mask.
 // =============================================================================
 #pragma once
 
@@ -24,12 +25,12 @@
 
 namespace trt_alpha::seg {
 
-//! 一个分割结果。
+//! One segmentation result.
 struct Segmentation
 {
-    det::Detection box;                        //!< 框（label == -1 表示无框）
-    core::BufferView mask;                     //!< 掩码视图（CV_8UC1 语义，整图）
-    std::shared_ptr<core::Buffer> maskOwner;   //!< 掩码所有者
+    det::Detection box;                        //!< box (label == -1 means no box)
+    core::BufferView mask;                     //!< mask view (CV_8UC1 semantics, full image)
+    std::shared_ptr<core::Buffer> maskOwner;   //!< owner of the mask
 };
 
 }  // namespace trt_alpha::seg

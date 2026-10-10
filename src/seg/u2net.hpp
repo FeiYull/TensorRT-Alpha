@@ -18,8 +18,8 @@
 #include "trt_alpha/core/engine.hpp"
 #include "trt_alpha/core/model_config.hpp"
 #include "trt_alpha/core/pinned_buffer.hpp"
-#include "trt_alpha/kernels/postprocess.hpp"
-#include "trt_alpha/kernels/preprocess.hpp"
+#include "trt_alpha/kernels/legacy/postprocess.hpp"
+#include "trt_alpha/kernels/legacy/preprocess.hpp"
 #include "trt_alpha/seg/segmentor.hpp"
 
 #include <cstdint>

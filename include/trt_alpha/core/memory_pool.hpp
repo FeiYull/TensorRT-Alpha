@@ -1,37 +1,46 @@
 // =============================================================================
 //  trt_alpha :: core :: memory_pool
 // -----------------------------------------------------------------------------
-//  MemoryPool —— 显存 + 页锁定内存的统一池。
+//  MemoryPool -- a unified pool for device memory and page-locked memory.
 //
-//  解决的问题：
-//    * cudaMalloc / cudaFree / cudaMallocHost 是重量级调用（数十 µs 起），
-//      频繁分配拖垮高吞吐场景
-//    * 多模型实例 / 动态 batch / 视频流尺寸变化时反复申请释放造成碎片
+//  Problems it solves:
+//    * cudaMalloc / cudaFree / cudaMallocHost are heavyweight calls (tens of us
+//      and up); allocating frequently drags down high-throughput scenarios
+//    * repeated allocate-free cycles caused by multiple model instances /
+//      dynamic batches / changing video-stream sizes lead to fragmentation
 //
-//  【安全设计】
-//    * 线程安全：每个 Kind 一把互斥锁，全部状态变更都在锁内
-//    * 归还凭据：Block{ptr, capacity} 必须原样来自 allocate() 的返回值
-//    * 双重归还检测：**所有构建**都维护在用指针登记表，重复归还 / 非法指针
-//      归还会被拒绝并打日志。这道护栏不能在 Release 关掉 —— 一旦同一指针
-//      进两次空闲链，两个调用方就会拿到同一块显存（数据踩踏），而 Release
-//      恰好是发布/bench 用的那个构建。开销是一次哈希插入/删除，可忽略。
-//    * 生命周期：instance() 返回 shared_ptr，RAII 容器持 weak_ptr；
-//      进程退出时池先销毁则容器退化为直接 cudaFree，无 use-after-free
-//    * 缓存上限：device / pinned 各有字节上限（默认 512 MiB / 256 MiB），
-//      超限的归还直接真释放，防止池无限膨胀
+//  [Safety design]
+//    * Thread safety: one mutex per Kind; every state change happens under it
+//    * Return credentials: the Block{ptr, capacity} must come back to release()
+//      exactly as allocate() returned it
+//    * Double-free detection: [every build] maintains a registry of pointers in
+//      use; a duplicate or foreign pointer is rejected and logged. This guard
+//      must not be compiled out in Release -- if the same pointer entered the
+//      free list twice, two callers would receive the same device memory (data
+//      corruption), and Release is exactly the build used for shipping and
+//      benching. The cost is one hash insert/erase, which is negligible.
+//    * Lifetime: instance() returns a shared_ptr and RAII containers hold a
+//      weak_ptr; if the pool is destroyed first at process exit, containers
+//      degrade to a direct cudaFree, so there is no use-after-free
+//    * Cache limits: device / pinned each have a byte ceiling (512 MiB / 256 MiB
+//      by default); returns beyond it are truly freed, so the pool cannot grow
+//      without bound
 //
-//  【高效设计】
-//    * 精确尺寸空闲链：std::map<capacity, blocks> + lower_bound
-//    * 256 字节粒度对齐（与 cudaMalloc 对齐保证一致）
-//    * 不做 2 次幂取整（避免最多 2x 显存浪费）
-//    * 命中路径 O(log n) 且零 CUDA 调用；未命中才真正 cudaMalloc，
-//      且重量级 CUDA 分配在锁外执行（不阻塞其它线程的命中路径）
-//    * 全量统计：命中数 / 真实 CUDA 分配数 / 峰值在用
+//  [Efficiency design]
+//    * Exact-size free lists: std::map<capacity, blocks> plus lower_bound
+//    * 256-byte granularity alignment (matching cudaMalloc's alignment guarantee)
+//    * No rounding up to powers of two (avoids up to 2x device-memory waste)
+//    * The hit path is O(log n) with zero CUDA calls; only a miss really calls
+//      cudaMalloc, and that heavyweight allocation runs outside the lock so it
+//      does not block other threads' hit path
+//    * Full statistics: hit count / real CUDA allocation count / peak in use
 //
-//  【不做】
-//    * 不用 cudaMallocAsync：拿不到精确统计和"框图 log"所需的信息；
-//      且要求 CUDA 11.2+。保留扩展点（allocateAsync）在注释里。
-//    * 池和流解耦：同一块内存可在不同流用；池不管"内存在哪条流上用"。
+//  [Not done]
+//    * cudaMallocAsync is not used: it cannot provide the exact statistics and
+//      "per-block log" we need, and it requires CUDA 11.2+. The extension point
+//      (allocateAsync) is kept in a comment.
+//    * The pool and streams are decoupled: one block may be used on different
+//      streams; the pool does not care which stream the memory is used on.
 // =============================================================================
 #pragma once
 
@@ -49,38 +58,39 @@ namespace trt_alpha::core {
 class MemoryPool
 {
 public:
-    //! 内存种类。
+    //! Kinds of memory.
     enum class Kind
     {
-        Device,        //!< 设备显存（cudaMalloc）
-        PinnedHost,    //!< 页锁定主机内存（cudaMallocHost）
+        Device,        //!< device memory (cudaMalloc)
+        PinnedHost,    //!< page-locked host memory (cudaMallocHost)
     };
 
-    //! 从池取回的块。capacity 是实际持有字节数（>= 请求的 bytes，
-    //! 向上取整到 256 的倍数）。归还时必须把 allocate() 返回的 Block
-    //! 原样传回 release()。
+    //! A block taken from the pool. capacity is the bytes actually held
+    //! (>= the requested bytes, rounded up to a multiple of 256). When returning
+    //! it, the Block from allocate() must be passed back to release() unchanged.
     struct Block
     {
         void* ptr = nullptr;
         std::size_t capacity = 0;
     };
 
-    //! 池统计。
+    //! Pool statistics.
     struct Stats
     {
-        std::size_t requests = 0;        //!< allocate 调用总次数
-        std::size_t hits = 0;            //!< 从空闲缓存命中次数
-        std::size_t cudaAllocs = 0;      //!< 真实 CUDA 分配次数
-        std::size_t inUseBytes = 0;      //!< 已分配未归还字节
-        std::size_t cachedBytes = 0;     //!< 空闲缓存字节（可立即复用）
-        std::size_t peakInUseBytes = 0;  //!< 峰值在用字节
+        std::size_t requests = 0;        //!< total allocate calls
+        std::size_t hits = 0;            //!< hits from the free cache
+        std::size_t cudaAllocs = 0;      //!< real CUDA allocations
+        std::size_t inUseBytes = 0;      //!< bytes allocated but not yet returned
+        std::size_t cachedBytes = 0;     //!< bytes in the free cache (immediately reusable)
+        std::size_t peakInUseBytes = 0;  //!< peak bytes in use
     };
 
-    //! 全局池单例。
-    //! 返回常引用（进程级单例，生命周期同程序）；调用方应存 weak_ptr 以感知池生命周期。
+    //! Global pool singleton. Returns a const reference (a process-wide singleton
+    //! living as long as the program); callers should keep a weak_ptr to observe
+    //! the pool's lifetime.
     static const std::shared_ptr<MemoryPool>& instance();
 
-    //! 构造（一般用 instance()；直接构造便于测试）。
+    //! Constructor (normally use instance(); direct construction helps tests).
     explicit MemoryPool(std::size_t deviceCacheLimitBytes = 512ULL << 20,
                         std::size_t pinnedCacheLimitBytes = 256ULL << 20);
     ~MemoryPool();
@@ -88,15 +98,17 @@ public:
     MemoryPool(const MemoryPool&) = delete;
     MemoryPool& operator=(const MemoryPool&) = delete;
 
-    //! 申请 >= bytes 的块。CUDA 分配失败抛异常。
-    //! bytes == 0 返回空块（不触 CUDA）。
+    //! Request a block of >= bytes. A failed CUDA allocation throws.
+    //! bytes == 0 returns an empty block (no CUDA call).
     [[nodiscard]] Block allocate(Kind kind, std::size_t bytes);
 
-    //! 归还块。noexcept —— 在 RAII 析构里调用。
-    //! 双重归还 / 非法指针一律拒绝并打 ERROR（所有构建都生效）。
+    //! Return a block. noexcept -- called from RAII destructors.
+    //! A double free or a foreign pointer is always rejected with an ERROR log
+    //! (in every build).
     void release(Kind kind, Block block) noexcept;
 
-    //! 立即释放该种类全部空闲缓存（显存紧张时手动调用）。
+    //! Free this kind's entire idle cache right away (call manually when memory
+    //! is tight).
     void releaseUnused(Kind kind);
 
     [[nodiscard]] Stats stats(Kind kind) const;
@@ -108,10 +120,10 @@ private:
     struct KindState
     {
         mutable std::mutex mutex;
-        std::map<std::size_t, std::vector<void*>> freeBlocks;   // capacity -> 空闲块栈
+        std::map<std::size_t, std::vector<void*>> freeBlocks;   // capacity -> stack of free blocks
         std::size_t cacheLimit = 0;
         Stats stats;
-        std::unordered_set<void*> outstanding;   // 在用指针登记（双重归还检测）
+        std::unordered_set<void*> outstanding;   // registry of pointers in use (double-free detection)
     };
 
     static std::size_t roundUp(std::size_t bytes) noexcept;

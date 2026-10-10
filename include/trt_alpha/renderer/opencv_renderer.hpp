@@ -1,17 +1,18 @@
 // =============================================================================
 //  trt_alpha :: renderer :: opencv_renderer
 // -----------------------------------------------------------------------------
-//  OpenCVRenderer —— IRenderer 的 OpenCV 实现。
+//  OpenCVRenderer -- the OpenCV implementation of IRenderer.
 //
-//  渲染风格（内部固定，不暴露给用户）：
-//    * 框线宽 2，字体 FONT_HERSHEY_DUPLEX，字号 0.5
-//    * 按 label 循环取色（同一 label 恒定同色）
-//    * 掩码按像素级混合（alpha = 0.35）
+//  Rendering style (fixed internally, not exposed to users):
+//    * box line width 2, font FONT_HERSHEY_DUPLEX, font scale 0.5
+//    * colours cycle by label (the same label always gets the same colour)
+//    * masks are blended per pixel (alpha = 0.35)
 //
-//  安全约定：
-//    * 一切 ROI 访问先裁剪到图像范围内（防越界）
-//    * 掩码类型不符时跳过而非崩溃
-//    * save() 拒绝对"输入源文件"的写入 —— 输出路径与输入同一文件 = 覆盖原图
+//  Safety conventions:
+//    * every ROI access is clipped to the image bounds first (no out-of-range)
+//    * a mask of the wrong type is skipped rather than crashing the process
+//    * save() refuses to write to an "input source file" -- an output path equal
+//      to an input file would overwrite the original
 // =============================================================================
 #pragma once
 
@@ -28,10 +29,11 @@ public:
     OpenCVRenderer() = default;
     ~OpenCVRenderer() override = default;
 
-    //! 登记一个输入源（文件或目录，绝对路径）。目录会被展开为其中的文件。
-    //! save() 命中这些路径时拒绝写盘 —— 这是"输出 == 输入"的最后一道闸门，
-    //! 任何数据源、任何调用方式（CLI / Infer）都躲不过。
-    //! 必须在 start() 之前调用（save() 只读它，故 save 可保持 const）。
+    //! Register an input source (a file or a directory, absolute path). A
+    //! directory is expanded into the files inside it. save() refuses to write
+    //! when it hits these paths -- this is the last gate for "output == input",
+    //! which no data source and no call path (CLI / Infer) can escape. Must be
+    //! called before start() (save() only reads it, so save can stay const).
     void addInputSource(const std::string& resolvedPath);
 
     [[nodiscard]] bool protectsInputs() const noexcept { return !m_inputPaths.empty(); }
@@ -46,7 +48,7 @@ public:
               const std::string& windowName) const override;
 
 private:
-    //! 归一化后的输入文件路径集合（见 cpp 里的 pathKey）。
+    //! The set of normalised input file paths (see pathKey in the cpp).
     std::unordered_set<std::string> m_inputPaths;
 };
 

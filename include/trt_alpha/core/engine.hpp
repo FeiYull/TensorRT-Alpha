@@ -1,16 +1,19 @@
 // =============================================================================
 //  trt_alpha :: core :: engine
 // -----------------------------------------------------------------------------
-//  Engine  —— 共享的 ICudaEngine 封装（线程安全，可被多个 Context 引用）。
-//  Context —— 独占的 IExecutionContext 封装（非线程安全，每个 worker 一个）。
-//  TrtEngine —— 兼容壳：持 shared_ptr<Engine> + 独占 Context。
+//  Engine  -- a shared ICudaEngine wrapper (thread-safe, referencable by
+//             several Contexts).
+//  Context -- an exclusive IExecutionContext wrapper (not thread-safe; one per
+//             worker).
+//  TrtEngine -- a compatibility shell: holds a shared_ptr<Engine> + an
+//               exclusive Context.
 //
-//  1 engine + N context 模型：
-//    * 反序列化 1 次 engine（权重 1 份）
-//    * 每个 worker 1 个 context
+//  1 engine + N context model:
+//    * deserialize the engine once (one copy of the weights)
+//    * one context per worker
 //
-//  兼容旧用法：
-//    * TrtEngine(file) 会自己反序列化一份 engine（独立，不复用）
+//  Compatibility with older usage:
+//    * TrtEngine(file) deserializes its own engine copy (independent, not shared)
 // =============================================================================
 #pragma once
 
@@ -36,103 +39,125 @@ struct BatchRange
     [[nodiscard]] bool isDynamic() const noexcept { return min != max; }
 };
 
-//! I/O 张量描述。
+//! I/O tensor description.
 struct TensorDesc
 {
     std::string name;
-    nvinfer1::Dims shape{};      // 引擎声明形状（动态维为 -1）
+    nvinfer1::Dims shape{};      // shape declared by the engine (dynamic axes are -1)
     nvinfer1::Dims minShape{};   // profile kMIN
     nvinfer1::Dims optShape{};   // profile kOPT
     nvinfer1::Dims maxShape{};   // profile kMAX
     DataType dtype = DataType::Float32;
-    //! 物理内存排布（线性 / 分块向量化）。与 shape 的【逻辑次序】正交：
-    //! shape 决定哪根轴是 H/W/C，format 决定这些值在内存里怎么摆。
+    //! Physical memory layout (linear / blocked-vectorized). Orthogonal to
+    //! shape's [logical order]: shape decides which axis is H/W/C, format decides
+    //! how those values sit in memory.
     nvinfer1::TensorFormat format = nvinfer1::TensorFormat::kLINEAR;
-    std::string formatDesc;      //!< 人类可读的格式名（日志 / 异常信息用）
+    std::string formatDesc;      //!< human-readable format name (for logs / exception messages)
     bool isInput = false;
 
     [[nodiscard]] std::size_t volume() const noexcept;
 
-    //! N 轴（batch 轴）在布局里的下标；布局未声明 batch 轴时返回 -1。
-    //! 有了它，"哪根轴是 batch" 才由【布局】决定，而不是硬写轴 0 ——
-    //! CHW（无 N 轴）/ HWCN 这类布局才不会读错轴。
+    //! Index of the N axis (batch axis) within the layout; -1 when the layout
+    //! declares no batch axis. With it, "which axis is batch" is decided by the
+    //! [layout] instead of being hard-wired to axis 0 -- layouts such as CHW (no
+    //! N axis) / HWCN then read the right axis.
     [[nodiscard]] int batchAxisIndex(const Layout& layout) const noexcept
     { return layout.has(Layout::kBatch) ? layout.indexOf(Layout::kBatch) : -1; }
 
-    //! 指定轴是否为动态维（-1）。axis < 0（无 batch 轴）恒为 false。
+    //! Whether the given axis is dynamic (-1). axis < 0 (no batch axis) is always false.
     [[nodiscard]] bool isDynamicBatch(int axis = 0) const noexcept
     { return axis >= 0 && axis < shape.nbDims && shape.d[axis] < 0; }
 
-    //! 指定轴的 batch 区间（读 profile 的 min/opt/max）。axis < 0 返回 {1,1,1}。
-    [[nodiscard]] BatchRange batchRange(int axis = 0) const noexcept;   // 见文件
+    //! The batch range of the given axis (reading min/opt/max from the profile).
+    //! axis < 0 returns {1,1,1}.
+    [[nodiscard]] BatchRange batchRange(int axis = 0) const noexcept;   // see the .cpp
 
 private:
     [[nodiscard]] int pick(const nvinfer1::Dims& d, int axis, int fallback) const noexcept;
 };
 
-//! 引擎输入 batch 的解析结果（统一静态 / 动态语义）。
+//! The result of resolving the engine input's batch (unified static / dynamic
+//! semantics).
 struct ResolvedBatch
 {
-    int  batch     = 1;      //!< 实际使用的 batch（== 请求值；不符时不会返回，直接抛异常）
-    bool isDynamic = false;  //!< 引擎输入是否为动态 batch
-    int  min = 1;            //!< 引擎 profile 最小 batch
-    int  opt = 1;            //!< 引擎 profile 最优 batch
-    int  max = 1;            //!< 引擎 profile 最大 batch
+    int  batch     = 1;      //!< the batch actually used (== the requested value; a mismatch throws instead of returning)
+    bool isDynamic = false;  //!< whether the engine input is a dynamic batch
+    int  min = 1;            //!< engine profile minimum batch
+    int  opt = 1;            //!< engine profile optimal batch
+    int  max = 1;            //!< engine profile maximum batch
 };
 
-//! 依据引擎实际能力，校验调用方请求的 batch —— 不符一律抛 std::runtime_error：
-//!   * 静态引擎（onnx 固定 batch）：batch 由引擎写死，请求值必须等于该固定值；
-//!     不等 → 抛（**不静默纠正** —— 纠正会让人以为 ini / CLI 里的值生效了）。
-//!   * 动态引擎（onnx -1 + trtexec min/opt/max）：batch 必须落在 [min, max] 内；
-//!     请求值 > max 或 < min → 抛（**不静默钳制** —— 配置超出引擎能力是错误，
-//!     静默降级会让人以为设置生效，且数据源可能仍按原值打包）。
-//!   * 可选上界契约：declaredMax > 0 时，必须与引擎 profile max 一致，
-//!     否则抛 std::runtime_error（配置声明的能力与引擎不符）。
-//! 一句话：配置只表达"意图"，引擎 profile 是唯一真相源；冲突时显式失败，绝不静默改值。
-//! @param input       引擎输入张量描述（需已填 profile 形状）
-//! @param requested   调用方请求的 batch
-//! @param who         调用方名字（用于日志与异常信息）
-//! @param declaredMax 配置声明的上界契约；<=0 表示未声明
-//! @param batchAxis   batch 轴下标（由布局决定，见 TensorDesc::batchAxisIndex）；
-//!                    -1 表示该布局没有 batch 轴（如 CHW），此时 batch 概念上恒为 1
+//! Validate the batch the caller requested against the engine's real capability;
+//! any mismatch throws std::runtime_error:
+//!   * Static engine (fixed batch in the onnx): the batch is hard-wired by the
+//!     engine, so the requested value must equal it; otherwise it throws
+//!     (**no silent correction** -- correcting it would make people believe the
+//!     ini / CLI value took effect).
+//!   * Dynamic engine (onnx -1 plus trtexec min/opt/max): the batch must lie
+//!     within [min, max]; a request > max or < min throws (**no silent
+//!     clamping** -- a config exceeding the engine's capability is an error, and
+//!     a silent downgrade would make people think the setting took effect while
+//!     the data source may still pack by the original value).
+//!   * Optional upper-bound contract: when declaredMax > 0 it must equal the
+//!     engine profile's max, otherwise it throws std::runtime_error (the
+//!     capability declared by the config disagrees with the engine).
+//! In one line: the config only expresses "intent", the engine profile is the
+//! single source of truth, and a conflict fails explicitly instead of silently
+//! changing values.
+//! @param input       engine input tensor description (profile shapes must be filled in)
+//! @param requested   the batch the caller requested
+//! @param who         caller name (for logs and exception messages)
+//! @param declaredMax the upper-bound contract declared by the config; <= 0 = undeclared
+//! @param batchAxis   batch axis index (decided by the layout, see
+//!                    TensorDesc::batchAxisIndex); -1 means the layout has no
+//!                    batch axis (e.g. CHW), in which case the batch is
+//!                    conceptually always 1
 [[nodiscard]] ResolvedBatch resolveBatch(const TensorDesc& input,
                                          int requested,
                                          const std::string& who,
                                          int declaredMax = 0,
                                          int batchAxis = 0);
 
-//! 引擎输入【空间维】的解析结果（按语义命名，与布局的排列无关）。
+//! The result of resolving the engine input's [spatial axes] (named
+//! semantically, independent of the layout's ordering).
 struct ResolvedInputShape
 {
-    int  depth     = 0;      //!< 布局无 D 轴 / 引擎未声明时为 0
+    int  depth     = 0;      //!< 0 when the layout has no D axis / the engine does not declare one
     int  height    = 0;
     int  width     = 0;
-    bool dynamic   = false;  //!< 空间维中存在动态（-1）轴（此时采用调用方意图值）
-    bool corrected = false;  //!< 静态维被引擎纠正过（与意图值不同）
+    bool dynamic   = false;  //!< a dynamic (-1) axis exists among the spatial axes (the caller's intent value is used)
+    bool corrected = false;  //!< a static axis was corrected by the engine (differs from the intent value)
 };
 
-//! 校验输入张量的【秩 / 通道轴 / 物理格式】，任一不符抛 std::runtime_error：
-//!   * shape.nbDims != layout.rank()  → 布局声明与引擎不符
-//!   * C 轴静态尺寸 != channels       → 布局声明写错（防止把 H/W 当通道、静默错读）
-//!   * format != kLINEAR             → 引擎要求分块/向量化排布，本框架只喂线性 buffer
-//! 这三条是"安全不放步"的护栏：宁可明确报错，也不静默拿错轴。
-//! @param channels 期望通道数；<=0 表示跳过通道校验
+//! Validate the input tensor's [rank / channel axis / physical format]; any
+//! mismatch throws std::runtime_error:
+//!   * shape.nbDims != layout.rank()  -> the layout declaration disagrees with the engine
+//!   * a static C-axis extent != channels -> the layout declaration is wrong
+//!     (prevents mistaking H/W for channels and silently reading garbage)
+//!   * format != kLINEAR             -> the engine demands blocked/vectorized
+//!     layout while this framework only feeds linear buffers
+//! These three are the "rather fail than take a wrong step" guards: an explicit
+//! error beats silently using the wrong axis.
+//! @param channels expected channel count; <= 0 skips the channel check
 void validateInputTensor(const TensorDesc& input, const Layout& layout,
                          int channels, const std::string& who);
 
-//! 以【引擎声明形状】为唯一真相源解析输入的空间维（D/H/W）。
-//!   * 静态轴（> 0）：忽略 intent，采用引擎值；与 intent 不同则 corrected = true
-//!   * 动态轴（-1）  ：采用 intent（调用方意图值）；intent 未提供则为 0
-//! 前置校验同 validateInputTensor。
+//! Resolve the input's spatial axes (D/H/W) using the [engine-declared shape] as
+//! the single source of truth.
+//!   * static axis (> 0): ignore the intent and use the engine's value; if it
+//!     differs from the intent, corrected = true
+//!   * dynamic axis (-1): use the intent (the caller's intended value); 0 when no
+//!     intent is provided
+//! The pre-checks are the same as validateInputTensor.
 void resolveInputShape(const TensorDesc& input, const Layout& layout, int channels,
                        const ResolvedInputShape& intent, const std::string& who,
                        ResolvedInputShape& out);
 
-//! 共享的 ICudaEngine（线程安全，可被多个 Context 引用）。
+//! A shared ICudaEngine (thread-safe, referencable by several Contexts).
 class Engine
 {
 public:
-    //! 从序列化 engine 文件加载。失败抛 std::runtime_error。
+    //! Load from a serialized engine file. Throws std::runtime_error on failure.
     explicit Engine(const std::string& engineFile);
 
     Engine(const Engine&) = delete;
@@ -153,11 +178,11 @@ private:
     std::vector<TensorDesc> m_io;
 };
 
-//! 独占的 IExecutionContext（非线程安全，每个 worker 一个）。
+//! An exclusive IExecutionContext (not thread-safe; one per worker).
 class Context
 {
 public:
-    //! 从共享 engine 创建 context。engine 必须比 Context 活得更久。
+    //! Create a context from a shared engine. The engine must outlive the Context.
     explicit Context(Engine& engine);
 
     Context(const Context&) = delete;
@@ -168,21 +193,23 @@ public:
     [[nodiscard]] nvinfer1::IExecutionContext* get() noexcept { return m_context.get(); }
     [[nodiscard]] const nvinfer1::IExecutionContext* get() const noexcept { return m_context.get(); }
 
-    //! 设置实际输入形状。
-    //!  * 动态张量：下发 TRT；越界（超出 profile）由 TRT 拒绝并抛 std::runtime_error。
-    //!  * 静态张量：形状由引擎写死；与请求一致时静默跳过，
-    //!    不一致时抛 std::runtime_error（配置 / 引擎不匹配，杜绝静默越界）。
+    //! Set the actual input shape.
+    //!  * Dynamic tensor: forwarded to TRT; an out-of-profile value is rejected by
+    //!    TRT, which throws std::runtime_error.
+    //!  * Static tensor: the shape is hard-wired by the engine; a matching request
+    //!    is skipped silently, while a mismatching one throws std::runtime_error
+    //!    (config / engine mismatch; never a silent out-of-range).
     void setInputShape(const std::string& name, const nvinfer1::Dims& dims);
 
-    //! context 级（已应用 setInputShape 后）的实际形状。
+    //! The actual shape at context level (after setInputShape has been applied).
     [[nodiscard]] nvinfer1::Dims contextShape(const std::string& name) const;
 
 private:
     std::unique_ptr<nvinfer1::IExecutionContext> m_context;
-    nvinfer1::ICudaEngine* m_engine = nullptr;   // 不拥有
+    nvinfer1::ICudaEngine* m_engine = nullptr;   // non-owning
 };
 
-//! 兼容壳：持 shared_ptr<Engine> + 独占 Context。
+//! Compatibility shell: holds a shared_ptr<Engine> + an exclusive Context.
 class TrtEngine
 {
 public:
@@ -192,13 +219,13 @@ public:
         bool fp16 = true;
     };
 
-    //! 旧构造：自己反序列化一份 engine（独立，不复用）。
+    //! Legacy constructor: deserializes its own engine copy (independent, not shared).
     explicit TrtEngine(const std::string& engineFile);
 
-    //! 新构造：复用共享 engine（1 engine + N context）。
+    //! New constructor: reuse a shared engine (1 engine + N contexts).
     explicit TrtEngine(std::shared_ptr<Engine> sharedEngine);
 
-    //! ONNX → engine（TODO）。
+    //! ONNX -> engine (TODO).
     static void buildFromOnnx(const std::string& onnxFile,
                               const std::string& engineFile,
                               const BuildOptions& options = {});
@@ -242,14 +269,20 @@ private:
     std::unique_ptr<Context> m_context;
 };
 
-//! 一步到位：落定输入 batch、解析输入布局 / 空间维并下发 setInputShape，
-//! 结果就地写回 cfg.batchSize / cfg.dstH / cfg.dstW。
-//!   * batch：先过 resolveBatch（引擎 profile 为唯一真相源，不符即抛）
-//!   * 布局优先级：cfg.layout（INI 的 input.layout）> modelLayout（模型规范布局）
-//!   * 目标形状按 layout 逐轴构造 → 天然支持 3~8 维的任意排列（NCHW/NHWC/NCDHW/CHWN/…）
-//!   * 配置里的 dst_h / dst_w 降级为"意图值"：仅在引擎对应维为动态（-1）时生效；
-//!     静态维一律以引擎为准并 WARN 纠正。
-//! 失败（引擎无此输入 / 校验不过 / 某轴尺寸无法确定）抛 std::runtime_error。
+//! One-stop call: settle the input batch, resolve the input layout / spatial
+//! axes and issue setInputShape, writing the result back into cfg.batchSize /
+//! cfg.dstH / cfg.dstW in place.
+//!   * batch: goes through resolveBatch first (the engine profile is the single
+//!     source of truth; a mismatch throws)
+//!   * layout priority: cfg.layout (the INI's input.layout) > modelLayout (the
+//!     model's canonical layout)
+//!   * the target shape is built axis by axis from the layout, so any permutation
+//!     of 3 to 8 dimensions works (NCHW/NHWC/NCDHW/CHWN/...)
+//!   * dst_h / dst_w in the config are downgraded to "intent values": they only
+//!     take effect when the corresponding engine axis is dynamic (-1); static
+//!     axes always follow the engine, with a WARN about the correction
+//! A failure (no such input / a failed check / an undeterminable axis extent)
+//! throws std::runtime_error.
 void applyInputShape(TrtEngine& engine, const std::string& tensorName,
                      const Layout& modelLayout, int channels, ModelConfig& cfg);
 

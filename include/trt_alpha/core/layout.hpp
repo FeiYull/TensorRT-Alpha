@@ -1,23 +1,27 @@
 // =============================================================================
 //  trt_alpha :: core :: layout
 // -----------------------------------------------------------------------------
-//  Layout —— 张量的【逻辑维度次序】描述（与物理内存排布无关）。
+//  Layout -- the [logical axis order] of a tensor (unrelated to how it is laid
+//  out physically in memory).
 //
-//  为什么不用 enum：
-//    维序在生态里是开放的 —— 2D 图像 NCHW / NHWC，3D NCDHW / NDHWC，
-//    无 batch 的 CHW / HWC，1D 音频 NCW / NWC，视频 NTCHW，
-//    以及昇腾 CANN 真实存在的 CHWN / HWCN / DHWCN …… 枚举写死就永远追不上。
-//    因此用"轴字母串"表达：字符串长度 == 张量秩，每个字母标识一根轴的语义。
-//    → 任意排列、任意秩（≤ 8）都支持，新增布局【零代码改动】。
+//  Why not an enum:
+//    Axis orders are open-ended in the ecosystem -- 2D images are NCHW / NHWC,
+//    3D is NCDHW / NDHWC, batchless is CHW / HWC, 1D audio is NCW / NWC, video
+//    is NTCHW, and Ascend CANN really has CHWN / HWCN / DHWCN ... a fixed enum
+//    can never keep up. So it is expressed as an axis letter string: the string
+//    length equals the tensor rank and every letter names one axis's meaning.
+//    -> Any permutation and any rank (<= 8) is supported; adding a layout takes
+//       [zero code changes].
 //
-//  约定字母（不区分大小写）：
+//  Letters (case-insensitive):
 //    N = batch   C = channel   D = depth   H = height
-//    W = width   T = time      E = embed   ? = 未标注（对应昇腾 "ND" 任意格式）
-//  约束：每个字母至多出现一次（'?' 可重复）。
+//    W = width   T = time      E = embed   ? = unlabelled (Ascend's "ND" any-format)
+//  Constraint: each letter appears at most once ('?' may repeat).
 //
-//  ⚠ 这里描述的是【逻辑次序】（ICudaEngine::getTensorShape 返回的次序），
-//     不是【物理格式】（TensorRT 的 TensorFormat、昇腾的 NC1HWC0 等分块格式）。
-//     物理格式由后端自己处理，框架只做守卫，见 core::TensorDesc::format。
+//  NOTE This describes the [logical order] (the order returned by
+//  ICudaEngine::getTensorShape), not the [physical format] (TensorRT's
+//  TensorFormat, Ascend's blocked NC1HWC0, ...). The physical format is handled
+//  by the backend; the framework only guards it, see core::TensorDesc::format.
 // =============================================================================
 #pragma once
 
@@ -33,9 +37,9 @@ namespace trt_alpha::core {
 class Layout
 {
 public:
-    static constexpr int kMaxRank = 8;   // 与 nvinfer1::Dims::MAX_DIMS 一致
+    static constexpr int kMaxRank = 8;   // same as nvinfer1::Dims::MAX_DIMS
 
-    // 轴字母
+    // Axis letters
     static constexpr char kBatch   = 'N';
     static constexpr char kChannel = 'C';
     static constexpr char kDepth   = 'D';
@@ -43,13 +47,14 @@ public:
     static constexpr char kWidth   = 'W';
     static constexpr char kTime    = 'T';
     static constexpr char kEmbed   = 'E';
-    static constexpr char kAny     = '?';   // 未标注轴（长度仍计入秩）
+    static constexpr char kAny     = '?';   // unlabelled axis (still counts towards the rank)
 
-    //! 空布局 = 未指定。
+    //! An empty layout = unspecified.
     constexpr Layout() noexcept = default;
 
-    //! 从轴字母串构造（不区分大小写）。
-    //! 非法（空 / 超长 / 未知字母 / 字母重复）抛 std::runtime_error。
+    //! Construct from an axis letter string (case-insensitive).
+    //! Invalid input (empty / too long / unknown letter / duplicate letter)
+    //! throws std::runtime_error.
     constexpr explicit Layout(std::string_view axes)
     {
         if (axes.empty() || axes.size() > static_cast<std::size_t>(kMaxRank))
@@ -79,7 +84,7 @@ public:
         }
     }
 
-    //! 非抛出版本：失败返回 false 且 out 保持不变。
+    //! Throwing-free variant: on failure it returns false and leaves out unchanged.
     [[nodiscard]] static bool tryParse(std::string_view axes, Layout& out) noexcept
     {
         try
@@ -94,7 +99,8 @@ public:
         }
     }
 
-    //! 按秩给出约定默认布局：3 → CHW、4 → NCHW、5 → NCDHW；其余返回空（调用方须显式声明）。
+    //! The conventional default layout for a rank: 3 -> CHW, 4 -> NCHW,
+    //! 5 -> NCDHW; anything else returns empty (the caller must declare one).
     [[nodiscard]] static Layout defaultForRank(int rank) noexcept
     {
         switch (rank)
@@ -109,7 +115,7 @@ public:
     [[nodiscard]] constexpr bool empty() const noexcept { return m_rank == 0; }
     [[nodiscard]] constexpr int  rank()  const noexcept { return m_rank; }
 
-    //! 轴字母所在的位置下标；不存在返回 -1。
+    //! Position index of an axis letter; -1 when absent.
     [[nodiscard]] constexpr int indexOf(char axis) const noexcept
     {
         const char c = toUpper(axis);
@@ -126,7 +132,7 @@ public:
         return (index >= 0 && index < m_rank) ? m_axes[static_cast<std::size_t>(index)] : '\0';
     }
 
-    //! 规范化的轴字母串（日志 / 异常信息用）。
+    //! The normalised axis letter string (for logs / exception messages).
     [[nodiscard]] std::string str() const
     {
         return std::string(m_axes.data(), static_cast<std::size_t>(m_rank));
@@ -146,9 +152,11 @@ public:
     }
     [[nodiscard]] constexpr bool operator!=(const Layout& o) const noexcept { return !(*this == o); }
 
-    // ---- 常用布局常量 ----
-    // 声明与定义分离：类内是自身的不完整类型，无法就地初始化；
-    // 定义见 src/core/layout.cpp（编译期常量初始化，无静态初始化顺序问题）。
+    // ---- Common layout constants ----
+    // Declaration and definition are separated: inside the class the type is
+    // still incomplete, so in-place initialization is impossible. The definitions
+    // live in src/core/layout.cpp (constant-initialized at compile time, so there
+    // is no static initialization order problem).
     static const Layout NCHW;
     static const Layout NHWC;
     static const Layout NCDHW;
@@ -167,7 +175,7 @@ private:
                c == kWidth || c == kTime || c == kEmbed || c == kAny;
     }
 
-    std::array<char, kMaxRank> m_axes{};   // 已大写；前 m_rank 个有效
+    std::array<char, kMaxRank> m_axes{};   // upper-cased; the first m_rank entries are valid
     std::int8_t                m_rank = 0;
 };
 

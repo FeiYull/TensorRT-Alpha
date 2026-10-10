@@ -1,9 +1,9 @@
 // =============================================================================
 //  trt_alpha :: infer
 // -----------------------------------------------------------------------------
-//  Infer —— 高层"加载模型 + 跑推理"接口。
+//  Infer -- the high-level "load a model + run inference" interface.
 //
-//  用法（同步）：
+//  Usage (synchronous):
 //      trt_alpha::InferParams p;
 //      p.model_type  = trt_alpha::ModelType::yolov8;
 //      p.config_path = "configs/yolov8.ini";
@@ -17,7 +17,7 @@
 //          for (auto& b : f.boxes()) { ... }
 //      }
 //
-//  用法（异步）：
+//  Usage (asynchronous):
 //      p.source = "data/people.mp4";
 //      trt_alpha::Infer model(p);
 //      auto stream = model.async();
@@ -26,12 +26,14 @@
 //          for (auto& f : r.frames()) { ... }
 //      }
 //
-//  设计：
-//    * 一个结构体 InferParams 装所有参数
-//    * 构造时：读 ini（base + special 合并）→ 应用 p 覆盖 → 打印 → 建 pool
-//    * run()  —— 同步，永远不渲染，返回一批 Result
-//    * async()—— 异步，show || save 时 Pipeline 自己渲染，否则用户拿 Result
-//    * 全部参数命名用 snake_case，和 ini 对齐
+//  Design:
+//    * one InferParams struct holds every parameter
+//    * on construction: read the ini (base + special merged), apply the p
+//      overrides, print, then build the pool
+//    * run()   -- synchronous, never renders, returns one batch of Result
+//    * async() -- asynchronous; when show || save is set, Pipeline renders by
+//      itself, otherwise the caller gets Result
+//    * every parameter is named in snake_case, matching the ini
 // =============================================================================
 #pragma once
 
@@ -51,7 +53,8 @@
 namespace trt_alpha {
 
 // -----------------------------------------------------------------------------
-//  ModelType —— 已注册模型的枚举（和 ModelRegistry 的注册名一一对应）。
+//  ModelType -- an enum of registered models (one-to-one with the registration
+//  names in ModelRegistry).
 // -----------------------------------------------------------------------------
 enum class ModelType
 {
@@ -72,7 +75,8 @@ enum class ModelType
 };
 
 // -----------------------------------------------------------------------------
-//  QueuePolicy —— 队列满时策略。Unset = 不覆盖（走 ini 默认）。
+//  QueuePolicy -- the policy when the queue is full. Unset = no override (use
+//  the ini default).
 // -----------------------------------------------------------------------------
 enum class QueuePolicy
 {
@@ -83,66 +87,67 @@ enum class QueuePolicy
 };
 
 // -----------------------------------------------------------------------------
-//  InferParams —— Infer 构造参数。
+//  InferParams -- the Infer constructor parameters.
 //
-//  必填：
-//    * model_type  —— 模型类型
-//    * config_path —— ini 路径（如 "configs/yolov8.ini"）
-//    * 源：source（图片 / 视频 / URL）或 camera_id（摄像头），二选一
+//  Required:
+//    * model_type  -- the model type
+//    * config_path -- the ini path (e.g. "configs/yolov8.ini")
+//    * a source: source (image / video / URL) or camera_id (camera), one of them
 //
-//  可选（空 / -1 / Unset = 不覆盖，走 ini）：
-//    * 加载期：engine / class_names_file / batch_size / dst_h / dst_w
-//    * 运行期：conf_thresh / iou_thresh / top_k
-//    * 并发：  workers / max_queue_size / result_queue_size / policy
-//    * 输出：  save_dir / show_window
+//  Optional (empty / -1 / Unset = no override, use the ini):
+//    * load time:   engine / class_names_file / batch_size / dst_h / dst_w
+//    * run time:    conf_thresh / iou_thresh / top_k
+//    * concurrency: workers / max_queue_size / result_queue_size / policy
+//    * output:      save_dir / show_window
 //
-//  仅 InferParams（ini 里没有）：
+//  InferParams only (not present in the ini):
 //    * save / show / loop
 // -----------------------------------------------------------------------------
 struct InferParams
 {
-    // ---- 必填 ----
+    // ---- Required ----
     ModelType   model_type{};
     std::string config_path;
 
-    // ---- 源（source 或 camera_id 二选一）----
-    std::string source;             // 图片 / 视频 / RTSP / HTTP URL
+    // ---- Source (source or camera_id, one of them) ----
+    std::string source;             // image / video / RTSP / HTTP URL
     int         camera_id = -1;
-    bool        loop = false;       // 视频循环（仅 source 是视频时有效）
+    bool        loop = false;       // loop the video (only when source is a video)
 
-    // ---- 覆盖 ini（加载期）----
-    std::string engine;             // 空 = 用 ini
-    std::string class_names_file;   // 空 = 用 ini
+    // ---- Override the ini (load time) ----
+    std::string engine;             // empty = use the ini
+    std::string class_names_file;   // empty = use the ini
     int         batch_size = -1;
     int         dst_h = -1;
     int         dst_w = -1;
 
-    // ---- 覆盖 ini（运行期）----
+    // ---- Override the ini (run time) ----
     float conf_thresh = -1.f;
     float iou_thresh  = -1.f;
     int   top_k       = -1;
 
-    // ---- 输出（仅 InferParams）----
+    // ---- Output (InferParams only) ----
     bool        save = false;
-    std::string save_dir;           // 空 = 用 ini
+    std::string save_dir;           // empty = use the ini
     bool        show = false;
-    std::string show_window;        // 空 = 用 ini
+    std::string show_window;        // empty = use the ini
 
-    // ---- 覆盖 ini（并发）----
+    // ---- Override the ini (concurrency) ----
     int         workers = -1;
     int         max_queue_size = -1;
     int         result_queue_size = -1;
     QueuePolicy policy = QueuePolicy::Unset;
 
-    // ---- 兜底：任意 ini 字段 ----
+    // ---- Catch-all: any ini field ----
     std::unordered_map<std::string, std::string> extras;
 
-    //! 校验：model_type 合法 / config_path 非空 / 源二选一。
+    //! Validate: model_type is legal / config_path is non-empty / exactly one source.
     void validate() const;
 };
 
 // -----------------------------------------------------------------------------
-//  Frame —— 一批里的一帧（只读视图，生命周期跟 Result 一致）。
+//  Frame -- one frame within a batch (a read-only view living as long as the
+//  Result).
 // -----------------------------------------------------------------------------
 class Frame
 {
@@ -166,7 +171,7 @@ private:
 };
 
 // -----------------------------------------------------------------------------
-//  Result —— 一批推理结果。
+//  Result -- one batch of inference results.
 // -----------------------------------------------------------------------------
 class Result
 {
@@ -187,7 +192,7 @@ public:
     [[nodiscard]] Frame operator[](std::size_t i) const { return Frame(&m_result, i); }
     [[nodiscard]] std::vector<Frame> frames() const;
 
-    //! 拍平便利访问器（所有帧拼一起）。
+    //! Flattening convenience accessors (all frames concatenated).
     [[nodiscard]] std::vector<det::Detection> boxes() const;
     [[nodiscard]] std::vector<seg::Segmentation> masks() const;
     [[nodiscard]] std::vector<kpt::KeypointResult> keypoints() const;
@@ -198,7 +203,7 @@ private:
 };
 
 // -----------------------------------------------------------------------------
-//  Stream —— async() 的返回值。按 batch 拿结果。
+//  Stream -- the return value of async(). Results are fetched batch by batch.
 // -----------------------------------------------------------------------------
 class Stream
 {
@@ -212,10 +217,11 @@ public:
     Stream(const Stream&) = delete;
     Stream& operator=(const Stream&) = delete;
 
-    //! 拿下一批（阻塞）。false = 流结束 / 渲染模式（不产 Result）。
+    //! Fetch the next batch (blocking). false = end of stream, or render mode
+    //! (which produces no Result).
     bool get(Result& out);
 
-    //! 主动停止（线程安全，幂等）。
+    //! Stop explicitly (thread-safe, idempotent).
     void stop();
 
     [[nodiscard]] bool running() const noexcept;
@@ -227,12 +233,13 @@ private:
 };
 
 // -----------------------------------------------------------------------------
-//  Infer —— 高层 API。
+//  Infer -- the high-level API.
 //
-//  生命周期：
-//    * 构造：合并配置 + 建 pool（engine 加载 + 显存分配）
-//    * run() / async()：跑推理
-//    * 析构：停 pool
+//  Lifetime:
+//    * construction: merge the config + build the pool (engine load + device
+//      memory allocation)
+//    * run() / async(): run inference
+//    * destruction: stop the pool
 // -----------------------------------------------------------------------------
 class Infer
 {
@@ -245,16 +252,18 @@ public:
     Infer(Infer&&) noexcept;
     Infer& operator=(Infer&&) noexcept;
 
-    //! 异步：返回 Stream。
-    //! show || save 时，Pipeline 起渲染线程自己消费（Stream::get() 返回 false）。
-    //! 否则，用户用 Stream::get() 拿 Result。
+    //! Asynchronous: returns a Stream.
+    //! When show || save is set, Pipeline starts a render thread and consumes
+    //! results itself (Stream::get() returns false). Otherwise the caller uses
+    //! Stream::get() to fetch Result.
     [[nodiscard]] Stream async();
 
 private:
     struct Impl;
-    //! 共享所有权：async() 返回的 Stream 会借走 Impl 里的 pool / renderer
-    //! （Pipeline 以裸指针引用），因此 Stream 必须保活 Impl —— 否则
-    //! Infer 先析构而 Stream 还在用时就是悬垂（UB）。
+    //! Shared ownership: the Stream returned by async() borrows the pool /
+    //! renderer inside Impl (Pipeline references them by raw pointer), so the
+    //! Stream must keep Impl alive -- otherwise with Infer destroyed first while
+    //! the Stream is still in use we would have a dangling reference (UB).
     std::shared_ptr<Impl> m_impl;
 };
 

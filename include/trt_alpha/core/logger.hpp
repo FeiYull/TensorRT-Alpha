@@ -1,30 +1,31 @@
 // =============================================================================
 //  trt_alpha :: core :: logger
 // -----------------------------------------------------------------------------
-//  应用日志设施 + TensorRT ILogger 桥接。
+//  Application logging facility + TensorRT ILogger bridge.
 //
-//  【日志级别】
+//  [Log levels]
 //    DEBUG / INFO / WARN / ERROR
-//    编译期通过 TRT_ALPHA_LOG_MIN_LEVEL 控制（CMake 按构建类型自动设）：
-//      * Debug  构建 → DEBUG（全开，冗余日志，崩溃可诊断）
-//      * Release 构建 → INFO（只保留关键信息，DEBUG 零开销）
+//    Controlled at compile time via TRT_ALPHA_LOG_MIN_LEVEL
+//    (CMake sets it automatically per build type):
+//      * Debug   build -> DEBUG (all on, verbose logs, crash-diagnosable)
+//      * Release build -> INFO (key info only, DEBUG is zero-cost)
 //
-//  【日志格式】
+//  [Log format]
 //    [2026-09-25 15:30:12.345] [DEBUG] [tid=12345] [yolov8.cpp:314 postprocess] message
-//    包含：时间戳(ms) / 级别 / 线程 ID / 文件:行号 / 函数名 / 消息
-//    这样"崩溃时看日志能迅速定位"。
+//    Contains: timestamp(ms) / level / thread ID / file:line / function name / message
+//    so that "when it crashes, the log pinpoints the location fast".
 //
-//  【多线程安全】
-//    * 线程本地 ostringstream 拼接（避免竞争）
-//    * 全局锁保证"整行原子输出"（不撕裂）
-//    * 与 TrtLoggerAdapter 共用同一把锁
+//  [Thread safety]
+//    * thread-local ostringstream for assembling (avoids races)
+//    * a global lock guarantees "whole-line atomic output" (no tearing)
+//    * shares the same lock with TrtLoggerAdapter
 //
-//  【崩溃捕获】（可选，在 main / test 里调用）
-//    installCrashHandler() —— 捕获 SIGSEGV / SIGABRT / 未处理异常，
-//    打 ERROR 日志后退出，Release 下也能"留下遗言"。
+//  [Crash capture] (optional; call from main / test)
+//    installCrashHandler() -- catches SIGSEGV / SIGABRT / unhandled exceptions,
+//    logs at ERROR then exits, leaving a "last word" even in Release.
 //
-//  【不做】
-//    * 日志轮转、网络日志、结构化日志（YAGNI）
+//  [Not doing]
+//    * log rotation, network logging, structured logging (YAGNI)
 // =============================================================================
 #pragma once
 
@@ -40,7 +41,7 @@
 #include <vector>
 
 // -----------------------------------------------------------------------------
-//  级别常量（数值越大越严重）
+//  Level constants (larger value = more severe)
 // -----------------------------------------------------------------------------
 #define TRT_ALPHA_LOG_LEVEL_DEBUG 0
 #define TRT_ALPHA_LOG_LEVEL_INFO  1
@@ -53,15 +54,15 @@
 
 namespace trt_alpha::core::detail {
 
-//! 全局日志锁：保证"整行输出"原子。
+//! Global log lock: guarantees atomic whole-line output.
 inline std::mutex& logMutex() noexcept
 {
     static std::mutex m;
     return m;
 }
 
-//! 线程本地输出流：避免拼接阶段的数据竞争。
-//! 每次调用清空并复用，避免频繁分配。
+//! Thread-local output stream: avoids data races during assembly.
+//! Cleared and reused on every call to avoid frequent allocations.
 inline std::ostringstream& tlsStream()
 {
     thread_local std::ostringstream oss;
@@ -70,8 +71,8 @@ inline std::ostringstream& tlsStream()
     return oss;
 }
 
-//! 生成日志前缀："[时间戳] [级别] [tid] [文件:行号 函数名] "
-//! 由 logger.cpp 实现。
+//! Build the log prefix: "[timestamp] [level] [tid] [file:line function] "
+//! Implemented in logger.cpp.
 std::string logPrefix(const char* level,
                       const char* file,
                       int line,
@@ -80,16 +81,18 @@ std::string logPrefix(const char* level,
 }  // namespace trt_alpha::core::detail
 
 // -----------------------------------------------------------------------------
-//  应用日志宏
+//  Application log macros
 //
-//  注意：__VA_ARGS__ 外面【不加括号】。
-//  原因：__VA_ARGS__ 展开后形如 `"..." << msg`，它是一个"流插入表达式"。
-//  如果加括号变成 `("..." << msg)`，左操作数就成了字符串字面量，
-//  而 C++ 没有 `const char* << T` 这个重载，会报 C2296 / C2297。
+//  Note: do NOT wrap __VA_ARGS__ in parentheses.
+//  Reason: after expansion __VA_ARGS__ looks like `"..." << msg`, i.e. a
+//  "stream-insertion expression". Adding parentheses turns the left operand
+//  into a string literal, and C++ has no `const char* << T` overload,
+//  which triggers C2296 / C2297.
 //
-//  如果调用点含逗号（例如 `duration<double, std::milli>`），
-//  预处理器会把逗号当参数分隔符，报 C4002。
-//  解法：在【调用点】给含逗号的子表达式额外加一层圆括号：
+//  If the call site contains a comma (e.g. `duration<double, std::milli>`),
+//  the preprocessor treats the comma as an argument separator and reports C4002.
+//  Fix: add an extra pair of parentheses around the comma-containing subexpression
+//  at the [call site]:
 //      TRT_LOG_DEBUG("... " << (std::chrono::duration<double, std::milli>(a-b).count())
 //                   << " ms");
 // -----------------------------------------------------------------------------
@@ -150,11 +153,11 @@ std::string logPrefix(const char* level,
 #endif
 
 // -----------------------------------------------------------------------------
-//  TensorRT ILogger 桥接
+//  TensorRT ILogger bridge
 // -----------------------------------------------------------------------------
 namespace trt_alpha::core {
 
-//! 把 TensorRT 内部日志转发到应用日志。
+//! Forward TensorRT internal logs to the application log.
 class TrtLoggerAdapter final : public nvinfer1::ILogger
 {
 public:
@@ -196,7 +199,7 @@ private:
     Severity m_minSeverity;
 };
 
-//! 全局 TRT logger 单例（builder / runtime 共用）。
+//! Global TRT logger singleton (shared by builder / runtime).
 inline TrtLoggerAdapter& trtLogger() noexcept
 {
     static TrtLoggerAdapter instance;
@@ -204,19 +207,19 @@ inline TrtLoggerAdapter& trtLogger() noexcept
 }
 
 // -----------------------------------------------------------------------------
-//  崩溃捕获（可选，在 main / test 里调用）
+//  Crash capture (optional; call from main / test)
 // -----------------------------------------------------------------------------
-//! 安装崩溃处理器：
+//! Install the crash handler:
 //!   * Linux: SIGSEGV / SIGABRT / SIGFPE / SIGILL
 //!   * Windows: SetUnhandledExceptionFilter
-//! 崩溃时打 ERROR 日志并 flush，然后退出。
-//! 幂等（重复调用只生效一次）。
+//! Logs at ERROR and flushes before exiting on a crash.
+//! Idempotent (repeated calls take effect only once).
 void installCrashHandler() noexcept;
 
 }  // namespace trt_alpha::core
 
 // -----------------------------------------------------------------------------
-//  内存分配框图 log
+//  Memory allocation box log
 // -----------------------------------------------------------------------------
 namespace trt_alpha::core::detail {
 
@@ -232,14 +235,15 @@ struct AllocInfo
     MemorySpace space = MemorySpace::Host;
 };
 
-//! 打一个多行框图（原子输出，不撕裂）。
+//! Print a multi-line box (atomic output, no tearing).
 void logAllocBox(const AllocInfo& info);
 
-//! 把若干"内容行"渲染成一个文本框图并原子输出到 stdout。
-//!   * 上下边框用 hLine（默认 '='，即"双横线"风格），左右边框 '|'
-//!   * 宽度按最长行自适应（不截断内容）
-//!   * 输出【不带】日志前缀，Release 构建下同样输出（INFO 语义）
-//! 用于 [CONFIG] 这类"要完整看到一屏"的展示块。
+//! Render several "content lines" into a text box and atomically output it to stdout.
+//!   * top/bottom border uses hLine (default '=', i.e. the "double horizontal line" style),
+//!     left/right border '|'
+//!   * width adapts to the longest line (content is not truncated)
+//!   * output is [without] a log prefix, and is emitted in Release builds too (INFO semantics)
+//! Used for display blocks like [CONFIG] that should be seen on one screen.
 void logBox(const std::vector<std::string>& lines, char hLine = '=');
 
 }  // namespace trt_alpha::core::detail

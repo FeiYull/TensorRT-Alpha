@@ -1,21 +1,21 @@
 // =============================================================================
 //  trt_alpha :: pipeline :: pipeline_config
 // -----------------------------------------------------------------------------
-//  PipelineConfig —— 三级流水线的配置。
+//  PipelineConfig -- configuration for the three-stage pipeline.
 //
-//  数据流：
-//    [DataSource] → [InferencePool] → [ResultQueue] → [Renderer]
+//  Data flow:
+//    [DataSource] -> [InferencePool] -> [ResultQueue] -> [Renderer]
 //
-//  多池 + 路由：
-//    * pools[i] —— 第 i 个推理池（不同模型）
-//    * sourceToPool[i] —— 源 i 用哪个池（下标）
-//    * sourceToPool 为空时：所有源用 pools[0]
+//  Multiple pools + routing:
+//    * pools[i]        -- the i-th inference pool (different models)
+//    * sourceToPool[i] -- which pool source i uses (an index)
+//    * when sourceToPool is empty: every source uses pools[0]
 //
-//  存盘 / 显示：
-//    * saveEnabled：是否存盘
-//    * saveDir：存盘目录（相对工程根或绝对路径）
-//    * showEnabled：是否显示
-//    * showWindow：显示窗口名
+//  Save / show:
+//    * saveEnabled: whether to save to disk
+//    * saveDir: output directory (relative to the project root, or absolute)
+//    * showEnabled: whether to display
+//    * showWindow: window title
 // =============================================================================
 #pragma once
 
@@ -37,43 +37,47 @@ namespace trt_alpha::pipeline {
 
 struct PipelineConfig
 {
-    // ---- 数据源（用户创建，所有权转移给 Pipeline）----
+    // ---- Data sources (created by the caller; ownership moves to Pipeline) ----
     std::vector<std::unique_ptr<datasource::IDataSource>> sources;
 
-    // ---- 推理池（用户创建，生命周期由用户管）----
+    // ---- Inference pools (created by the caller; lifetime managed by the caller) ----
     std::vector<core::InferencePool*> pools;
 
-    // ---- 源 → 池 路由 ----
-    //! 长度应等于 sources.size()。
-    //! 空 = 所有源用 pools[0]。
-    //! sourceToPool[i] = k 表示源 i 用 pools[k]。
+    // ---- Source -> pool routing ----
+    //! Its length should equal sources.size().
+    //! Empty = every source uses pools[0].
+    //! sourceToPool[i] = k means source i uses pools[k].
     std::vector<std::size_t> sourceToPool;
 
-    // ---- 渲染 ----
+    // ---- Rendering ----
     renderer::IRenderer* renderer = nullptr;
     std::vector<core::ClassInfo> classNames;
 
-    // ---- 结果队列 ----
+    // ---- Result queue ----
     std::size_t resultQueueSize = 32;
 
-    //! 队列满时策略。默认 Block —— 批处理（视频文件 / 图片目录）要求一帧不落，
-    //! 宁可让源线程等渲染追上，也不静默丢帧。
-    //! 实时源（摄像头 / RTSP 流）应显式改为 DropOldest：实时场景宁可丢旧帧，
-    //! 也不能让延迟无限累积。
+    //! Policy when the queue is full. The default is Block -- batch processing
+    //! (video files / image directories) requires dropping no frames, so it
+    //! would rather make the source thread wait for the renderer to catch up
+    //! than silently drop. A real-time source (camera / RTSP stream) should
+    //! switch explicitly to DropOldest: there it is better to drop old frames
+    //! than to let latency grow without bound.
     core::QueueFullPolicy queueFullPolicy = core::QueueFullPolicy::Block;
 
-    //! 是否把"渲染后的结果"再推给 processedQueue（供 popProcessed 取）。
-    //! 默认 false：没人消费时不该产出，否则 Block 策略下渲染线程会写满队列后
-    //! 永久阻塞。只有确实要调 popProcessed 的调用方（如 Infer::async）才置 true。
+    //! Whether to push the "post-render results" on to processedQueue (for
+    //! popProcessed to pick up). Default false: nothing should be produced when
+    //! nobody consumes, or under the Block policy the render thread would fill
+    //! the queue and then block forever. Only callers that really call
+    //! popProcessed (e.g. Infer::async) set it true.
     bool exposeProcessed = false;
 
-    // ---- 存盘 / 显示 ----
+    // ---- Save / show ----
     bool saveEnabled = false;
     std::string saveDir = "save";
     bool showEnabled = false;
     std::string showWindow = "trt_alpha";
 
-    // ---- 源停止等待超时（ms） ----
+    // ---- Timeout when waiting for sources to stop (ms) ----
     int stopTimeoutMs = 2000;
 };
 

@@ -1,18 +1,20 @@
 // =============================================================================
 //  trt_alpha :: core :: data_type
 // -----------------------------------------------------------------------------
-//  DataType —— 内存块中【每个元素】的类型。
+//  DataType -- the type of *each element* in a memory block.
 //
-//  为什么需要它：
-//    * 同一块内存，元素类型不同，占用的字节数不同
-//      （uint8 每元素 1 字节；float32 每元素 4 字节）
-//    * fp16 和 bf16 都是 2 字节，但语义不同，不能混用
-//    * 只有"每元素字节数"（elementSize）不够，必须知道具体类型
+//  Why it is needed:
+//    * the same block occupies a different number of bytes depending on the
+//      element type (uint8 = 1 byte per element; float32 = 4)
+//    * fp16 and bf16 are both 2 bytes but mean different things and must not be
+//      mixed
+//    * knowing only the per-element byte count is not enough; the concrete type
+//      must be known
 //
-//  覆盖范围：
-//    * 图像：UInt8 / UInt16 / Float32
-//    * TensorRT 输入输出：Float16 / BFloat16 / Float32 / Int8 / Float8_*
-//    * 通用：Bool / Int16 / UInt16 / Int32 / UInt32 / Float64
+//  Coverage:
+//    * images: UInt8 / UInt16 / Float32
+//    * TensorRT inputs / outputs: Float16 / BFloat16 / Float32 / Int8 / Float8_*
+//    * general: Bool / Int16 / UInt16 / Int32 / UInt32 / Float64
 // =============================================================================
 #pragma once
 
@@ -23,7 +25,7 @@ namespace trt_alpha::core {
 
 enum class DataType : std::uint8_t
 {
-    // ---- 整型 ----
+    // ---- Integer ----
     Int8,
     UInt8,
     Int16,
@@ -31,19 +33,19 @@ enum class DataType : std::uint8_t
     Int32,
     UInt32,
 
-    // ---- 浮点 ----
+    // ---- Floating point ----
     Float16,       // IEEE 754 half
     BFloat16,      // brain float
     Float32,
     Float64,
-    Float8_E4M3,   // 8-bit float，4 位指数 3 位尾数
-    Float8_E5M2,   // 8-bit float，5 位指数 2 位尾数
+    Float8_E4M3,   // 8-bit float, 4-bit exponent, 3-bit mantissa
+    Float8_E5M2,   // 8-bit float, 5-bit exponent, 2-bit mantissa
 
-    // ---- 布尔 ----
+    // ---- Boolean ----
     Bool,
 };
 
-//! 每元素占用的字节数。
+//! Bytes occupied by each element.
 [[nodiscard]] constexpr std::size_t sizeOf(DataType dt) noexcept
 {
     switch (dt)
@@ -65,7 +67,7 @@ enum class DataType : std::uint8_t
     return 0;   // unreachable
 }
 
-//! 可读名字（日志 / 调试用）。
+//! Human-readable name (for logs / debugging).
 [[nodiscard]] const char* nameOf(DataType dt) noexcept;
 
 }  // namespace trt_alpha::core

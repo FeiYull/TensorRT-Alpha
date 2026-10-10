@@ -1,22 +1,26 @@
 // =============================================================================
-//  trt_alpha :: core :: paths —— 工程根目录识别 + 相对路径解析
+//  trt_alpha :: core :: paths -- project root discovery + relative path resolution
 // -----------------------------------------------------------------------------
-//  目的：让程序在【任意工作目录】下都能找到 configs/ 与 data/ 下的默认资源，
-//  既不需要 cd 到工程根，也不需要改代码里的路径字符串。
+//  Goal: let the program find the default resources under configs/ and data/
+//  from [any working directory], with no need to cd to the project root and no
+//  need to edit the path strings in the code.
 //
-//  根目录探测顺序（第一个命中即采用，结果缓存一次）：
-//      1. --root <dir>（外部显式指定，调 setOverride）
-//      2. 环境变量 TRT_ALPHA_ROOT
-//      3. 可执行文件所在目录逐级向上找"根标志"
-//      4. 编译期 TRT_ALPHA_ROOT_DIR（CMake 写入的源码根，便于 out-of-tree 构建）
-//      5. 当前工作目录逐级向上找"根标志"
-//      6. 兜底 = 当前工作目录
+//  Root discovery order (the first hit wins; the result is cached once):
+//      1. --root <dir> (passed in explicitly; calls setOverride)
+//      2. the TRT_ALPHA_ROOT environment variable
+//      3. walk up from the executable's directory looking for a "root marker"
+//      4. the compile-time TRT_ALPHA_ROOT_DIR (the source root written by CMake,
+//         handy for out-of-tree builds)
+//      5. walk up from the current working directory looking for a "root marker"
+//      6. fallback = the current working directory
 //
-//  "根标志" = 目录下存在 configs/ 子目录，或存在 .trt_alpha_root 文件
-//  （后者给"发布时只拷 exe + data"的场景留的手工标记）。
+//  A "root marker" is a configs/ subdirectory, or a .trt_alpha_root file (the
+//  latter is a manual marker for "ship only the exe + data" releases).
 //
-//  Windows / Linux 通用：exe 定位分别用 GetModuleFileNameW 与 /proc/self/exe；
-//  路径一律以 std::filesystem::path 承载，避免窄字符流在非 ASCII 路径上出错。
+//  Portable across Windows / Linux: the executable is located with
+//  GetModuleFileNameW and /proc/self/exe respectively; paths are always carried
+//  as std::filesystem::path so that narrow-character streams cannot break on
+//  non-ASCII paths.
 // =============================================================================
 #pragma once
 
@@ -25,46 +29,56 @@
 
 namespace trt_alpha::core {
 
-//! 全局路径策略（纯静态，无实例）。
-//! 所有状态在首次 root() 时初始化一次，之后只读（除非显式 setOverride）。
+//! Global path policy (purely static, no instances).
+//! All state is initialized once on the first root() call and is read-only
+//! afterwards (unless setOverride is called explicitly).
 class Paths
 {
 public:
-    //! 显式指定根目录（来自 --root）。
-    //! 必须在首次 root() 之前调用，否则抛 std::logic_error。
-    //! 传空字符串 = 清空 override（回到自动探测）。
+    //! Set the root directory explicitly (from --root).
+    //! Must be called before the first root(); otherwise throws std::logic_error.
+    //! An empty string clears the override (back to automatic discovery).
     static void setOverride(const std::string& dir);
 
-    //! 工程根目录（绝对路径）。首次调用时探测并缓存。
+    //! The project root (absolute). Discovered and cached on the first call.
     [[nodiscard]] static const std::filesystem::path& root();
 
-    //! 根目录的来源说明（日志/报错用，如 "executable location"）。
+    //! A description of where the root came from (for logs / errors, e.g.
+    //! "executable location").
     [[nodiscard]] static std::string rootSource();
 
-    //! 字符串 → 路径。
-    //! 非 ASCII 时兼容两种来源：命令行（cmd 的 ANSI 代码页）与配置文件（UTF-8），
-    //! 按"哪个真实存在"择一，都不存在则按原生编码处理。
+    //! string -> path.
+    //! For non-ASCII input, two sources are accepted: the command line (cmd's
+    //! ANSI code page) and configuration files (UTF-8). Whichever actually
+    //! exists wins; if neither does, the native encoding is assumed.
     [[nodiscard]] static std::filesystem::path toPath(const std::string& text);
 
-    //! 相对路径以 root() 为基准展开；绝对路径原样返回；空串返回空路径。
+    //! A relative path is expanded against root(); an absolute path is returned
+    //! unchanged; an empty string yields an empty path.
     [[nodiscard]] static std::filesystem::path resolve(const std::string& text);
 
-    //! 是否为网络 URL（形如 <scheme>://<host>...），如 rtsp / rtmp / http(s) / udp。
-    //! 判定依据是 RFC 3986 的 scheme 形态（字母开头 + [A-Za-z0-9+.-]，且至少 2 字符），
-    //! 因此 Windows 盘符 "D:/a.jpg" 与 "C://x" 都不会被误判。
-    //! 用途：URL 不是本地文件 —— 必须跳过 requireFile / 目录扫描这类本地校验。
+    //! Whether this is a network URL (of the form <scheme>://<host>...), such as
+    //! rtsp / rtmp / http(s) / udp. The test follows the RFC 3986 scheme shape
+    //! (starts with a letter, then [A-Za-z0-9+.-], at least 2 characters), so
+    //! Windows drive paths such as "D:/a.jpg" and "C://x" are not misread as URLs.
+    //! Purpose: a URL is not a local file, so local checks such as requireFile /
+    //! directory scanning must be skipped for it.
     [[nodiscard]] static bool isUrl(const std::string& text);
 
-    //! resolve() + 存在性校验。缺失时抛出带"根目录来源 + 修复建议"的可读错误。
-    //! role 用于错误消息（如 "config file" / "input image"）。
+    //! resolve() plus an existence check. When missing, it throws a readable
+    //! error carrying "where the root came from + how to fix it".
+    //! role is used in the error message (e.g. "config file" / "input image").
     [[nodiscard]] static std::filesystem::path requireFile(const std::string& text,
                                                           const std::string& role);
 
-    //! 把绝对路径转成便于打印/日志的字符串（Windows 下为原生编码）。
+    //! Turn an absolute path into a string convenient for printing / logging
+    //! (native encoding on Windows).
     [[nodiscard]] static std::string toDisplay(const std::filesystem::path& path);
 
-    //! 解析"结果存盘目录"。规则一句话：谁显式给了目录就用谁的（原样，不再拼子目录）；
-    //! 都没给才回退 <默认根>/<模型名>（默认根 = "save"）。
+    //! Resolve the "results output directory". One rule: whoever passed a
+    //! directory explicitly wins (used as-is, with no subdirectory appended);
+    //! only when nobody did, fall back to <default root>/<model name> (default
+    //! root = "save").
     //!   resolveSaveDir("out", "yolov8") -> "out"
     //!   resolveSaveDir("",    "yolov8") -> "save/yolov8"
     //!   resolveSaveDir("",    "")       -> "save"

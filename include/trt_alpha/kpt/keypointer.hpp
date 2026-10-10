@@ -1,7 +1,8 @@
 // =============================================================================
 //  trt_alpha :: kpt :: keypointer
 // -----------------------------------------------------------------------------
-//  IKeypointer —— 姿态估计任务基类（继承 IModel，加 keypoints() 访问器）。
+//  IKeypointer -- the pose-estimation task base class (inherits IModel and adds
+//  a keypoints() accessor).
 // =============================================================================
 #pragma once
 
@@ -34,7 +35,8 @@ public:
     [[nodiscard]] const core::ModelConfig& config() const noexcept override { return m_cfg; }
 
 protected:
-    //! 从 cfg 读通用参数（一次实现，所有姿态模型共用）。
+    //! Read the common parameters from cfg (implemented once, shared by every
+    //! pose model).
     void loadCommonConfig(const core::ModelConfig& cfg)
     {
         m_cfg           = cfg;
@@ -45,7 +47,7 @@ protected:
         m_normScale     = cfg.getFloat("scale",       m_normScale);
         m_padValue      = cfg.getFloat("pad_value",   m_padValue);
 
-        // mean / std：逗号分隔的三元组
+        // mean / std: a comma-separated triple
         const std::string meanStr = cfg.getString("mean", "");
         if (!meanStr.empty()) {
             float v[3];
@@ -68,8 +70,8 @@ protected:
         }
     }
 
-    //! 所有姿态模型共用的成员。
-    //! iou_thresh 默认 0.7（pose 专属，不是 0.45）。
+    //! Members shared by every pose model.
+    //! iou_thresh defaults to 0.7 (specific to pose, not 0.45).
     core::ModelConfig m_cfg;
     int   m_numClass      = 80;
     float m_confThreshold = 0.25f;

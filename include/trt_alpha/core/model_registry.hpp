@@ -1,16 +1,21 @@
 // =============================================================================
 //  trt_alpha :: core :: model_registry
 // -----------------------------------------------------------------------------
-//  ModelRegistry —— 模型注册中心（工厂的运行时字典）。
+//  ModelRegistry -- the model registration centre (a runtime dictionary for
+//  the factory).
 //
-//  Meyers 单例规避静态初始化顺序问题；互斥锁保证并发注册/创建安全。
+//  A Meyers singleton sidesteps the static initialization order problem and a
+//  mutex keeps concurrent registration / creation safe.
 //
-//  用法：
-//    * 在模型 .cpp 末尾写一行 TRT_ALPHA_REGISTER_MODEL("yolov8", det::YoloV8)
-//    * 调用方通过 ModelRegistry::instance().create("yolov8") 创建实例
+//  Usage:
+//    * Add one line at the end of a model's .cpp:
+//        TRT_ALPHA_REGISTER_MODEL("yolov8", det::YoloV8)
+//    * Callers create instances with ModelRegistry::instance().create("yolov8")
 //
-//  【重要】注册体位于静态库目标内，可执行文件必须以 WHOLE_ARCHIVE 方式
-//  链接模型库（CMake 已固化），否则链接器会丢弃未引用的 .obj、注册不会发生。
+//  [IMPORTANT] The registrars live inside a static library target, so the
+//  executable must link the model library with WHOLE_ARCHIVE (already fixed in
+//  CMake). Otherwise the linker discards unreferenced .obj files and no
+//  registration takes place.
 // =============================================================================
 #pragma once
 
@@ -29,16 +34,18 @@ class ModelRegistry
 public:
     using Factory = std::unique_ptr<IModel> (*)();
 
-    //! 全局单例。
+    //! Global singleton.
     static ModelRegistry& instance() noexcept;
 
-    //! 注册（重名返回 false）。由 TRT_ALPHA_REGISTER_MODEL 宏调用。
+    //! Register a factory (returns false on a duplicate name).
+    //! Called by the TRT_ALPHA_REGISTER_MODEL macro.
     bool add(const std::string& name, Factory factory);
 
-    //! 按名创建实例。未知名字抛 std::runtime_error（信息里列出全部已注册名）。
+    //! Create an instance by name. An unknown name throws std::runtime_error
+    //! (the message lists every registered name).
     [[nodiscard]] std::unique_ptr<IModel> create(const std::string& name) const;
 
-    //! 列出全部已注册名。
+    //! List every registered name.
     [[nodiscard]] std::vector<std::string> names() const;
 
 private:
@@ -51,15 +58,17 @@ private:
 }  // namespace trt_alpha
 
 // =============================================================================
-//  注册宏
+//  registration macro
 // =============================================================================
-//  用法（在模型 .cpp 末尾写一行）：
+//  Usage (one line at the end of a model's .cpp):
 //    TRT_ALPHA_REGISTER_MODEL("yolov8", trt_alpha::det::YoloV8)
 //
-//  注册器名由 __LINE__ 生成（ClassName 可能含 "::"，不能直接参与 token 拼接）。
+//  The registrar name is generated from __LINE__ (ClassName may contain "::",
+//  so it cannot take part in token pasting directly).
 //
-//  注意：注册体位于静态库目标内，可执行文件必须以 WHOLE_ARCHIVE 方式链接
-//  模型库，否则链接器会丢弃未引用的 .obj、注册不会发生。
+//  Note: the registrar lives inside a static library target, so the executable
+//  must link the model library with WHOLE_ARCHIVE; otherwise the linker
+//  discards unreferenced .obj files and no registration takes place.
 // =============================================================================
 #define TRT_ALPHA_CONCAT_IMPL(a, b) a##b
 #define TRT_ALPHA_CONCAT(a, b) TRT_ALPHA_CONCAT_IMPL(a, b)

@@ -1,19 +1,23 @@
 // =============================================================================
 //  trt_alpha :: core :: batch_result
 // -----------------------------------------------------------------------------
-//  BatchResult —— 一批图像的推理结果。
+//  BatchResult -- the inference results for one batch of images.
 //
-//  字段说明：
-//    * sourceId / firstFrameIndex：跟 Batch 对齐（多源分辨 + 帧号）
-//    * buffer / views / validCount：原图（推理时输入的那批图）
-//    * detections / segmentations / classifications / keypoints：各任务结果
-//      （按模型类型填，未命中的任务字段保持空）
-//    * inferenceMs：本批端到端耗时（性能元信息）
+//  Fields:
+//    * sourceId / firstFrameIndex: mirrored from Batch (source disambiguation
+//      + frame index)
+//    * buffer / views / validCount: the source images (the very batch fed into
+//      inference)
+//    * detections / segmentations / classifications / keypoints: per-task
+//      results (filled according to the model type; task fields that were not
+//      produced stay empty)
+//    * inferenceMs: end-to-end time for this batch (performance metadata)
 //
-//  生命周期：
-//    * buffer 是 shared_ptr（保证 views[i].data 有效）
-//    * 各任务结果自拥有（vector 里的 struct 值语义）
-//    * 渲染阶段用 views[i] 拿原图，detections[i] 等拿结果
+//  Lifetime:
+//    * buffer is a shared_ptr (keeps views[i].data valid)
+//    * Each task's results own their data (value semantics inside the vectors)
+//    * The render stage reads the source image via views[i] and the results via
+//      detections[i] and friends
 // =============================================================================
 #pragma once
 
@@ -31,40 +35,43 @@
 
 namespace trt_alpha::core {
 
-//! 一批图像的推理结果。
+//! Inference results for one batch of images.
 struct BatchResult
 {
-    // ---- 源信息（跟 Batch 对齐）----
-    int sourceId = -1;                           //!< 源标识
-    std::uint64_t firstFrameIndex = 0;           //!< 本批首帧的帧号
+    // ---- Source information (mirrors Batch) ----
+    int sourceId = -1;                           //!< source identifier
+    std::uint64_t firstFrameIndex = 0;           //!< frame index of this batch's first frame
 
-    // ---- 原图（推理时的输入）----
-    std::shared_ptr<Buffer> buffer;              //!< 原图所有者（一整块连续内存）
-    std::vector<BufferView> views;               //!< 每张图的视图
-    int validCount = 0;                          //!< 有效帧数（<= views.size()）
+    // ---- Source images (the batch that was fed in) ----
+    std::shared_ptr<Buffer> buffer;              //!< owner of the source images (one contiguous block)
+    std::vector<BufferView> views;               //!< view of each image
+    int validCount = 0;                          //!< number of valid frames (<= views.size())
 
-    //! 每帧的"来源名主干"（不含扩展名 / 序号），长度 == validCount。
-    //! 存盘时按它命名（图片源 = 原文件名）；为空时渲染层回退 frame_<帧号>。
+    //! Per-frame "source stem" (extension / index stripped); length == validCount.
+    //! Files are named after it when saved (image source = original filename);
+    //! when empty the renderer falls back to frame_<index>.
     std::vector<std::string> frameNames;
 
-    // ---- 各任务结果（按模型类型填，未命中的保持空）----
-    std::vector<std::vector<det::Detection>> detections;          //!< 每张图的检测结果
-    std::vector<std::vector<seg::Segmentation>> segmentations;    //!< 每张图的分割结果
-    std::vector<std::vector<cls::ClassScore>> classifications;    //!< 每张图的分类结果
-    std::vector<std::vector<kpt::KeypointResult>> keypoints;      //!< 每张图的姿态结果
+    // ---- Per-task results (filled by model type; unmatched tasks stay empty) ----
+    std::vector<std::vector<det::Detection>> detections;          //!< detections per image
+    std::vector<std::vector<seg::Segmentation>> segmentations;    //!< segmentations per image
+    std::vector<std::vector<cls::ClassScore>> classifications;    //!< classifications per image
+    std::vector<std::vector<kpt::KeypointResult>> keypoints;      //!< pose results per image
 
-    // ---- 性能元信息 ----
-    //! 本批【端到端】耗时（ms）：setBatch → preprocess → infer → postprocess 全程。
-    //! 注意不是纯 GPU 推理时间 —— infer() 只负责入队，GPU 执行会被统计在此总时长内。
+    // ---- Performance metadata ----
+    //! End-to-end time for this batch (ms): the whole
+    //! setBatch -> preprocess -> infer -> postprocess path.
+    //! Note this is not pure GPU inference time -- infer() only enqueues, so the
+    //! actual GPU work is counted inside this total.
     double inferenceMs = 0.0;
 
-    //! 是否为空。
+    //! Whether the result is empty.
     [[nodiscard]] bool empty() const noexcept
     {
         return buffer == nullptr || views.empty();
     }
 
-    //! batch size。
+    //! Batch size.
     [[nodiscard]] std::size_t size() const noexcept { return views.size(); }
 };
 

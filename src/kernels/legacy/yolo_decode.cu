@@ -6,7 +6,7 @@
 //        block size 走 common.cuh。
 // =============================================================================
 #include "trt_alpha/kernels/common.cuh"
-#include "trt_alpha/kernels/yolo_decode.cuh"
+#include "trt_alpha/kernels/legacy/yolo_decode.cuh"
 
 #include <stdexcept>
 #include <string>

@@ -1,7 +1,8 @@
 // =============================================================================
 //  trt_alpha :: det :: detector
 // -----------------------------------------------------------------------------
-//  IDetector —— 检测任务基类（继承 IModel，加 detections() 访问器）。
+//  IDetector -- the detection task base class (inherits IModel and adds a
+//  detections() accessor).
 // =============================================================================
 #pragma once
 
@@ -34,7 +35,8 @@ public:
     [[nodiscard]] const core::ModelConfig& config() const noexcept override { return m_cfg; }
 
 protected:
-    //! 从 cfg 读通用参数（一次实现，所有检测模型共用）。
+    //! Read the common parameters from cfg (implemented once, shared by every
+    //! detection model).
     void loadCommonConfig(const core::ModelConfig& cfg)
     {
         m_cfg           = cfg;
@@ -67,7 +69,7 @@ protected:
         }
     }
 
-    //! 所有检测模型共用的 9 个成员。
+    //! The 9 members shared by every detection model.
     core::ModelConfig m_cfg;
     int   m_numClass      = 80;
     float m_confThreshold = 0.25f;

@@ -1,30 +1,32 @@
 // =============================================================================
 //  trt_alpha :: datasource :: i_data_source
 // -----------------------------------------------------------------------------
-//  IDataSource —— 数据源抽象接口。
+//  IDataSource -- the data-source abstraction.
 //
-//  职责：
-//    * 从图片 / 视频 / 摄像头读帧
-//    * 攒满一批（batchSize）产出 core::Batch
-//    * 不满一批时：多余帧填 0，validCount 标记有效帧数
+//  Responsibilities:
+//    * read frames from an image / video / camera
+//    * accumulate a full batch and produce a core::Batch
+//    * when a batch is not full: zero-fill the extra frames and mark the valid
+//      count in validCount
 //
-//  不负责：
-//    * 推理 / 渲染 / 预处理
-//    * 主动丢帧（用户自己管）
+//  Not responsible for:
+//    * inference / rendering / preprocessing
+//    * dropping frames on its own (the caller manages that)
 //
-//  生命周期：
-//    * 构造 = 打开资源（图片 / 视频 / 摄像头）
-//    * next() = 读一批
-//    * requestStop() = 请求停止（线程安全）
-//    * 析构 = 释放资源
+//  Lifetime:
+//    * construction = open the resource (image / video / camera)
+//    * next() = read one batch
+//    * requestStop() = ask to stop (thread-safe)
+//    * destruction = release the resource
 //
-//  线程模型：
-//    * 每个 IDataSource 实例由【一个数据源线程】调用
-//    * requestStop() 可由其他线程调用（线程安全）
+//  Threading model:
+//    * each IDataSource instance is called by [one data-source thread]
+//    * requestStop() may be called from other threads (thread-safe)
 //
-//  错误处理：
-//    * 构造失败（文件不存在 / 摄像头打不开）→ 抛异常
-//    * next() 读失败 → 返回 false（结束）或抛异常（意外错误）
+//  Error handling:
+//    * construction failure (missing file / camera that will not open) -> throw
+//    * next() read failure -> return false (end of stream) or throw (unexpected
+//      error)
 // =============================================================================
 #pragma once
 
@@ -40,19 +42,20 @@ public:
     IDataSource(const IDataSource&) = delete;
     IDataSource& operator=(const IDataSource&) = delete;
 
-    //! 读下一批。返回 false 表示"没有更多了"（文件读完 / 被请求停止）。
-    //! 输出参数 out：
-    //!   * out.buffer 是连续内存，大小 = batchSize × H × W × C
-    //!   * out.views[i] 指向 buffer 的第 i 块
-    //!   * out.validCount 标记有效帧数
-    //!   * 不满的批：后 (batchSize - validCount) 帧填 0
+    //! Read the next batch. Returning false means "there is no more" (the file
+    //! is exhausted, or a stop was requested).
+    //! Output parameter out:
+    //!   * out.buffer is contiguous memory, sized batchSize x H x W x C
+    //!   * out.views[i] points at block i of that buffer
+    //!   * out.validCount marks the number of valid frames
+    //!   * a partial batch: the last (batchSize - validCount) frames are zero-filled
     [[nodiscard]] virtual bool next(core::Batch& out) = 0;
 
-    //! 请求停止（线程安全，可从任意线程调用）。
-    //! 调用后，正在阻塞的 next() 应尽快返回 false。
+    //! Request a stop (thread-safe; callable from any thread).
+    //! Once called, a blocking next() should return false as soon as possible.
     virtual void requestStop() = 0;
 
-    //! 数据源类型名（日志 / 调试用）。
+    //! Data-source type name (for logs / debugging).
     [[nodiscard]] virtual const char* typeName() const noexcept = 0;
 
 protected:

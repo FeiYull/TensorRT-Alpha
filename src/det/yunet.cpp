@@ -5,7 +5,7 @@
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
 #include "trt_alpha/kernels/cast.hpp"
-#include "trt_alpha/kernels/preprocess.hpp"
+#include "trt_alpha/kernels/legacy/preprocess.hpp"
 
 #include <algorithm>
 #include <cfloat>
@@ -29,7 +29,7 @@ const int kMinSizesDim[4] = { 3, 2, 2, 3 };
 const float kSteps[4] = { 8.f, 16.f, 32.f, 64.f };
 const float kVariancesHost[2] = { 0.1f, 0.2f };
 
-//! 三个输出的行宽：定义在 kernels/postprocess.hpp（kernel 与形状校验共用的单一来源）。
+//! 三个输出的行宽：定义在 kernels/legacy/postprocess.hpp（kernel 与形状校验共用的单一来源）。
 using kernels::kYuNetConfRow;
 using kernels::kYuNetIouRow;
 using kernels::kYuNetLocRow;

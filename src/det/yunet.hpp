@@ -19,7 +19,7 @@
 #include "trt_alpha/core/model_config.hpp"
 #include "trt_alpha/core/pinned_buffer.hpp"
 #include "trt_alpha/det/detector.hpp"
-#include "trt_alpha/kernels/postprocess.hpp"
+#include "trt_alpha/kernels/legacy/postprocess.hpp"
 
 #include <cstdint>
 #include <memory>

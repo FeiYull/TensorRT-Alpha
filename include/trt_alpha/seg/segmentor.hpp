@@ -1,7 +1,8 @@
 // =============================================================================
 //  trt_alpha :: seg :: segmentor
 // -----------------------------------------------------------------------------
-//  ISegmentor —— 分割任务基类（继承 IModel，加 segmentations() 访问器）。
+//  ISegmentor -- the segmentation task base class (inherits IModel and adds a
+//  segmentations() accessor).
 // =============================================================================
 #pragma once
 
@@ -34,8 +35,9 @@ public:
     [[nodiscard]] const core::ModelConfig& config() const noexcept override { return m_cfg; }
 
 protected:
-    //! 从 cfg 读通用参数（一次实现，所有分割模型共用）。
-    //! 派生类的 loadConfig() 里调一次，然后读自己的特有字段。
+    //! Read the common parameters from cfg (implemented once, shared by every
+    //! segmentation model). Called once from a derived class's loadConfig(),
+    //! which then reads its own model-specific fields.
     void loadCommonConfig(const core::ModelConfig& cfg)
     {
         m_cfg           = cfg;
@@ -46,7 +48,7 @@ protected:
         m_normScale     = cfg.getFloat("scale",       m_normScale);
         m_padValue      = cfg.getFloat("pad_value",   m_padValue);
 
-        // mean / std：逗号分隔的三元组
+        // mean / std: a comma-separated triple
         const std::string meanStr = cfg.getString("mean", "");
         if (!meanStr.empty()) {
             float v[3];
@@ -69,7 +71,7 @@ protected:
         }
     }
 
-    //! 所有分割模型共用的成员。
+    //! Members shared by every segmentation model.
     core::ModelConfig m_cfg;
     int   m_numClass      = 80;
     float m_confThreshold = 0.25f;

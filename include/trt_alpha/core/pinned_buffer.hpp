@@ -1,11 +1,14 @@
 // =============================================================================
 //  trt_alpha :: core :: pinned_buffer
 // -----------------------------------------------------------------------------
-//  PinnedBuffer —— 页锁定主机内存的 RAII 容器（经 MemoryPool 池化）。
+//  PinnedBuffer -- an RAII container for page-locked host memory (pooled
+//  through MemoryPool).
 //
-//  页锁定内存作为 cudaMemcpyAsync 的源 / 目的，带宽显著高于普通可分页内存。
+//  As the source / destination of cudaMemcpyAsync, page-locked memory offers
+//  significantly higher bandwidth than ordinary pageable memory.
 //
-//  设计同 DeviceBuffer；禁移动（保留一致性——若将来需要可加 move）。
+//  Designed like DeviceBuffer; move is disabled to stay consistent (it can be
+//  added later if needed).
 // =============================================================================
 #pragma once
 

@@ -2,7 +2,7 @@
 //  trt_alpha :: kernels :: u2net_reduce（实现）
 // =============================================================================
 #include "trt_alpha/kernels/common.cuh"
-#include "trt_alpha/kernels/u2net_reduce.hpp"
+#include "trt_alpha/kernels/legacy/u2net_reduce.hpp"
 
 #include <cfloat>
 #include <stdexcept>

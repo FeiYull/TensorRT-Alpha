@@ -1,14 +1,19 @@
 // =============================================================================
 //  trt_alpha :: core :: cuda_stream
 // -----------------------------------------------------------------------------
-//  CudaStream —— cudaStream_t 的 RAII 封装。
+//  CudaStream -- an RAII wrapper around cudaStream_t.
 //
-//  设计：
-//    * 用默认 flag（阻塞流）创建：与 legacy default stream 自动互相同步，
-//      因此与任何外部跑在默认流上的代码（如 OpenCV CUDA 后端）时序安全。
-//    * 禁拷贝、禁移动：流是"独占资源句柄"，移动会引入所有权歧义。
-//    * 不绑定到 MemoryPool —— 池只分配内存，不管"内存在哪条流上用"。
-//      流和内存的关系由使用者维护（"我在流 S 上用 buffer B，用完前不释放 B"）。
+//  Design:
+//    * Created with the default flag (blocking stream): it synchronizes
+//      automatically with the legacy default stream, so it is timing-safe
+//      against any external code running on the default stream (e.g. the OpenCV
+//      CUDA backend).
+//    * Copy and move are disabled: a stream is an exclusive resource handle and
+//      moving it would introduce ownership ambiguity.
+//    * Not tied to MemoryPool -- the pool only allocates memory, it does not
+//      care which stream that memory is used on. The stream/memory relationship
+//      is maintained by the user ("I use buffer B on stream S and must not free
+//      B until I am done").
 // =============================================================================
 #pragma once
 
@@ -29,7 +34,7 @@ public:
 
     [[nodiscard]] cudaStream_t get() const noexcept { return m_stream; }
 
-    //! 同步本流上所有已入队的操作。
+    //! Synchronize every operation enqueued on this stream.
     void synchronize();
 
 private:

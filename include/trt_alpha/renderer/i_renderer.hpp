@@ -1,22 +1,27 @@
 // =============================================================================
 //  trt_alpha :: renderer :: i_renderer
 // -----------------------------------------------------------------------------
-//  IRenderer —— 渲染抽象接口。
+//  IRenderer -- the rendering abstraction.
 //
-//  设计原则：
-//    * 只认识结果结构体（BatchResult / Detection / Segmentation / ClassScore），
-//      不认识具体模型
-//    * 换后端（OpenCV → Qt / Skia / JSON）时新增实现即可，调用方 switch 指针
-//    * 【不依赖 OpenCV】：接口本身不暴露 cv::Mat，只用 core 的类型
-//    * 只做"画 / 存 / 显示"，不做"读图 / 推理 / 调度"
+//  Design principles:
+//    * Knows only the result structs (BatchResult / Detection / Segmentation /
+//      ClassScore), never a concrete model
+//    * Swapping the backend (OpenCV -> Qt / Skia / JSON) means adding an
+//      implementation and switching the pointer at the call site
+//    * [Does not depend on OpenCV]: the interface never exposes cv::Mat; it uses
+//      only core's types
+//    * It only "draws / saves / shows"; it never "reads images / infers /
+//      schedules"
 //
-//  调用时序契约：
-//    drawResult() → save() / show()
-//    先画，再存 / 显。drawResult() 就地修改 result.views 指向的内存。
+//  Call-sequence contract:
+//    drawResult() -> save() / show()
+//    Draw first, then save / show. drawResult() modifies in place the memory
+//    that result.views points to.
 //
-//  线程安全：
-//    * 实现方负责自己的线程安全
-//    * 通常一个渲染线程串行调用，不需要额外同步
+//  Thread safety:
+//    * each implementation is responsible for its own thread safety
+//    * typically a single render thread calls it serially, so no extra
+//      synchronization is needed
 // =============================================================================
 #pragma once
 
@@ -36,24 +41,26 @@ public:
     IRenderer(const IRenderer&) = delete;
     IRenderer& operator=(const IRenderer&) = delete;
 
-    //! 画整批结果（in-place，写回 result.views 指向的内存）。
-    //! 遍历 result.views[0..validCount-1]，按 detections / segmentations /
-    //! classifications 自动分发。
-    //! classNames 是"类别名 + 颜色"的数组（来自 ModelConfig.classNames）。
+    //! Draw a whole batch of results (in place, back into result.views' memory).
+    //! It walks result.views[0..validCount-1] and dispatches automatically
+    //! according to detections / segmentations / classifications.
+    //! classNames is the array of "class name + colour" (from
+    //! ModelConfig.classNames).
     virtual void drawResult(core::BatchResult& result,
                             const std::vector<core::ClassInfo>& classNames) const = 0;
 
-    //! 存盘：每张有效图存成 <outputDir>/<帧来源名>.jpg
-    //!   * 图片源 = 原文件名（data/bus.jpg -> <outputDir>/bus.jpg）
-    //!   * 视频 / 相机 = <主干>_<帧号>（demo_000123.jpg / cam0_000123.jpg）
-    //!   * result.frameNames 缺失或为空时回退 frame_<帧号>
-    //!   * 同名文件直接覆盖，覆盖前打一条 WARN
-    //! 自动创建 outputDir（如不存在）。
+    //! Save: every valid image goes to <outputDir>/<frame source name>.jpg
+    //!   * image source = the original filename (data/bus.jpg -> <outputDir>/bus.jpg)
+    //!   * video / camera = <stem>_<frame index> (demo_000123.jpg / cam0_000123.jpg)
+    //!   * falls back to frame_<index> when result.frameNames is missing or empty
+    //!   * a file of the same name is overwritten directly, after a WARN is logged
+    //! outputDir is created automatically when absent.
     virtual void save(const core::BatchResult& result,
                       const std::string& outputDir) const = 0;
 
-    //! 显示：cv::imshow + cv::waitKey(1)（不阻塞），只显示第一张有效图。
-    //! 实时场景"每帧一张"用这个。批量场景请用 save()。
+    //! Show: cv::imshow + cv::waitKey(1) (non-blocking); only the first valid
+    //! image is displayed. Use this for real-time "one image per frame". For
+    //! batch scenarios use save().
     virtual void show(const core::BatchResult& result,
                       const std::string& windowName) const = 0;
 

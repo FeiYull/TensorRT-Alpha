@@ -1,28 +1,28 @@
 // =============================================================================
 //  trt_alpha :: core :: ini_parser
 // -----------------------------------------------------------------------------
-//  IniParser —— 极简 INI 解析器（支持节）。
+//  IniParser -- a minimal INI parser (sections supported).
 //
-//  支持的语法：
-//    [section]              节头
-//    key = value            键值对（在节内）
-//    key = value            键值对（无节，全局）
-//    # 注释                 整行注释
-//    ; 注释                 整行注释
-//    行内 # 注释            value # comment
+//  Supported syntax:
+//    [section]              section header
+//    key = value            key/value pair (inside a section)
+//    key = value            key/value pair (no section, global)
+//    # comment              whole-line comment
+//    ; comment              whole-line comment
+//    inline # comment       value # comment
 //
-//  不支持：
-//    * 多行值
-//    * 引号
-//    * 嵌套节（[a.b.c] 当普通节名处理）
-//    * 转义
+//  Not supported:
+//    * multi-line values
+//    * quotes
+//    * nested sections ([a.b.c] is treated as an ordinary section name)
+//    * escapes
 //
-//  查询：
-//    ini.getString("key")                // 全局 key
-//    ini.getString("section.key")        // 节内 key
-//    ini.getString("key", "section")     // 同上（另一种写法）
+//  Lookup:
+//    ini.getString("key")                // global key
+//    ini.getString("section.key")        // key inside a section
+//    ini.getString("key", "section")     // same as above (alternative form)
 //
-//  读取失败 / 语法错误 → 抛 std::runtime_error（消息带上下文）。
+//  A read failure / syntax error -> throws std::runtime_error (with context).
 // =============================================================================
 #pragma once
 
@@ -35,10 +35,10 @@ namespace trt_alpha::core {
 class IniParser
 {
 public:
-    //! 解析文件。文件不可读 / 语法非法抛异常。
+    //! Parse a file. An unreadable file or invalid syntax throws.
     static IniParser load(const std::string& path);
 
-    //! 解析字符串（测试用）。
+    //! Parse a string (for tests).
     static IniParser parseString(const std::string& content);
 
     [[nodiscard]] bool has(const std::string& key) const;
@@ -58,28 +58,30 @@ public:
     [[nodiscard]] float getFloat(const std::string& key, const std::string& section,
                                 float fallback) const;
 
-    //! 逗号分隔字符串 → vector<string>。
+    //! Comma-separated string -> vector<string>.
     [[nodiscard]] std::vector<std::string>
     getStringList(const std::string& key, const std::string& section = "",
                   char sep = ',') const;
-    
-    //! 返回全部 key-value（key 格式："section.key" 或 "key"）。
+
+    //! Return every key/value pair (keys look like "section.key" or "key").
     [[nodiscard]] const std::unordered_map<std::string, std::string>& all() const noexcept
     {
         return m_kv;
     }
 
-    //! 全部 key 的【文件出现顺序】（首次出现；重复键只记一次）。
-    //! 用于按 ini 原样展示配置（unordered_map 本身无序）。
+    //! [File order] of all keys (first occurrence; duplicate keys are recorded
+    //! once). Used to display the config exactly as the ini file has it (an
+    //! unordered_map is unordered by itself).
     [[nodiscard]] const std::vector<std::string>& keys() const noexcept
     {
         return m_order;
     }
 
 private:
-    //! 内部 key 格式："section.key" 或 "key"（无节）
+    //! Internal key format: "section.key", or "key" when there is no section.
     std::unordered_map<std::string, std::string> m_kv;
-    //! m_kv 中 key 的首次出现顺序（与 m_kv 严格同步：只增不改）。
+    //! First-occurrence order of the keys in m_kv (kept strictly in sync with
+    //! m_kv: append-only).
     std::vector<std::string> m_order;
 
     static std::string makeKey(const std::string& section, const std::string& key);

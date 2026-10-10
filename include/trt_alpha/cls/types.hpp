@@ -1,17 +1,17 @@
 // =============================================================================
 //  trt_alpha :: cls :: types
 // -----------------------------------------------------------------------------
-//  ClassScore —— 一个类别得分（分类任务的 top-k 一项）。
+//  ClassScore -- one class score (an entry of a classification top-k).
 // =============================================================================
 #pragma once
 
 namespace trt_alpha::cls {
 
-//! 一个类别得分。
+//! One class score.
 struct ClassScore
 {
-    int label = -1;       //!< 类别 ID
-    float score = 0.f;    //!< 得分（通常是 softmax 概率）
+    int label = -1;       //!< class ID
+    float score = 0.f;    //!< score (usually a softmax probability)
 };
 
 }  // namespace trt_alpha::cls

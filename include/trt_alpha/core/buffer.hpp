@@ -1,22 +1,25 @@
 // =============================================================================
 //  trt_alpha :: core :: buffer
 // -----------------------------------------------------------------------------
-//  Buffer —— 拥有型内存容器（Host 或 Device）。
+//  Buffer -- an owning memory container (Host or Device).
 //
-//  职责：
-//    * 分配 / 释放 Host 或 Device 内存
-//    * 记录内存的布局信息（宽、高、通道、步长、类型、在哪）
-//    * 提供 BufferView（只读视图）
+//  Responsibilities:
+//    * allocate / free Host or Device memory
+//    * record the layout information (width, height, channels, stride, type,
+//      and where it lives)
+//    * hand out BufferView (read-only views)
 //
-//  不负责：
-//    * 颜色 / 张量语义（由上下游约定）
-//    * 数据操作（不做拷贝、不做转换）
-//    * "该不该分配"（调用方决定）
+//  Not responsible for:
+//    * colour / tensor semantics (agreed between producer and consumer)
+//    * data manipulation (no copies, no conversions)
+//    * deciding "whether to allocate" (the caller decides)
 //
-//  设计约定：
-//    * 紧凑分配：stride = width * channels * sizeOf(dtype)（无 padding）
-//    * 禁拷贝、禁移动：拥有内存的类不通过值传递，只通过 shared_ptr 引用
-//    * Device 当前用 cudaMalloc 直接分配；等 MemoryPool 完成后替换实现
+//  Design conventions:
+//    * Tight allocation: stride = width * channels * sizeOf(dtype) (no padding)
+//    * Copy and move are disabled: a class that owns memory is never passed by
+//      value, only by shared_ptr
+//    * Device currently allocates straight through cudaMalloc; the
+//      implementation will switch to MemoryPool once it lands
 // =============================================================================
 #pragma once
 
@@ -29,7 +32,7 @@
 
 namespace trt_alpha::core {
 
-//! 拥有型内存容器。不可拷贝、不可移动（只通过 shared_ptr 传递）。
+//! Owning memory container. Not copyable, not movable (passed only via shared_ptr).
 class Buffer
 {
 public:
@@ -41,41 +44,41 @@ public:
     Buffer& operator=(Buffer&&) = delete;
 
     // -------------------------------------------------------------------------
-    // 工厂
+    // Factories
     // -------------------------------------------------------------------------
 
-    //! 在 Host 分配。
-    //! 宽/高/通道必须 > 0。stride = width * channels * sizeOf(dtype)（紧凑）。
+    //! Allocate on the Host.
+    //! width / height / channels must be > 0. stride = width * channels * sizeOf(dtype) (tight).
     [[nodiscard]] static std::shared_ptr<Buffer>
     createHost(int width, int height, int channels, DataType dtype);
 
-    //! 在 Device 分配（cudaMalloc）。
-    //! 等 MemoryPool 完成后改为经池分配。
+    //! Allocate on the Device (cudaMalloc).
+    //! Will switch to pooled allocation once MemoryPool lands.
     [[nodiscard]] static std::shared_ptr<Buffer>
     createDevice(int width, int height, int channels, DataType dtype);
 
-    //! 从 Host 数据构造（逐行拷贝）。
-    //! srcData 必须指向至少 srcStride * height 字节的有效内存。
-    //! srcStride 是"源数据每行的字节数"（可能 > 紧凑值）。
+    //! Build from Host data (row-by-row copy).
+    //! srcData must point to at least srcStride * height valid bytes.
+    //! srcStride is "bytes per row in the source data" (may exceed the tight value).
     [[nodiscard]] static std::shared_ptr<Buffer>
     fromHostData(const std::uint8_t* srcData, int width, int height,
                  int channels, int srcStride, DataType dtype);
 
     // -------------------------------------------------------------------------
-    // 视图
+    // Views
     // -------------------------------------------------------------------------
 
     [[nodiscard]] BufferView view() const noexcept;
 
     // -------------------------------------------------------------------------
-    // 原始访问
+    // Raw access
     // -------------------------------------------------------------------------
 
     [[nodiscard]] const std::uint8_t* data() const noexcept { return m_data; }
     [[nodiscard]] std::uint8_t* mutableData() noexcept { return m_data; }
 
     // -------------------------------------------------------------------------
-    // 布局信息
+    // Layout information
     // -------------------------------------------------------------------------
 
     [[nodiscard]] int width() const noexcept { return m_width; }
@@ -85,7 +88,7 @@ public:
     [[nodiscard]] DataType dtype() const noexcept { return m_dtype; }
     [[nodiscard]] MemorySpace space() const noexcept { return m_space; }
 
-    //! 总占用字节数 = stride * height。
+    //! Total bytes occupied = stride * height.
     [[nodiscard]] std::size_t byteSize() const noexcept
     {
         return static_cast<std::size_t>(m_stride) * static_cast<std::size_t>(m_height);

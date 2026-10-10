@@ -1,10 +1,11 @@
 // =============================================================================
 //  trt_alpha :: kpt :: types
 // -----------------------------------------------------------------------------
-//  Keypoint —— 一个关键点（原图像素坐标 + 置信度）。
-//  KeypointResult —— 一个人的姿态（框 + 关键点）。
+//  Keypoint       -- one keypoint (source-image pixel coordinates + confidence).
+//  KeypointResult -- one person's pose (box + keypoints).
 //
-//  坐标约定：原图像素坐标（letterbox 逆变换已在模型内部完成）。
+//  Coordinate convention: source-image pixel coordinates (the inverse letterbox
+//  transform is already applied inside the model).
 // =============================================================================
 #pragma once
 
@@ -14,19 +15,19 @@
 
 namespace trt_alpha::kpt {
 
-//! 一个关键点。
+//! One keypoint.
 struct Keypoint
 {
-    float x = 0.f;            //!< 原图像素 x
-    float y = 0.f;            //!< 原图像素 y
-    float confidence = 0.f;   //!< 置信度
+    float x = 0.f;            //!< source-image pixel x
+    float y = 0.f;            //!< source-image pixel y
+    float confidence = 0.f;   //!< confidence
 };
 
-//! 一个人的姿态（框 + 关键点）。
+//! One person's pose (box + keypoints).
 struct KeypointResult
 {
-    det::Detection box;              //!< 人框（复用 Detection，label 通常 0）
-    std::vector<Keypoint> keypoints; //!< N 个关键点（COCO: 17）
+    det::Detection box;              //!< person box (reuses Detection; label is usually 0)
+    std::vector<Keypoint> keypoints; //!< N keypoints (COCO: 17)
 };
 
 }  // namespace trt_alpha::kpt

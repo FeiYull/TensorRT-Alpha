@@ -88,3 +88,7 @@ build/
 *out/
 *out_yunet
 *rtsp.md
+*.nsys-rep
+*.sqlite
+*tools/
+*profile/

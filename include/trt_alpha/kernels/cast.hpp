@@ -1,7 +1,7 @@
 // =============================================================================
 //  trt_alpha :: kernels :: cast
 // -----------------------------------------------------------------------------
-//  类型转换 kernel（Device -> Device）。
+//  Type-conversion kernels (Device -> Device).
 // =============================================================================
 #pragma once
 
@@ -11,7 +11,7 @@
 
 namespace trt_alpha::kernels {
 
-//! uint8 -> float32（Device -> Device），逐元素。
+//! uint8 -> float32 (Device -> Device), element-wise.
 void u8ToF32(cudaStream_t stream,
              const std::uint8_t* src,
              float* dst,

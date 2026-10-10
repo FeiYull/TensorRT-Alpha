@@ -1,10 +1,11 @@
 // =============================================================================
 //  trt_alpha :: det :: types
 // -----------------------------------------------------------------------------
-//  Detection —— 一个检测框（可选带关键点）。
+//  Detection -- one detection box (optionally carrying keypoints).
 //
-//  坐标约定：原图像素坐标（letterbox 逆变换已在模型内部完成）。
-//  不再描述颜色 / 通道；纯数据。
+//  Coordinate convention: source-image pixel coordinates (the inverse
+//  letterbox transform is already applied inside the model).
+//  No colour / channel description; pure data.
 // =============================================================================
 #pragma once
 
@@ -12,24 +13,25 @@
 
 namespace trt_alpha::det {
 
-//! 一个 2D 点（原图像素坐标，float）。
+//! A 2D point (source-image pixel coordinates, float).
 struct Point2f
 {
     float x = 0.f;
     float y = 0.f;
 };
 
-//! 一个检测框。
+//! One detection box.
 struct Detection
 {
-    float left = 0.f;         //!< 左（原图像素 x）
-    float top = 0.f;          //!< 上（原图像素 y）
-    float right = 0.f;        //!< 右（原图像素 x）
-    float bottom = 0.f;       //!< 下（原图像素 y）
-    float confidence = 0.f;   //!< 置信度
-    int label = -1;           //!< 类别 ID（-1 = 无效）
+    float left = 0.f;         //!< left (source-image pixel x)
+    float top = 0.f;          //!< top (source-image pixel y)
+    float right = 0.f;        //!< right (source-image pixel x)
+    float bottom = 0.f;       //!< bottom (source-image pixel y)
+    float confidence = 0.f;   //!< confidence
+    int label = -1;           //!< class ID (-1 = invalid)
 
-    //! 可选关键点（人脸 5 点等）。空 = 无关键点（YOLO 系列）。
+    //! Optional keypoints (e.g. the 5 face landmarks). Empty = no keypoints
+    //! (YOLO series).
     std::vector<Point2f> land_marks;
 };
 

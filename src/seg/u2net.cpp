@@ -6,7 +6,7 @@
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
 
-#include "trt_alpha/kernels/u2net_reduce.hpp"
+#include "trt_alpha/kernels/legacy/u2net_reduce.hpp"
 #include <cuda_runtime.h>
 
 #include <algorithm>

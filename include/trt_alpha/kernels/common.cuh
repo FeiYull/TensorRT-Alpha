@@ -1,11 +1,11 @@
 // =============================================================================
 //  trt_alpha :: kernels :: common
 // -----------------------------------------------------------------------------
-//  所有 kernel 共享的常量 + 辅助函数。
+//  Constants and helpers shared by every kernel.
 //
-//  Block 分类：
-//    * 2D block —— 像素 / anchor / decode / nms（dx, dy 各一维）
-//    * 1D block —— reduce / cast（只有 dx）
+//  Block categories:
+//    * 2D block -- pixels / anchors / decode / nms (one dimension each for dx, dy)
+//    * 1D block -- reduce / cast (dx only)
 // =============================================================================
 #pragma once
 
@@ -15,28 +15,28 @@
 
 namespace trt_alpha::kernels {
 
-//! 2D block（像素 / anchor kernel 用）。
+//! 2D block (used by pixel / anchor kernels).
 constexpr int kBlock2DX = 8;
 constexpr int kBlock2DY = 8;
 
-//! 1D block（reduce / cast kernel 用）。
+//! 1D block (used by reduce / cast kernels).
 constexpr int kBlock1D = 256;
 
-//! 便捷：生成 2D block。
+//! Convenience: build a 2D block.
 inline dim3 block2D() noexcept
 {
     return dim3(static_cast<unsigned>(kBlock2DX),
                 static_cast<unsigned>(kBlock2DY));
 }
 
-//! 便捷：计算 1D grid（向上取整）。
+//! Convenience: compute a 1D grid (rounding up).
 inline int gridSize1D(std::size_t n, int block) noexcept
 {
     return static_cast<int>((n + static_cast<std::size_t>(block) - 1) /
                             static_cast<std::size_t>(block));
 }
 
-//! 便捷：计算 2D grid（x 方向覆盖 n，y 方向覆盖 batch）。
+//! Convenience: compute a 2D grid (x covers n, y covers batch).
 inline dim3 gridSize2D(std::size_t n, int batch) noexcept
 {
     return dim3(static_cast<unsigned>(gridSize1D(n, kBlock2DX)),
