@@ -158,3 +158,9 @@ enable_testing()          # 顶层开启 CTest，注册的各 test_* 可 `ctest 
 add_subdirectory(test)
 add_subdirectory(app)
 add_subdirectory(samples)
+
+# demos/ is a local-only playground (ignored by .gitignore). Guard the mount so a
+# fresh clone that does not carry the directory still configures cleanly.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/demos/CMakeLists.txt")
+    add_subdirectory(demos)
+endif()

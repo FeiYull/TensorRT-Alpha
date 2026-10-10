@@ -92,3 +92,4 @@ build/
 *.sqlite
 *tools/
 *profile/
+*demos/
