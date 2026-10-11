@@ -1,7 +1,7 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: proprocess_fused_yolo26_det
+//  trt_alpha :: kernels :: ops :: postprocess_fused_yolo26_det
 // -----------------------------------------------------------------------------
-//  Implementation described at the top of proprocess_fused_yolo26_det.hpp.
+//  Implementation described at the top of postprocess_fused_yolo26_det.hpp.
 //
 //  One block per image, four phases inside it:
 //      1) decode + conf filter + compact      (parallel over the anchors)
@@ -9,7 +9,7 @@
 //      3) greedy NMS                          (detail::greedyRounds)
 //      4) write count / dets
 // =============================================================================
-#include "trt_alpha/kernels/ops/proprocess_fused_yolo26_det.hpp"
+#include "trt_alpha/kernels/ops/postprocess_fused_yolo26_det.hpp"
 #include "trt_alpha/kernels/common.cuh"
 
 #include "nms_utral_detail.cuh"

@@ -1,7 +1,7 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: proprocess_fused_vec_yolo26_det
+//  trt_alpha :: kernels :: ops :: postprocess_fused_vec_yolo26_det
 // -----------------------------------------------------------------------------
-//  Implementation described at the top of proprocess_fused_vec_yolo26_det.hpp.
+//  Implementation described at the top of postprocess_fused_vec_yolo26_det.hpp.
 //
 //  One block per image, four phases -- exactly like the scalar fused kernel:
 //      1) decode + conf filter + compact
@@ -13,7 +13,7 @@
 //  as 16B float4 per channel. anchors % 4 != 0 (and the tail quad) is handled by
 //  a scalar loop, so any anchor count is legal.
 // =============================================================================
-#include "trt_alpha/kernels/ops/proprocess_fused_vec_yolo26_det.hpp"
+#include "trt_alpha/kernels/ops/postprocess_fused_vec_yolo26_det.hpp"
 #include "trt_alpha/kernels/common.cuh"
 
 #include "nms_utral_detail.cuh"

@@ -5,9 +5,9 @@
 //
 //  The parameter struct lives HERE rather than in one of the operator headers,
 //  so that
-//      proprocess_fused_yolo26_det.hpp
+//      postprocess_fused_yolo26_det.hpp
 //  and
-//      proprocess_fused_vec_yolo26_det.hpp
+//      postprocess_fused_vec_yolo26_det.hpp
 //  stay two independent operators: neither has to include the other just to get
 //  the parameters, and there is exactly ONE definition -- no copy to keep in
 //  sync (the same reasoning that made computeLetterBox a single function).

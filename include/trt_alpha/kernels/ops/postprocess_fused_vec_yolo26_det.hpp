@@ -1,17 +1,17 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: proprocess_fused_vec_yolo26_det
+//  trt_alpha :: kernels :: ops :: postprocess_fused_vec_yolo26_det
 // -----------------------------------------------------------------------------
-//  The VECTORIZED variant of proprocess_fused_yolo26_det.
+//  The VECTORIZED variant of postprocess_fused_yolo26_det.
 //
 //  Same math, same order of operations, bit-identical output -- only the decode
 //  phase changes:
 //
-//      scalar (proprocess_fused_yolo26_det)  this file (vec)
-//      -------------------------------       --------------------------------
-//      1 thread = 1 anchor                   1 thread = 4 consecutive anchors
-//      1 scalar load / channel / anchor      one 16B float4 load / channel
-//      nc serial max/argmax per anchor       the 4 max/argmax reductions run
-//                                            in parallel (independent lanes)
+//      scalar (postprocess_fused_yolo26_det)  this file (vec)
+//      -------------------------------------  ---------------
+//      1 thread = 1 anchor                    1 thread = 4 consecutive anchors
+//      1 scalar load / channel / anchor       one 16B float4 load / channel
+//      nc serial max/argmax per anchor        the 4 max/argmax reductions run
+//                                             in parallel (independent lanes)
 //
 //  Why it is safe:
 //      * y is channel-major: for a fixed channel the anchors are contiguous, so

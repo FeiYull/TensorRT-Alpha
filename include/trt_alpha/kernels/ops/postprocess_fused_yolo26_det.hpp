@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: proprocess_fused_yolo26_det
+//  trt_alpha :: kernels :: ops :: postprocess_fused_yolo26_det
 // -----------------------------------------------------------------------------
 //  The FUSED variant of "decode_yolo26 + nms_utral": one kernel does everything.
 //
