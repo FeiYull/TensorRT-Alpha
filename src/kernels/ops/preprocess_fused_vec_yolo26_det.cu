@@ -1,7 +1,7 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: preprocess_fused_vec
+//  trt_alpha :: kernels :: ops :: preprocess_fused_vec_yolo26_det
 // -----------------------------------------------------------------------------
-//  Implementation described at the top of preprocess_fused_vec.hpp. Key points:
+//  Implementation described at the top of preprocess_fused_vec_yolo26_det.hpp. Key points:
 //    * the math is IDENTICAL to the scalar version; only the memory access changes
 //      (1 thread = 4 pixels + float4 vector stores)
 //    * the fixed-point coefficient tables still come from
@@ -10,7 +10,7 @@
 //    * the letterbox geometry comes from the shared computeLetterBox() -- there is
 //      no longer a duplicated copy to keep in sync
 // =============================================================================
-#include "trt_alpha/kernels/ops/preprocess_fused_vec.hpp"
+#include "trt_alpha/kernels/ops/preprocess_fused_vec_yolo26_det.hpp"
 #include "trt_alpha/kernels/common.cuh"
 
 #include <cuda_runtime.h>

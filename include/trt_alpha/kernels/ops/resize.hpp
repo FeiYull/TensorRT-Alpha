@@ -115,7 +115,7 @@ public:
     //! Fixed-point coefficient tables (device pointers), so that fused operators
     //! can reuse the very same coefficients.
     //!
-    //! A fused kernel (e.g. preprocess_fused) must be numerically bit-exact with
+    //! A fused kernel (e.g. preprocess_fused_yolo26_det) must be numerically bit-exact with
     //! cv::resize, and consistency depends entirely on how these four tables are
     //! built. Copying buildCoeffs elsewhere would drift sooner or later, so
     //! instead of duplicating it we expose the already-verified result here.

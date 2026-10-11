@@ -1,14 +1,14 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: preprocess_fused
+//  trt_alpha :: kernels :: ops :: preprocess_fused_yolo26_det
 // -----------------------------------------------------------------------------
-//  See the top of preprocess_fused.hpp for the full description. Key points:
+//  See the top of preprocess_fused_yolo26_det.hpp for the full description. Key points:
 //    * each output pixel needs only 2x2 source pixels -> the fixed-point chain can
 //      be reproduced in place, with no intermediate buffer
 //    * the coefficient tables come straight from CvResizePlan::coefTables()
 //      (the set already verified to give max=0)
 //    * padding pixels write a constant directly, without touching the source
 // =============================================================================
-#include "trt_alpha/kernels/ops/preprocess_fused.hpp"
+#include "trt_alpha/kernels/ops/preprocess_fused_yolo26_det.hpp"
 #include "trt_alpha/kernels/common.cuh"
 
 #include <cuda_runtime.h>

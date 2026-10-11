@@ -48,8 +48,8 @@
 #include "trt_alpha/kernels/ops/cvt_color.hpp"
 #include "trt_alpha/kernels/ops/hwc2chw.hpp"
 #include "trt_alpha/kernels/ops/normalize.hpp"
-#include "trt_alpha/kernels/ops/preprocess_fused.hpp"
-#include "trt_alpha/kernels/ops/preprocess_fused_vec.hpp"
+#include "trt_alpha/kernels/ops/preprocess_fused_yolo26_det.hpp"
+#include "trt_alpha/kernels/ops/preprocess_fused_vec_yolo26_det.hpp"
 #include "trt_alpha/kernels/ops/resize.hpp"
 
 #include <cuda_runtime.h>
@@ -290,7 +290,7 @@ int main(int argc, char** argv)
     }
     if (vecPlan.lastError() != cudaSuccess)
     {
-        std::fprintf(stderr, "[launch] preprocess_fused_vec : %s\n",
+        std::fprintf(stderr, "[launch] preprocess_fused_vec_yolo26_det : %s\n",
                      cudaGetErrorString(vecPlan.lastError()));
         return 2;
     }
