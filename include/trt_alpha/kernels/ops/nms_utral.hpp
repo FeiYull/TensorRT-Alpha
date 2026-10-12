@@ -4,7 +4,7 @@
 //  Ultralytics-style non-maximum suppression ("utral" = ultralytics), CUDA C.
 //
 //  Input  cand : float [batch][anchors][6 + extra]
-//                = [x1, y1, x2, y2, conf, cls, extra...]   (see decode_yolo26)
+//                = [x1, y1, x2, y2, conf, cls, extra...]   (see decode_yolov26)
 //  Output count: int   [batch]                       number of detections kept
 //         dets : float [batch][maxDet][6 + extra]     kept rows, in keep order
 //                coordinates are the INPUT coordinates (network pixels, no

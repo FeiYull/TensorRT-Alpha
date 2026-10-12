@@ -9,7 +9,7 @@
 //                           by round                          (detail::greedyRounds)
 //
 //  The sort and the greedy loop live in nms_utral_detail.cuh because the two
-//  fused variants (postprocess_fused_yolo26_det / _vec) run the very same code after
+//  fused variants (postprocess_fused_yolov26_det / _vec) run the very same code after
 //  decoding in place.
 // =============================================================================
 #include "trt_alpha/kernels/ops/nms_utral.hpp"

@@ -1,7 +1,7 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: decode_yolo26
+//  trt_alpha :: kernels :: ops :: decode_yolov26
 // -----------------------------------------------------------------------------
-//  Turn a YOLO26 one2many detection-head output into one candidate per anchor.
+//  Turn a YOLOV26 one2many detection-head output into one candidate per anchor.
 //
 //  The exported ONNX already contains make_anchors + dist2bbox + "* stride" +
 //  class sigmoid, so the engine's single output is
@@ -41,9 +41,9 @@
 namespace trt_alpha::kernels::ops {
 
 // =============================================================================
-//  DecodeYolo26Config -- geometry of one decode pass (batch never enters it)
+//  DecodeYoloV26Config -- geometry of one decode pass (batch never enters it)
 // =============================================================================
-struct DecodeYolo26Config
+struct DecodeYoloV26Config
 {
     int nc      = 80;     //!< number of classes
     int extra   = 0;      //!< extra channels carried through (seg 32 / pose 51)
@@ -56,24 +56,24 @@ struct DecodeYolo26Config
 };
 
 // =============================================================================
-//  CvDecodeYolo26Plan -- interface fixed in the constructor, only launch in the
+//  CvDecodeYoloV26Plan -- interface fixed in the constructor, only launch in the
 //  loop (mirrors CvPreprocessPlan / CvResizePlan in this directory)
 // =============================================================================
-class CvDecodeYolo26Plan
+class CvDecodeYoloV26Plan
 {
 public:
-    explicit CvDecodeYolo26Plan(const DecodeYolo26Config& cfg);
+    explicit CvDecodeYoloV26Plan(const DecodeYoloV26Config& cfg);
 
-    ~CvDecodeYolo26Plan();
+    ~CvDecodeYoloV26Plan();
 
-    CvDecodeYolo26Plan(const CvDecodeYolo26Plan&)            = delete;
-    CvDecodeYolo26Plan& operator=(const CvDecodeYolo26Plan&) = delete;
-    CvDecodeYolo26Plan(CvDecodeYolo26Plan&& other) noexcept;
+    CvDecodeYoloV26Plan(const CvDecodeYoloV26Plan&)            = delete;
+    CvDecodeYoloV26Plan& operator=(const CvDecodeYoloV26Plan&) = delete;
+    CvDecodeYoloV26Plan(CvDecodeYoloV26Plan&& other) noexcept;
 
     bool        ok()        const noexcept { return err_ == cudaSuccess; }
     cudaError_t lastError() const noexcept { return err_; }
 
-    const DecodeYolo26Config& config() const noexcept { return cfg_; }
+    const DecodeYoloV26Config& config() const noexcept { return cfg_; }
 
     // -------------------------------------------------------------------------
     //! Hot path: issues exactly one kernel.
@@ -85,15 +85,15 @@ public:
                 const float* y, float* cand) const;
 
 private:
-    DecodeYolo26Config cfg_;
+    DecodeYoloV26Config cfg_;
     mutable cudaError_t err_ = cudaSuccess;
 };
 
 // =============================================================================
-//  decodeYolo26Device -- one-shot convenience version
+//  decodeYoloV26Device -- one-shot convenience version
 // =============================================================================
-void decodeYolo26Device(cudaStream_t stream, int batch,
+void decodeYoloV26Device(cudaStream_t stream, int batch,
                         const float* y, float* cand,
-                        const DecodeYolo26Config& cfg);
+                        const DecodeYoloV26Config& cfg);
 
 }  // namespace trt_alpha::kernels::ops

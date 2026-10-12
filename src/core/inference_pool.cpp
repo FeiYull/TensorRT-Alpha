@@ -84,7 +84,14 @@ InferencePool::InferencePool(const ModelConfig& cfg,
                               << ", no input.layout declared)");
                 break;
             }
-            const int batchAxis = t.batchAxisIndex(workerCfg.layout);
+            // 未声明布局时按上面那条规范约定取轴 0（rank >= 4 才会走到这里）。
+            // 注意：不能直接把空 layout 喂给 batchAxisIndex —— 它返回 -1，
+            // 会被 resolveBatch 理解成"输入没有 batch 轴、batch 恒为 1"，
+            // 于是 static batch > 1 的引擎在预检里被误判为不符（模型侧
+            // applyInputShape 拿的是模型自带的规范布局，判定是对的，两边会打架）。
+            const int batchAxis = workerCfg.layout.empty()
+                                      ? 0
+                                      : t.batchAxisIndex(workerCfg.layout);
             m_resolvedBatch = core::resolveBatch(t, workerCfg.batchSize,
                                                  "[InferencePool]",
                                                  workerCfg.maxBatchSize,

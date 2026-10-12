@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: preprocess_fused_yolo26_det
+//  trt_alpha :: kernels :: ops :: preprocess_fused_yolov26_det
 // -----------------------------------------------------------------------------
 //  Five-in-one: fuses the 5 YOLO preprocessing operators into a SINGLE kernel.
 //
@@ -99,7 +99,7 @@ struct LetterBoxInfo
 //! implementation that had to be kept textually identical; that duplicate is gone,
 //! so the two can no longer drift.
 //!
-//! Implemented in preprocess_fused_yolo26_det.cu.
+//! Implemented in preprocess_fused_yolov26_det.cu.
 // =============================================================================
 LetterBoxInfo computeLetterBox(int srcW, int srcH, int outW, int outH);
 

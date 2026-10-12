@@ -1,13 +1,13 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: yolo26_det_common
+//  trt_alpha :: kernels :: ops :: yolov26_det_common
 // -----------------------------------------------------------------------------
-//  Types shared by the YOLO26 detection postprocess operators.
+//  Types shared by the YOLOV26 detection postprocess operators.
 //
 //  The parameter struct lives HERE rather than in one of the operator headers,
 //  so that
-//      postprocess_fused_yolo26_det.hpp
+//      postprocess_fused_yolov26_det.hpp
 //  and
-//      postprocess_fused_vec_yolo26_det.hpp
+//      postprocess_fused_vec_yolov26_det.hpp
 //  stay two independent operators: neither has to include the other just to get
 //  the parameters, and there is exactly ONE definition -- no copy to keep in
 //  sync (the same reasoning that made computeLetterBox a single function).
@@ -17,11 +17,11 @@
 namespace trt_alpha::kernels::ops {
 
 // =============================================================================
-//  ProprocessFusedYolo26Config
+//  ProprocessFusedYoloV26Config
 // -----------------------------------------------------------------------------
 //  Geometry and thresholds of "decode + conf filter + greedy NMS" for one image.
 // =============================================================================
-struct ProprocessFusedYolo26Config
+struct ProprocessFusedYoloV26Config
 {
     int   anchors    = 8400;
     int   nc         = 80;
@@ -36,6 +36,6 @@ struct ProprocessFusedYolo26Config
 };
 
 //! The vectorized variant is parameter-compatible with the scalar one.
-using ProprocessFusedVecYolo26Config = ProprocessFusedYolo26Config;
+using ProprocessFusedVecYoloV26Config = ProprocessFusedYoloV26Config;
 
 }  // namespace trt_alpha::kernels::ops

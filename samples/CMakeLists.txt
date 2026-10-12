@@ -4,6 +4,7 @@
 # add_subdirectory(sample_yolov6)
 # add_subdirectory(sample_yolov7)
 add_subdirectory(sample_yolov8)
+add_subdirectory(sample_yolov26)
 # add_subdirectory(sample_yolox)
 # add_subdirectory(sample_yolor)
 # add_subdirectory(sample_yolonas)

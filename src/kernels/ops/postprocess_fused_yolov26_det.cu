@@ -1,7 +1,7 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: postprocess_fused_yolo26_det
+//  trt_alpha :: kernels :: ops :: postprocess_fused_yolov26_det
 // -----------------------------------------------------------------------------
-//  Implementation described at the top of postprocess_fused_yolo26_det.hpp.
+//  Implementation described at the top of postprocess_fused_yolov26_det.hpp.
 //
 //  One block per image, four phases inside it:
 //      1) decode + conf filter + compact      (parallel over the anchors)
@@ -9,7 +9,7 @@
 //      3) greedy NMS                          (detail::greedyRounds)
 //      4) write count / dets
 // =============================================================================
-#include "trt_alpha/kernels/ops/postprocess_fused_yolo26_det.hpp"
+#include "trt_alpha/kernels/ops/postprocess_fused_yolov26_det.hpp"
 #include "trt_alpha/kernels/common.cuh"
 
 #include "nms_utral_detail.cuh"
@@ -27,7 +27,7 @@ using detail::rankSortByConf;
 // =============================================================================
 //  Fused kernel -- one block per image
 // =============================================================================
-__global__ void proprocessFusedYolo26Kernel(
+__global__ void proprocessFusedYoloV26Kernel(
     const float* __restrict__ y, int nc, int extra, int anchors,
     float confThresh, float iouThresh, float maxWh, int maxDet,
     int* __restrict__ outCount, float* __restrict__ dets,
@@ -114,12 +114,12 @@ __global__ void proprocessFusedYolo26Kernel(
 // =============================================================================
 void launchFused(cudaStream_t stream, int batch, const float* y,
                  int* count, float* dets,
-                 const ProprocessFusedYolo26Config& cfg,
+                 const ProprocessFusedYoloV26Config& cfg,
                  float* buf, int* order, unsigned char* alive, int* cnt)
 {
     const dim3 blk((unsigned)kBlock1D);
     const dim3 grd((unsigned)batch);
-    proprocessFusedYolo26Kernel<<<grd, blk, 0, stream>>>(
+    proprocessFusedYoloV26Kernel<<<grd, blk, 0, stream>>>(
         y, cfg.nc, cfg.extra, cfg.anchors,
         cfg.confThresh, cfg.iouThresh, cfg.maxWh, cfg.maxDet,
         count, dets, buf, order, alive, cnt);
@@ -128,9 +128,9 @@ void launchFused(cudaStream_t stream, int batch, const float* y,
 }  // namespace
 
 // =============================================================================
-//  CvProprocessFusedYolo26Plan
+//  CvProprocessFusedYoloV26Plan
 // =============================================================================
-CvProprocessFusedYolo26Plan::CvProprocessFusedYolo26Plan(const ProprocessFusedYolo26Config& cfg)
+CvProprocessFusedYoloV26Plan::CvProprocessFusedYoloV26Plan(const ProprocessFusedYoloV26Config& cfg)
     : cfg_(cfg)
 {
     if (cfg_.anchors <= 0 || cfg_.nc <= 0 || cfg_.extra < 0 ||
@@ -157,12 +157,12 @@ CvProprocessFusedYolo26Plan::CvProprocessFusedYolo26Plan(const ProprocessFusedYo
     err_ = cudaSuccess;
 }
 
-CvProprocessFusedYolo26Plan::~CvProprocessFusedYolo26Plan()
+CvProprocessFusedYoloV26Plan::~CvProprocessFusedYoloV26Plan()
 {
     release();
 }
 
-CvProprocessFusedYolo26Plan::CvProprocessFusedYolo26Plan(CvProprocessFusedYolo26Plan&& other) noexcept
+CvProprocessFusedYoloV26Plan::CvProprocessFusedYoloV26Plan(CvProprocessFusedYoloV26Plan&& other) noexcept
     : cfg_(other.cfg_)
     , d_buf_(other.d_buf_)
     , d_order_(other.d_order_)
@@ -177,7 +177,7 @@ CvProprocessFusedYolo26Plan::CvProprocessFusedYolo26Plan(CvProprocessFusedYolo26
     other.err_ = cudaSuccess;
 }
 
-void CvProprocessFusedYolo26Plan::release() noexcept
+void CvProprocessFusedYoloV26Plan::release() noexcept
 {
     if (d_buf_)   { cudaFree(d_buf_);   d_buf_ = nullptr; }
     if (d_order_) { cudaFree(d_order_); d_order_ = nullptr; }
@@ -185,7 +185,7 @@ void CvProprocessFusedYolo26Plan::release() noexcept
     if (d_cnt_)   { cudaFree(d_cnt_);   d_cnt_ = nullptr; }
 }
 
-void CvProprocessFusedYolo26Plan::launch(cudaStream_t stream, int batch,
+void CvProprocessFusedYoloV26Plan::launch(cudaStream_t stream, int batch,
                                          const float* y, int* count, float* dets) const
 {
     if (err_ != cudaSuccess || y == nullptr || count == nullptr || dets == nullptr)
@@ -200,13 +200,13 @@ void CvProprocessFusedYolo26Plan::launch(cudaStream_t stream, int batch,
 }
 
 // =============================================================================
-//  proprocessFusedYolo26Device
+//  proprocessFusedYoloV26Device
 // =============================================================================
-void proprocessFusedYolo26Device(cudaStream_t stream, int batch,
+void proprocessFusedYoloV26Device(cudaStream_t stream, int batch,
                                  const float* y, int* count, float* dets,
-                                 const ProprocessFusedYolo26Config& cfg)
+                                 const ProprocessFusedYoloV26Config& cfg)
 {
-    CvProprocessFusedYolo26Plan plan(cfg);
+    CvProprocessFusedYoloV26Plan plan(cfg);
     if (!plan.ok()) { return; }
     plan.launch(stream, batch, y, count, dets);
 }

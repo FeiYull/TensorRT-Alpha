@@ -1,12 +1,12 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: postprocess_fused_vec_yolo26_det
+//  trt_alpha :: kernels :: ops :: postprocess_fused_vec_yolov26_det
 // -----------------------------------------------------------------------------
-//  The VECTORIZED variant of postprocess_fused_yolo26_det.
+//  The VECTORIZED variant of postprocess_fused_yolov26_det.
 //
 //  Same math, same order of operations, bit-identical output -- only the decode
 //  phase changes:
 //
-//      scalar (postprocess_fused_yolo26_det)  this file (vec)
+//      scalar (postprocess_fused_yolov26_det)  this file (vec)
 //      -------------------------------------  ---------------
 //      1 thread = 1 anchor                    1 thread = 4 consecutive anchors
 //      1 scalar load / channel / anchor       one 16B float4 load / channel
@@ -24,34 +24,34 @@
 //      * The filter, the compaction, the sort and the greedy loop are literally
 //        the same code (nms_utral_detail.cuh).
 //
-//  The config comes from yolo26_det_common.hpp, the same single definition the
+//  The config comes from yolov26_det_common.hpp, the same single definition the
 //  scalar variant uses -- this header deliberately does NOT include the scalar
 //  operator header: the two plans are independent, they only share parameters.
 // =============================================================================
 #pragma once
 
-#include "trt_alpha/kernels/ops/yolo26_det_common.hpp"   // ProprocessFusedVecYolo26Config
+#include "trt_alpha/kernels/ops/yolov26_det_common.hpp"   // ProprocessFusedVecYoloV26Config
 
 namespace trt_alpha::kernels::ops {
 
 // =============================================================================
-//  CvProprocessFusedVecYolo26Plan -- interface identical to the scalar plan
+//  CvProprocessFusedVecYoloV26Plan -- interface identical to the scalar plan
 // =============================================================================
-class CvProprocessFusedVecYolo26Plan
+class CvProprocessFusedVecYoloV26Plan
 {
 public:
-    explicit CvProprocessFusedVecYolo26Plan(const ProprocessFusedVecYolo26Config& cfg);
+    explicit CvProprocessFusedVecYoloV26Plan(const ProprocessFusedVecYoloV26Config& cfg);
 
-    ~CvProprocessFusedVecYolo26Plan();
+    ~CvProprocessFusedVecYoloV26Plan();
 
-    CvProprocessFusedVecYolo26Plan(const CvProprocessFusedVecYolo26Plan&)            = delete;
-    CvProprocessFusedVecYolo26Plan& operator=(const CvProprocessFusedVecYolo26Plan&) = delete;
-    CvProprocessFusedVecYolo26Plan(CvProprocessFusedVecYolo26Plan&& other) noexcept;
+    CvProprocessFusedVecYoloV26Plan(const CvProprocessFusedVecYoloV26Plan&)            = delete;
+    CvProprocessFusedVecYoloV26Plan& operator=(const CvProprocessFusedVecYoloV26Plan&) = delete;
+    CvProprocessFusedVecYoloV26Plan(CvProprocessFusedVecYoloV26Plan&& other) noexcept;
 
     bool        ok()        const noexcept { return err_ == cudaSuccess; }
     cudaError_t lastError() const noexcept { return err_; }
 
-    const ProprocessFusedVecYolo26Config& config() const noexcept { return cfg_; }
+    const ProprocessFusedVecYoloV26Config& config() const noexcept { return cfg_; }
 
     int detStride() const noexcept { return cfg_.candStride(); }
 
@@ -62,7 +62,7 @@ public:
 private:
     void release() noexcept;
 
-    ProprocessFusedVecYolo26Config cfg_;
+    ProprocessFusedVecYoloV26Config cfg_;
     float*         d_buf_   = nullptr;
     int*           d_order_ = nullptr;
     unsigned char* d_alive_ = nullptr;
@@ -71,10 +71,10 @@ private:
 };
 
 // =============================================================================
-//  proprocessFusedVecYolo26Device -- one-shot convenience version
+//  proprocessFusedVecYoloV26Device -- one-shot convenience version
 // =============================================================================
-void proprocessFusedVecYolo26Device(cudaStream_t stream, int batch,
+void proprocessFusedVecYoloV26Device(cudaStream_t stream, int batch,
                                     const float* y, int* count, float* dets,
-                                    const ProprocessFusedVecYolo26Config& cfg);
+                                    const ProprocessFusedVecYoloV26Config& cfg);
 
 }  // namespace trt_alpha::kernels::ops

@@ -4,8 +4,8 @@
 //  The device-side core of NMS, shared by three translation units:
 //
 //      nms_utral.cu                  the standalone operator (decode then NMS)
-//      postprocess_fused_yolo26_det.cu    decode + filter + NMS in ONE kernel
-//      postprocess_fused_vec_yolo26_det.cu   same, with a vectorized decode
+//      postprocess_fused_yolov26_det.cu    decode + filter + NMS in ONE kernel
+//      postprocess_fused_vec_yolov26_det.cu   same, with a vectorized decode
 //
 //  Keeping the sort and the greedy loop here (instead of copy-pasting them) is
 //  the same reasoning that made computeLetterBox a single function: three copies

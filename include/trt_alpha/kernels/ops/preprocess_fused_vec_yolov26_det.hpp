@@ -1,5 +1,5 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: preprocess_fused_vec_yolo26_det
+//  trt_alpha :: kernels :: ops :: preprocess_fused_vec_yolov26_det
 // -----------------------------------------------------------------------------
 //  The VECTORIZED variant of preprocessFusedDevice.
 //
@@ -7,7 +7,7 @@
 //  /255 -- and the output is bit-identical. Only the memory access pattern and the
 //  amount of work per thread change:
 //
-//      scalar (preprocess_fused_yolo26_det)  this file (vec)
+//      scalar (preprocess_fused_yolov26_det)  this file (vec)
 //      ----------------------------          ----------------------------
 //      1 thread = 1 output pixel             1 thread = 4 consecutive output
 //                                            pixels (one quad)
@@ -34,11 +34,11 @@
 //     BGR->RGB still works by writing position.
 //
 //  WARNING: the output size is fixed (static ONNX); the geometry and the
-//  definition of LetterBoxInfo live in preprocess_fused_yolo26_det.hpp.
+//  definition of LetterBoxInfo live in preprocess_fused_yolov26_det.hpp.
 // =============================================================================
 #pragma once
 
-#include "trt_alpha/kernels/ops/preprocess_fused_yolo26_det.hpp"   // reuse LetterBoxInfo / NormMode
+#include "trt_alpha/kernels/ops/preprocess_fused_yolov26_det.hpp"   // reuse LetterBoxInfo / NormMode
 
 #include <memory>
 

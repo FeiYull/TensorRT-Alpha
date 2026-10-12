@@ -1,13 +1,13 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: decode_yolo26
+//  trt_alpha :: kernels :: ops :: decode_yolov26
 // -----------------------------------------------------------------------------
-//  Implementation described at the top of decode_yolo26.hpp.
+//  Implementation described at the top of decode_yolov26.hpp.
 //
 //  One thread per anchor, batch on blockIdx.y. Everything is a single IEEE-754
 //  float32 add / sub / divide-by-2, so the output is bit-identical to the Python
 //  reference (torch .max(dim) + xywh2xyxy).
 // =============================================================================
-#include "trt_alpha/kernels/ops/decode_yolo26.hpp"
+#include "trt_alpha/kernels/ops/decode_yolov26.hpp"
 #include "trt_alpha/kernels/common.cuh"
 
 #include <cuda_runtime.h>
@@ -26,12 +26,15 @@ namespace {
 //  Reads are coalesced: for a fixed channel, consecutive threads touch
 //  consecutive anchors.
 // =============================================================================
-__global__ void decodeYolo26Kernel(const float* __restrict__ y,
+__global__ void decodeYoloV26Kernel(const float* __restrict__ y,
                                    float* __restrict__ cand,
                                    int nc, int extra, int anchors)
 {
+    // blockIdx.y is the image index inside the batch. It is unsigned and the grid
+    // is launched with one block-row per image, so there is no negative case to
+    // test here (testing it would be a comparison of unsigned with zero).
     const int a = (int)(blockIdx.x * blockDim.x + threadIdx.x);
-    if (a >= anchors || blockIdx.y < 0)
+    if (a >= anchors)
     {
         return;
     }
@@ -87,15 +90,15 @@ void launchDecode(cudaStream_t stream, int batch,
     }
     const dim3 block(kBlock1D, 1, 1);
     const dim3 grid((unsigned)((anchors + kBlock1D - 1) / kBlock1D), (unsigned)batch, 1);
-    decodeYolo26Kernel<<<grid, block, 0, stream>>>(y, cand, nc, extra, anchors);
+    decodeYoloV26Kernel<<<grid, block, 0, stream>>>(y, cand, nc, extra, anchors);
 }
 
 }  // namespace
 
 // =============================================================================
-//  CvDecodeYolo26Plan
+//  CvDecodeYoloV26Plan
 // =============================================================================
-CvDecodeYolo26Plan::CvDecodeYolo26Plan(const DecodeYolo26Config& cfg)
+CvDecodeYoloV26Plan::CvDecodeYoloV26Plan(const DecodeYoloV26Config& cfg)
     : cfg_(cfg)
 {
     if (cfg_.nc <= 0 || cfg_.anchors <= 0 || cfg_.extra < 0)
@@ -106,11 +109,11 @@ CvDecodeYolo26Plan::CvDecodeYolo26Plan(const DecodeYolo26Config& cfg)
     err_ = cudaSuccess;
 }
 
-CvDecodeYolo26Plan::~CvDecodeYolo26Plan() = default;
+CvDecodeYoloV26Plan::~CvDecodeYoloV26Plan() = default;
 
-CvDecodeYolo26Plan::CvDecodeYolo26Plan(CvDecodeYolo26Plan&& other) noexcept = default;
+CvDecodeYoloV26Plan::CvDecodeYoloV26Plan(CvDecodeYoloV26Plan&& other) noexcept = default;
 
-void CvDecodeYolo26Plan::launch(cudaStream_t stream, int batch,
+void CvDecodeYoloV26Plan::launch(cudaStream_t stream, int batch,
                                 const float* y, float* cand) const
 {
     if (err_ != cudaSuccess || y == nullptr || cand == nullptr)
@@ -122,11 +125,11 @@ void CvDecodeYolo26Plan::launch(cudaStream_t stream, int batch,
 }
 
 // =============================================================================
-//  decodeYolo26Device
+//  decodeYoloV26Device
 // =============================================================================
-void decodeYolo26Device(cudaStream_t stream, int batch,
+void decodeYoloV26Device(cudaStream_t stream, int batch,
                         const float* y, float* cand,
-                        const DecodeYolo26Config& cfg)
+                        const DecodeYoloV26Config& cfg)
 {
     launchDecode(stream, batch, y, cand, cfg.nc, cfg.extra, cfg.anchors);
 }

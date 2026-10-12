@@ -392,8 +392,22 @@ bool OpenCVSource::next(core::Batch& out)
     out.validCount = 1;
     out.frameNames.push_back(firstName);
 
+    // 本批最多填几帧 —— 图片源恒为 1：
+    //   * 图片目录里各图尺寸通常不同，而一个批 buffer 的 stride / height 是按
+    //     本批首帧定死的，"批内必须同尺寸"是硬约束。把两张不同尺寸的图塞进同一
+    //     批会撞 copyIntoBatch 的守卫（--images data/ 就是这么炸的）。
+    //   * 一次推理只处理一张图，语义上也更清楚。
+    //   注意：views 仍然铺满 m_cfg.batchSize 个槽、buffer 尺寸也不变 —— 静态
+    //   batch 的引擎必须喂满 N 个槽，少给就是让引擎越界读。没填的槽补 0，
+    //   并用 validCount 标出有效张数；后处理 / 渲染都按 validCount 跳过补零槽。
+    //   视频 / 摄像头同源同尺寸，按 batchSize 攒帧（攒批在这里才有意义）。
+    const int wantFrames = (m_cfg.type == SourceType::Image ||
+                            m_cfg.type == SourceType::Images)
+                               ? 1
+                               : m_cfg.batchSize;
+
     // 继续填剩余帧
-    for (int i = 1; i < m_cfg.batchSize; ++i)
+    for (int i = 1; i < wantFrames; ++i)
     {
         if (m_stopRequested.load())
         {
@@ -429,10 +443,13 @@ bool OpenCVSource::next(core::Batch& out)
         std::memset(dst, 0, remain);
     }
 
-    m_nextFrameIndex += static_cast<std::uint64_t>(m_cfg.batchSize);
+    // 只按【实际消费掉的帧数】推进绝对帧号。之前固定 += batchSize，在末批
+    // 不足 / 图片源每批 1 张时会把帧号跳空（firstFrameIndex 是渲染器回退命名的
+    // 依据，跳空会让 fallback 名字出现空洞）。
+    m_nextFrameIndex += static_cast<std::uint64_t>(out.validCount);
 
-    TRT_LOG_DEBUG("OpenCVSource[" << typeName() << "]: batch #"
-                  << (m_nextFrameIndex / m_cfg.batchSize - 1)
+    TRT_LOG_DEBUG("OpenCVSource[" << typeName() << "]: batch @frame "
+                  << out.firstFrameIndex
                   << " validCount=" << out.validCount << "/" << m_cfg.batchSize);
 
     return out.validCount > 0;

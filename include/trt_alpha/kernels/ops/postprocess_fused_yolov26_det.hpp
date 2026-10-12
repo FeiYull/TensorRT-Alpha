@@ -1,7 +1,7 @@
 // =============================================================================
-//  trt_alpha :: kernels :: ops :: postprocess_fused_yolo26_det
+//  trt_alpha :: kernels :: ops :: postprocess_fused_yolov26_det
 // -----------------------------------------------------------------------------
-//  The FUSED variant of "decode_yolo26 + nms_utral": one kernel does everything.
+//  The FUSED variant of "decode_yolov26 + nms_utral": one kernel does everything.
 //
 //      y (batch, 4+nc+extra, A)
 //          -> decode each anchor (max/argmax over classes, xywh -> xyxy)
@@ -18,7 +18,7 @@
 //      * the sort and the greedy loop are the exact same device code, so the
 //        result cannot drift from the unfused path
 //
-//  The result is bit-identical to decode_yolo26 followed by nms_utral, and hence
+//  The result is bit-identical to decode_yolov26 followed by nms_utral, and hence
 //  to the Python reference. That is the invariant the demo checks.
 //
 //  Output: count : int   [batch]
@@ -26,7 +26,7 @@
 // =============================================================================
 #pragma once
 
-#include "trt_alpha/kernels/ops/yolo26_det_common.hpp"   // ProprocessFusedYolo26Config
+#include "trt_alpha/kernels/ops/yolov26_det_common.hpp"   // ProprocessFusedYoloV26Config
 
 #include <cuda_runtime.h>
 
@@ -35,23 +35,23 @@
 namespace trt_alpha::kernels::ops {
 
 // =============================================================================
-//  CvProprocessFusedYolo26Plan
+//  CvProprocessFusedYoloV26Plan
 // =============================================================================
-class CvProprocessFusedYolo26Plan
+class CvProprocessFusedYoloV26Plan
 {
 public:
-    explicit CvProprocessFusedYolo26Plan(const ProprocessFusedYolo26Config& cfg);
+    explicit CvProprocessFusedYoloV26Plan(const ProprocessFusedYoloV26Config& cfg);
 
-    ~CvProprocessFusedYolo26Plan();
+    ~CvProprocessFusedYoloV26Plan();
 
-    CvProprocessFusedYolo26Plan(const CvProprocessFusedYolo26Plan&)            = delete;
-    CvProprocessFusedYolo26Plan& operator=(const CvProprocessFusedYolo26Plan&) = delete;
-    CvProprocessFusedYolo26Plan(CvProprocessFusedYolo26Plan&& other) noexcept;
+    CvProprocessFusedYoloV26Plan(const CvProprocessFusedYoloV26Plan&)            = delete;
+    CvProprocessFusedYoloV26Plan& operator=(const CvProprocessFusedYoloV26Plan&) = delete;
+    CvProprocessFusedYoloV26Plan(CvProprocessFusedYoloV26Plan&& other) noexcept;
 
     bool        ok()        const noexcept { return err_ == cudaSuccess; }
     cudaError_t lastError() const noexcept { return err_; }
 
-    const ProprocessFusedYolo26Config& config() const noexcept { return cfg_; }
+    const ProprocessFusedYoloV26Config& config() const noexcept { return cfg_; }
 
     int detStride() const noexcept { return cfg_.candStride(); }
 
@@ -67,7 +67,7 @@ public:
 private:
     void release() noexcept;
 
-    ProprocessFusedYolo26Config cfg_;
+    ProprocessFusedYoloV26Config cfg_;
     float*         d_buf_   = nullptr;
     int*           d_order_ = nullptr;
     unsigned char* d_alive_ = nullptr;
@@ -76,10 +76,10 @@ private:
 };
 
 // =============================================================================
-//  proprocessFusedYolo26Device -- one-shot convenience version
+//  proprocessFusedYoloV26Device -- one-shot convenience version
 // =============================================================================
-void proprocessFusedYolo26Device(cudaStream_t stream, int batch,
+void proprocessFusedYoloV26Device(cudaStream_t stream, int batch,
                                  const float* y, int* count, float* dets,
-                                 const ProprocessFusedYolo26Config& cfg);
+                                 const ProprocessFusedYoloV26Config& cfg);
 
 }  // namespace trt_alpha::kernels::ops
