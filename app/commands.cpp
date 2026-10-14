@@ -78,15 +78,18 @@ void printUsage()
         "\n"
         "Commands:\n"
         "  list   List all registered models\n"
-        "  run    Run inference on image / images / video / camera\n"
+        "  run    Run inference on an image / directory / video / stream / camera\n"
         "  bench  Benchmark latency and throughput\n"
         "  build  Convert ONNX to engine (TODO)\n"
         "\n"
         "Run options:\n"
-        "  --image <path>    single image (a directory is also accepted: scanned, one level)\n"
-        "  --images <dir>    image directory (one level)\n"
-        "  --video <path|url>  video file, or stream URL (rtsp / rtmp / http / https)\n"
-        "  --camera <id>     camera device id\n"
+        "  --source <path|url|id>\n"
+        "                    the input source. Its kind is detected automatically:\n"
+        "                      data/bus.jpg         -> image\n"
+        "                      data/                -> image directory (one level)\n"
+        "                      data/people.mp4      -> local video file\n"
+        "                      rtsp://host:554/s1   -> network stream (rtsp/rtmp/http(s)/udp)\n"
+        "                      0                    -> camera device id\n"
         "  --net <name>      model name (default: yolov8)\n"
         "  --config <ini>    model INI (default: configs/<net>.ini)\n"
         "  --engine <trt>    override INI's engine path\n"
@@ -108,12 +111,13 @@ void printUsage()
         "\n"
         "Examples:\n"
         "  trt_alpha list\n"
-        "  trt_alpha run --image data/bus.jpg --net yolov8 --save\n"
-        "  trt_alpha run --video data/people.mp4 --net yolor --show\n"
-        "  trt_alpha run --video rtsp://192.168.1.10:554/stream1 --net yolov8 --show\n"
-        "  trt_alpha run --camera 0 --net yolov8_pose --show\n"
+        "  trt_alpha run --source data/bus.jpg --net yolov8 --save\n"
+        "  trt_alpha run --source data/ --net yolov8 --save\n"
+        "  trt_alpha run --source data/people.mp4 --net yolor --show\n"
+        "  trt_alpha run --source rtsp://192.168.1.10:554/stream1 --net yolov8 --show\n"
+        "  trt_alpha run --source 0 --net yolov8_pose --show\n"
         "  trt_alpha bench --net yolov8 --iters 100 --warmup 10\n"
-        "  trt_alpha run --image data/bus.jpg --net yolov8 --engine D:/models/yolov8n.trt\n";
+        "  trt_alpha run --source data/bus.jpg --net yolov8 --engine D:/models/yolov8n.trt\n";
 }
 
 int listCommand(const std::vector<std::string>& /*args*/)
@@ -205,6 +209,16 @@ int runCommand(const std::vector<std::string>& args)
     // 窗口名只有 --show 时才真正用到，但读一下即可见
     const std::string showWindow = modelCfg.getString("output.show_window", "trt_alpha");
 
+    // 渲染选项：按模型（<model>.ini 的 [render] 节），不放 base —— pose 的
+    // 关键点阈值、seg 的掩码透明度，不同任务默认值不同。在 pool 构造前读，
+    // 这样 markRead 痕迹会随 modelCfg 一起拷进 pool 的副本，框里才能如实标
+    // "已消费"（而不是 [unused]）。
+    trt_alpha::renderer::RenderOptions renderOptions;
+    renderOptions.kptConfThresh =
+        modelCfg.getFloat("render.kpt_conf_thresh", renderOptions.kptConfThresh);
+    renderOptions.maskAlpha =
+        modelCfg.getFloat("render.mask_alpha", renderOptions.maskAlpha);
+
     // 推理池
     trt_alpha::core::InferencePool pool(
         modelCfg,
@@ -230,34 +244,20 @@ int runCommand(const std::vector<std::string>& args)
     srcCfg.batchSize = pool.resolvedBatch();
     srcCfg.sourceId = 0;
 
-    if (!opt.image.empty())
+    // 一个 --source 涵盖图片 / 目录 / 视频 / 网络流 / 摄像头 id；类型由
+    // datasource::resolveSource 统一判别（与高层 Infer 共用同一套规则），
+    // 命令行不再需要区分。目录会在源内部自动升级为 Images。
     {
-        srcCfg.type = trt_alpha::datasource::SourceType::Image;
-        srcCfg.path = opt.image;
-    }
-    else if (!opt.images.empty())
-    {
-        srcCfg.type = trt_alpha::datasource::SourceType::Images;
-        srcCfg.path = opt.images;
-    }
-    else if (!opt.video.empty())
-    {
-        srcCfg.type = trt_alpha::datasource::SourceType::Video;
-        srcCfg.path = opt.video;
-    }
-    else if (opt.cameraId >= 0)
-    {
-        srcCfg.type = trt_alpha::datasource::SourceType::Camera;
-        srcCfg.cameraId = opt.cameraId;
-    }
-    else
-    {
-        throw std::runtime_error("run: no source (should not happen)");
+        const trt_alpha::datasource::ResolvedSource rs =
+            trt_alpha::datasource::resolveSource(opt.source);
+        srcCfg.type     = rs.type;
+        srcCfg.path     = rs.path;
+        srcCfg.cameraId = rs.cameraId;
     }
 
     // 安全守卫：结果按"原文件名"存盘 ⇒ 输出路径可能正好是输入文件本身。
     // 旧判据只处理"输入是目录"，漏掉了最常见的一种：输入是【单张图】而
-    // --save 指向这张图所在目录（--image data/bus.jpg --save data）——
+    // --save 指向这张图所在目录（--source data/bus.jpg --save data）——
     // 此时输出 data/bus.jpg == 输入，原图被覆盖成画框版，不可逆。
     // 新判据：把每个输入文件按渲染器的落盘规则算出输出路径，与输入逐一比对。
     // 只有图片 / 图片目录源会产出"原文件名"，视频与相机天然无此风险。
@@ -355,6 +355,7 @@ int runCommand(const std::vector<std::string>& args)
     pcfg.pools = { &pool };
     pcfg.renderer = needRender ? &renderer : nullptr;
     pcfg.classNames = modelCfg.classNames;
+    pcfg.renderOptions = renderOptions;
     pcfg.resultQueueSize = (qResult > 0) ? static_cast<std::size_t>(qResult) : std::size_t{32};
     pcfg.queueFullPolicy = queuePolicy;
     pcfg.saveEnabled = opt.save;

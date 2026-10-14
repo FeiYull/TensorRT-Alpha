@@ -255,7 +255,7 @@ namespace {
 //! 已知 section 的展示顺序。新增 section 时在这里补一项即可；
 //! 漏补也不会丢内容（未列出的 section 会按首次出现顺序排到末尾）。
 const char* const kSectionOrder[] = {
-    "model", "input", "normalize", "postprocess", "pool", "output", "kernels",
+    "model", "input", "normalize", "postprocess", "pool", "output", "render", "kernels",
 };
 
 struct KvRow

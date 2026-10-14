@@ -8,9 +8,12 @@
 //      + frame index)
 //    * buffer / views / validCount: the source images (the very batch fed into
 //      inference)
-//    * detections / segmentations / classifications / keypoints: per-task
-//      results (filled according to the model type; task fields that were not
-//      produced stay empty)
+//    * renderedBuffer / renderedViews: the SAME batch drawn on (boxes / masks /
+//      ...). Kept in a separate buffer so the source images above stay raw.
+//      Filled only when a renderer ran (save / show / draw); empty otherwise.
+//    * detections / segmentations / classifications / keypoints / obbs /
+//      depths / semantics: per-task results (filled according to the model
+//      type; task fields that were not produced stay empty)
 //    * inferenceMs: end-to-end time for this batch (performance metadata)
 //
 //  Lifetime:
@@ -24,8 +27,11 @@
 #include "trt_alpha/cls/types.hpp"
 #include "trt_alpha/core/buffer.hpp"
 #include "trt_alpha/core/buffer_view.hpp"
+#include "trt_alpha/depth/types.hpp"
 #include "trt_alpha/det/types.hpp"
+#include "trt_alpha/obb/types.hpp"
 #include "trt_alpha/seg/types.hpp"
+#include "trt_alpha/sem/types.hpp"
 #include "trt_alpha/kpt/types.hpp"
 
 #include <cstdint>
@@ -52,11 +58,23 @@ struct BatchResult
     //! when empty the renderer falls back to frame_<index>.
     std::vector<std::string> frameNames;
 
+    // ---- Rendered images (optional; only when a renderer is attached) ----
+    //! The drawn-on copy of the batch. It lives in its OWN buffer on purpose: the
+    //! renderer draws in place, so without this the source images above would be
+    //! overwritten. Both are handed back, which lets a caller get "raw + rendered"
+    //! from a single run: `views` = raw source, `renderedViews` = annotated.
+    //! Empty when no renderer ran (i.e. plain inference with save / show / draw off).
+    std::shared_ptr<Buffer> renderedBuffer;
+    std::vector<BufferView> renderedViews;
+
     // ---- Per-task results (filled by model type; unmatched tasks stay empty) ----
     std::vector<std::vector<det::Detection>> detections;          //!< detections per image
     std::vector<std::vector<seg::Segmentation>> segmentations;    //!< segmentations per image
     std::vector<std::vector<cls::ClassScore>> classifications;    //!< classifications per image
     std::vector<std::vector<kpt::KeypointResult>> keypoints;      //!< pose results per image
+    std::vector<std::vector<obb::ObbDetection>> obbs;             //!< oriented boxes per image
+    std::vector<depth::DepthMap> depths;                          //!< depth map per image
+    std::vector<sem::SemanticMask> semantics;                     //!< semantic mask per image
 
     // ---- Performance metadata ----
     //! End-to-end time for this batch (ms): the whole

@@ -93,3 +93,7 @@ build/
 *tools/
 *profile/
 *demos/
+
+# README 首页大图要进仓库：放行 .github/（上面 *github 规则把它整目录忽略了）
+!.github/
+!.github/**

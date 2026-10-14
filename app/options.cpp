@@ -4,6 +4,7 @@
 #include "options.hpp"
 
 #include "trt_alpha/core/logger.hpp"
+#include "trt_alpha/core/paths.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -67,7 +68,7 @@ void parseSize(const std::string& text, const std::string& flag, int& w, int& h)
 
 bool RunOptions::hasSource() const noexcept
 {
-    return !image.empty() || !images.empty() || !video.empty() || cameraId >= 0;
+    return !source.empty();
 }
 
 std::string RunOptions::resolveConfigPath() const
@@ -78,22 +79,13 @@ std::string RunOptions::resolveConfigPath() const
 
 void RunOptions::validate() const
 {
-    const int sourceCount =
-        (!image.empty()  ? 1 : 0) +
-        (!images.empty() ? 1 : 0) +
-        (!video.empty()  ? 1 : 0) +
-        (cameraId >= 0   ? 1 : 0);
+    if (source.empty())
+    {
+        throw std::runtime_error(
+            "run: no source specified (use --source <path|url|id>; image / directory / "
+            "video / stream / camera id are detected automatically)");
+    }
 
-    if (sourceCount == 0)
-    {
-        throw std::runtime_error("run: no source specified "
-                                 "(need one of --image / --images / --video / --camera)");
-    }
-    if (sourceCount > 1)
-    {
-        throw std::runtime_error("run: only one source allowed "
-                                 "(got " + std::to_string(sourceCount) + ")");
-    }
     if (batch == 0 || batch < -1)
     {
         throw std::runtime_error("run: --batch must be > 0 (got " +
@@ -118,10 +110,7 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
     {
         const std::string& a = args[i];
 
-        if      (a == "--image")    { opt.image = nextArg(args, i, a); }
-        else if (a == "--images")   { opt.images = nextArg(args, i, a); }
-        else if (a == "--video")    { opt.video = nextArg(args, i, a); }
-        else if (a == "--camera")   { opt.cameraId = parseInt(nextArg(args, i, a), a); }
+        if      (a == "--source")   { opt.source = nextArg(args, i, a); }
         else if (a == "--config")   { opt.config = nextArg(args, i, a); }
         else if (a == "--engine")   { opt.engine = nextArg(args, i, a); }
         else if (a == "--net")      { opt.net = nextArg(args, i, a); }
@@ -139,6 +128,13 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
             }
         }
         else if (a == "--show")     { opt.show = true; }
+        else if (a == "--image" || a == "--images" || a == "--video" ||
+                 a == "--url"   || a == "--camera")
+        {
+            throw std::runtime_error(
+                "run: '" + a + "' no longer exists; pass the source to --source "
+                "(image / directory / video / URL / camera id are detected automatically)");
+        }
         else
         {
             throw std::runtime_error("run: unknown option '" + a + "'");

@@ -9,6 +9,7 @@
 #include "trt_alpha/core/model_registry.hpp"
 #include "trt_alpha/core/paths.hpp"
 #include "trt_alpha/datasource/opencv_source.hpp"
+#include "trt_alpha/datasource/source_config.hpp"
 #include "trt_alpha/pipeline/pipeline.hpp"
 #include "trt_alpha/pipeline/pipeline_config.hpp"
 #include "trt_alpha/renderer/opencv_renderer.hpp"
@@ -33,6 +34,10 @@ const char* kModelNames[] = {
     "yolov8_pose", "yolov8_seg",
     "yolox", "yolor", "yolo_nas",
     "efficientdet", "yunet", "u2net",
+    "yolov26",
+    // YOLOV26 task variants -- order must match ModelType (append-only).
+    "yolov26_cls", "yolov26_depth", "yolov26_obb",
+    "yolov26_pose", "yolov26_seg", "yolov26_sem",
 };
 
 const char* registry_name(ModelType t)
@@ -60,28 +65,9 @@ core::QueueFullPolicy to_queue_policy(QueuePolicy p, bool realtime)
     }
 }
 
-//! 是否为视频文件后缀（小写比较；先剥离 URL 的查询串/锚点）。
-//! 按后缀而非子串判定：目录名 "a.mp4_backup" 里的图不该被当成视频。
-bool hasVideoExt(const std::string& src)
-{
-    const std::string path = src.substr(0, src.find_first_of("?#"));
-    const std::size_t dot = path.find_last_of('.');
-    if (dot == std::string::npos)
-    {
-        return false;
-    }
-    std::string ext = path.substr(dot);
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-
-    static const std::vector<std::string> kExts = {
-        ".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v",
-        ".ts", ".flv", ".mpg", ".mpeg", ".wmv",
-    };
-    return std::find(kExts.begin(), kExts.end(), ext) != kExts.end();
-}
-
 //! 构造数据源（根据 source / camera_id 推断类型）。
+//! source 的判别交给 datasource::resolveSource —— 与 CLI `--source` 共用同一套
+//! 规则（URL / 视频后缀 / 纯数字摄像头 / 其余=图片），避免两处各写一份慢慢走偏。
 datasource::SourceConfig build_source_config(const InferParams& p, int batch_size)
 {
     datasource::SourceConfig cfg;
@@ -91,13 +77,10 @@ datasource::SourceConfig build_source_config(const InferParams& p, int batch_siz
 
     if (!p.source.empty())
     {
-        // 判断源类型：URL（流）/ 视频文件 / 图片（也可能是目录，openImage 内部再降级）。
-        // URL 一律当流：cv::imread 只认本地文件，远程资源只能走 FFmpeg 后端。
-        const std::string& s = p.source;
-        cfg.path = s;
-        cfg.type = (core::Paths::isUrl(s) || hasVideoExt(s))
-                       ? datasource::SourceType::Video
-                       : datasource::SourceType::Image;
+        const datasource::ResolvedSource rs = datasource::resolveSource(p.source);
+        cfg.type     = rs.type;
+        cfg.path     = rs.path;
+        cfg.cameraId = rs.cameraId;
     }
     else if (p.camera_id >= 0)
     {
@@ -135,16 +118,27 @@ void InferParams::validate() const
 // =============================================================================
 core::BufferView Frame::image() const
 {
-    if (m_result == nullptr || m_index >= m_result->views.size()) {
+    if (!validSlot(m_result == nullptr ? 0 : m_result->views.size())) {
         return {};
     }
     return m_result->views[m_index];
 }
 
+core::BufferView Frame::rendered() const
+{
+    if (m_result == nullptr || m_result->renderedViews.empty()) {
+        return {};
+    }
+    if (!validSlot(m_result->renderedViews.size())) {
+        return {};
+    }
+    return m_result->renderedViews[m_index];
+}
+
 const std::vector<det::Detection>& Frame::boxes() const
 {
     static const std::vector<det::Detection> kEmpty;
-    if (m_result == nullptr || m_index >= m_result->detections.size()) {
+    if (!validSlot(m_result == nullptr ? 0 : m_result->detections.size())) {
         return kEmpty;
     }
     return m_result->detections[m_index];
@@ -153,7 +147,7 @@ const std::vector<det::Detection>& Frame::boxes() const
 const std::vector<seg::Segmentation>& Frame::masks() const
 {
     static const std::vector<seg::Segmentation> kEmpty;
-    if (m_result == nullptr || m_index >= m_result->segmentations.size()) {
+    if (!validSlot(m_result == nullptr ? 0 : m_result->segmentations.size())) {
         return kEmpty;
     }
     return m_result->segmentations[m_index];
@@ -162,7 +156,7 @@ const std::vector<seg::Segmentation>& Frame::masks() const
 const std::vector<kpt::KeypointResult>& Frame::keypoints() const
 {
     static const std::vector<kpt::KeypointResult> kEmpty;
-    if (m_result == nullptr || m_index >= m_result->keypoints.size()) {
+    if (!validSlot(m_result == nullptr ? 0 : m_result->keypoints.size())) {
         return kEmpty;
     }
     return m_result->keypoints[m_index];
@@ -171,10 +165,37 @@ const std::vector<kpt::KeypointResult>& Frame::keypoints() const
 const std::vector<cls::ClassScore>& Frame::classifications() const
 {
     static const std::vector<cls::ClassScore> kEmpty;
-    if (m_result == nullptr || m_index >= m_result->classifications.size()) {
+    if (!validSlot(m_result == nullptr ? 0 : m_result->classifications.size())) {
         return kEmpty;
     }
     return m_result->classifications[m_index];
+}
+
+const std::vector<obb::ObbDetection>& Frame::obbs() const
+{
+    static const std::vector<obb::ObbDetection> kEmpty;
+    if (!validSlot(m_result == nullptr ? 0 : m_result->obbs.size())) {
+        return kEmpty;
+    }
+    return m_result->obbs[m_index];
+}
+
+const depth::DepthMap& Frame::depth() const
+{
+    static const depth::DepthMap kEmpty;
+    if (!validSlot(m_result == nullptr ? 0 : m_result->depths.size())) {
+        return kEmpty;
+    }
+    return m_result->depths[m_index];
+}
+
+const sem::SemanticMask& Frame::semantic() const
+{
+    static const sem::SemanticMask kEmpty;
+    if (!validSlot(m_result == nullptr ? 0 : m_result->semantics.size())) {
+        return kEmpty;
+    }
+    return m_result->semantics[m_index];
 }
 
 // =============================================================================
@@ -182,9 +203,10 @@ const std::vector<cls::ClassScore>& Frame::classifications() const
 // =============================================================================
 std::vector<Frame> Result::frames() const
 {
+    const std::size_t n = size();          // valid frames only (skip zero-fill padding)
     std::vector<Frame> out;
-    out.reserve(m_result.views.size());
-    for (std::size_t i = 0; i < m_result.views.size(); ++i) {
+    out.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
         out.emplace_back(&m_result, i);
     }
     return out;
@@ -193,7 +215,9 @@ std::vector<Frame> Result::frames() const
 std::vector<det::Detection> Result::boxes() const
 {
     std::vector<det::Detection> out;
-    for (const auto& v : m_result.detections) {
+    const std::size_t n = size();
+    for (std::size_t i = 0; i < n && i < m_result.detections.size(); ++i) {
+        const auto& v = m_result.detections[i];
         out.insert(out.end(), v.begin(), v.end());
     }
     return out;
@@ -202,7 +226,9 @@ std::vector<det::Detection> Result::boxes() const
 std::vector<seg::Segmentation> Result::masks() const
 {
     std::vector<seg::Segmentation> out;
-    for (const auto& v : m_result.segmentations) {
+    const std::size_t n = size();
+    for (std::size_t i = 0; i < n && i < m_result.segmentations.size(); ++i) {
+        const auto& v = m_result.segmentations[i];
         out.insert(out.end(), v.begin(), v.end());
     }
     return out;
@@ -211,7 +237,9 @@ std::vector<seg::Segmentation> Result::masks() const
 std::vector<kpt::KeypointResult> Result::keypoints() const
 {
     std::vector<kpt::KeypointResult> out;
-    for (const auto& v : m_result.keypoints) {
+    const std::size_t n = size();
+    for (std::size_t i = 0; i < n && i < m_result.keypoints.size(); ++i) {
+        const auto& v = m_result.keypoints[i];
         out.insert(out.end(), v.begin(), v.end());
     }
     return out;
@@ -220,10 +248,37 @@ std::vector<kpt::KeypointResult> Result::keypoints() const
 std::vector<cls::ClassScore> Result::classifications() const
 {
     std::vector<cls::ClassScore> out;
-    for (const auto& v : m_result.classifications) {
+    const std::size_t n = size();
+    for (std::size_t i = 0; i < n && i < m_result.classifications.size(); ++i) {
+        const auto& v = m_result.classifications[i];
         out.insert(out.end(), v.begin(), v.end());
     }
     return out;
+}
+
+std::vector<obb::ObbDetection> Result::obbs() const
+{
+    std::vector<obb::ObbDetection> out;
+    const std::size_t n = size();
+    for (std::size_t i = 0; i < n && i < m_result.obbs.size(); ++i) {
+        const auto& v = m_result.obbs[i];
+        out.insert(out.end(), v.begin(), v.end());
+    }
+    return out;
+}
+
+std::vector<depth::DepthMap> Result::depths() const
+{
+    const std::size_t n = std::min(size(), m_result.depths.size());
+    return std::vector<depth::DepthMap>(m_result.depths.begin(),
+                                        m_result.depths.begin() + n);
+}
+
+std::vector<sem::SemanticMask> Result::semantics() const
+{
+    const std::size_t n = std::min(size(), m_result.semantics.size());
+    return std::vector<sem::SemanticMask>(m_result.semantics.begin(),
+                                          m_result.semantics.begin() + n);
 }
 
 // =============================================================================
@@ -258,7 +313,7 @@ core::ModelConfig Infer::Impl::merge_config() const
     if (params.max_queue_size > 0)    cfg.extras["max_queue_size"] = std::to_string(params.max_queue_size);
     if (params.result_queue_size > 0) cfg.extras["result_queue_size"] = std::to_string(params.result_queue_size);
 
-    if (!params.save_dir.empty())    cfg.extras["save_dir"] = params.save_dir;
+    if (!params.save.dir.empty())    cfg.extras["save_dir"] = params.save.dir;
     if (!params.show_window.empty()) cfg.extras["show_window"] = params.show_window;
 
     for (const auto& [k, v] : params.extras) {
@@ -388,7 +443,11 @@ Stream Infer::async()
 {
     m_impl->ensure_pool();
 
-    const bool render = m_impl->params.show || m_impl->params.save;
+    // Draw when the caller asked for the annotated frame (draw), or when the result
+    // needs to be written / shown -- all three share the same renderer + copy path.
+    const bool render = m_impl->params.draw ||
+                        m_impl->params.show ||
+                        m_impl->params.save.enabled;
 
     datasource::SourceConfig srcCfg =
         build_source_config(m_impl->params, m_impl->pool->resolvedBatch());
@@ -412,11 +471,11 @@ Stream Infer::async()
         pcfg.renderer = &m_impl->renderer;
         // Stream::get() 在有渲染器时走 popProcessed ⇒ 必须先声明要消费
         pcfg.exposeProcessed = true;
-        pcfg.saveEnabled = m_impl->params.save;
+        pcfg.saveEnabled = m_impl->params.save.enabled;
         pcfg.showEnabled = m_impl->params.show;
-        // 存盘目录：params.save_dir > ini output.save_dir > 默认 save/<net>。
+        // 存盘目录：params.save.dir > ini output.save_dir > 默认 save/<net>。
         // 谁显式给了就用谁的（原样，不拼子目录）。
-        std::string saveDir = m_impl->params.save_dir;
+        std::string saveDir = m_impl->params.save.dir;
         if (saveDir.empty()) {
             saveDir = m_impl->pool->modelConfig().getString("output.save_dir", "");
         }
@@ -425,7 +484,7 @@ Stream Infer::async()
         if (!m_impl->params.show_window.empty()) pcfg.showWindow = m_impl->params.show_window;
 
         // 登记输入源：save() 据此拒绝覆盖原图（输出 == 输入的最后一道闸门）
-        if (m_impl->params.save && !core::Paths::isUrl(m_impl->params.source)) {
+        if (m_impl->params.save.enabled && !core::Paths::isUrl(m_impl->params.source)) {
             m_impl->renderer.addInputSource(
                 core::Paths::resolve(m_impl->params.source).string());
         }

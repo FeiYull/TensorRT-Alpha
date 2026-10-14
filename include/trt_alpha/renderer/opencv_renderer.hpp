@@ -6,7 +6,7 @@
 //  Rendering style (fixed internally, not exposed to users):
 //    * box line width 2, font FONT_HERSHEY_DUPLEX, font scale 0.5
 //    * colours cycle by label (the same label always gets the same colour)
-//    * masks are blended per pixel (alpha = 0.35)
+//    * per-model knobs (mask alpha / keypoint threshold) come in via RenderOptions
 //
 //  Safety conventions:
 //    * every ROI access is clipped to the image bounds first (no out-of-range)
@@ -39,7 +39,8 @@ public:
     [[nodiscard]] bool protectsInputs() const noexcept { return !m_inputPaths.empty(); }
 
     void drawResult(core::BatchResult& result,
-                    const std::vector<core::ClassInfo>& classNames) const override;
+                    const std::vector<core::ClassInfo>& classNames,
+                    const RenderOptions& options) const override;
 
     void save(const core::BatchResult& result,
               const std::string& outputDir) const override;

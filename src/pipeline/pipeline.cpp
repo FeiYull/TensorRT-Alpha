@@ -4,6 +4,7 @@
 #include "trt_alpha/pipeline/pipeline.hpp"
 
 #include "trt_alpha/core/bounded_queue.hpp"
+#include "trt_alpha/core/buffer.hpp"
 #include "trt_alpha/core/inference_pool.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/paths.hpp"
@@ -12,8 +13,11 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace trt_alpha::pipeline {
 
@@ -309,11 +313,45 @@ void Pipeline::renderLoop()
                          << " stride=" << result.views[i].stride);
         }
 
+        // 渲染是 in-place 的（直接往 result.buffer 的像素上画框）。若调用方要读
+        // 结果（exposeProcessed），就不能让渲染污染原图 —— 先把像素深拷一份，让
+        // 渲染画在副本上，画完再把原 buffer / views 换回来。任务结果
+        // （boxes / masks / keypoints / depth / ...）全程不动，零拷贝。
+        const bool keepRaw = m_cfg.exposeProcessed && m_processedQueue != nullptr;
+        std::shared_ptr<core::Buffer>    savedBuffer;
+        std::vector<const std::uint8_t*> savedViewData;
+        if (keepRaw && result.buffer != nullptr)
+        {
+            savedBuffer = result.buffer;
+            savedViewData.reserve(result.views.size());
+            for (const auto& v : result.views) { savedViewData.push_back(v.data); }
+
+            const std::uint8_t* oldBase = result.buffer->data();
+            std::shared_ptr<core::Buffer> renderBuffer = core::Buffer::fromHostData(
+                oldBase,
+                result.buffer->width(), result.buffer->height(),
+                result.buffer->channels(), result.buffer->stride(),
+                result.buffer->dtype());
+            for (auto& v : result.views)
+            {
+                v.data = renderBuffer->data() + (v.data - oldBase);
+            }
+            result.buffer = std::move(renderBuffer);
+
+            // Hand back BOTH: keep the drawn-on copy around. drawResult / save /
+            // show below all work on this copy, so once they are done renderedViews
+            // holds the annotated pixels while views gets restored to the raw
+            // source. Without this the rendered frame would be thrown away and only
+            // the saved file would be able to show it.
+            result.renderedBuffer = result.buffer;
+            result.renderedViews  = result.views;
+        }
+
         // 画
         TRT_LOG_DEBUG("Pipeline: calling drawResult");
         try
         {
-            m_cfg.renderer->drawResult(result, m_cfg.classNames);
+            m_cfg.renderer->drawResult(result, m_cfg.classNames, m_cfg.renderOptions);
             TRT_LOG_DEBUG("Pipeline: drawResult done");
         }
         catch (const std::exception& e)
@@ -350,10 +388,20 @@ void Pipeline::renderLoop()
             }
         }
 
-        // 把处理完的结果推给"渲染后队列"（供用户 popProcessed 取）。
-        // 仅当调用方声明要消费时才推：没人消费还推，Block 策略下渲染线程会
-        // 写满队列后永久阻塞（Drop 策略下则纯属白丢）。
-        if (m_cfg.exposeProcessed && m_processedQueue != nullptr)
+        // 还原原图：渲染只借用了像素克隆，swap 回来把【原图】留给调用方。
+        if (keepRaw && savedBuffer != nullptr)
+        {
+            result.buffer = std::move(savedBuffer);
+            for (std::size_t vi = 0; vi < savedViewData.size(); ++vi)
+            {
+                result.views[vi].data = savedViewData[vi];
+            }
+        }
+
+        // 把结果推给"处理后队列"（供用户 popProcessed 取）。内容是【原图】——
+        // 渲染只影响落盘 / 显示。仅当调用方声明要消费时才推：没人消费还推，
+        // Block 策略下渲染线程会写满队列后永久阻塞（Drop 策略下则纯属白丢）。
+        if (keepRaw)
         {
             m_processedQueue->push(std::move(result));
         }

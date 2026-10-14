@@ -51,4 +51,23 @@ struct SourceConfig
     int sourceId = -1;
 };
 
+//! The type (and the target it points at) deduced from one user-supplied source
+//! string. See resolveSource() for the rule.
+struct ResolvedSource
+{
+    SourceType  type = SourceType::Image;
+    std::string path;                  //!< set unless type == Camera
+    int         cameraId = -1;         //!< set when type == Camera
+};
+
+//! Interpret one "source" string the same way everywhere -- the CLI `--source`
+//! and InferParams::source share this single rule, so the two can never drift:
+//!   * a URL (rtsp / rtmp / http(s) / udp)  -> Video  (stream, FFmpeg backend)
+//!   * all digits ("0", "1", ...)           -> Camera (device id)
+//!   * a known video extension              -> Video  (local file)
+//!   * anything else                        -> Image  (a directory upgrades itself
+//!                                            to Images inside the source)
+//! Empty input yields the default (Image / empty path); callers reject it.
+[[nodiscard]] ResolvedSource resolveSource(const std::string& source);
+
 }  // namespace trt_alpha::datasource

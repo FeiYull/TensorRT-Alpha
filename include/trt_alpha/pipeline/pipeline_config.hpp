@@ -53,6 +53,10 @@ struct PipelineConfig
     renderer::IRenderer* renderer = nullptr;
     std::vector<core::ClassInfo> classNames;
 
+    //! Per-model rendering knobs (keypoint threshold / mask alpha / ...), read
+    //! from <model>.ini [render] by the caller. Passed straight to drawResult.
+    renderer::RenderOptions renderOptions;
+
     // ---- Result queue ----
     std::size_t resultQueueSize = 32;
 

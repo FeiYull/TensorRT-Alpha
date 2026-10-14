@@ -14,11 +14,10 @@ namespace trt_alpha::app {
 //! `run` 命令的参数。
 struct RunOptions
 {
-    // ---- 数据源（四选一）----
-    std::string image;          //!< --image <path>
-    std::string images;         //!< --images <dir>
-    std::string video;          //!< --video <path>
-    int cameraId = -1;          //!< --camera <id>
+    // ---- 数据源 ----
+    //! --source <path|url|id>：一个参数涵盖图片 / 目录 / 视频 / 网络流 / 摄像头 id。
+    //! 具体类型由框架内部判别（datasource::resolveSource），命令行不再区分。
+    std::string source;
 
     // ---- 模型 ----
     std::string config;         //!< --config <ini>（不传则 configs/<net>.ini）

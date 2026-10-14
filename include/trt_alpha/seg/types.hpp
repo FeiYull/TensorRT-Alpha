@@ -28,9 +28,20 @@ namespace trt_alpha::seg {
 //! One segmentation result.
 struct Segmentation
 {
-    det::Detection box;                        //!< box (label == -1 means no box)
-    core::BufferView mask;                     //!< mask view (CV_8UC1 semantics, full image)
-    std::shared_ptr<core::Buffer> maskOwner;   //!< owner of the mask
+    det::Detection box;                        //!< box, in SOURCE-IMAGE pixels (label == -1 means no box)
+
+    //! Binary mask in NETWORK-INPUT space (e.g. 640x640, letterbox padding included),
+    //! CV_8UC1 semantics: 255 = foreground, 0 = background. This is the raw layout
+    //! that matches the python reference / test dumps -- keep using it for parity.
+    core::BufferView mask;
+    std::shared_ptr<core::Buffer> maskOwner;   //!< owner of `mask`
+
+    //! The same mask already un-letterboxed to the SOURCE-IMAGE size (srcW x srcH),
+    //! CV_8UC1 0/255 -- usable directly (overlay / crop by `box` / cv::imwrite)
+    //! without any resizing on the caller's side. `box` above lives in the very same
+    //! source-image coordinate system. Empty for models without an instance mask.
+    core::BufferView maskOrig;
+    std::shared_ptr<core::Buffer> maskOrigOwner;   //!< owner of `maskOrig`
 };
 
 }  // namespace trt_alpha::seg

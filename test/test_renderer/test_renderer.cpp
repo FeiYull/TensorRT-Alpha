@@ -34,6 +34,7 @@ using trt_alpha::core::DataType;
 using trt_alpha::core::MemorySpace;
 using trt_alpha::det::Detection;
 using trt_alpha::renderer::OpenCVRenderer;
+using trt_alpha::renderer::RenderOptions;
 
 namespace {
 
@@ -102,7 +103,7 @@ int main()
         const std::uint8_t orig0 = before[10 * 100 * 3 + 10 * 3 + 0];
         check(orig0 == 128, "[1] before draw: pixel is gray (128)");
 
-        renderer.drawResult(r, classNames);
+        renderer.drawResult(r, classNames, RenderOptions{});
 
         // (10, 10) 是框的左上角，(10, 10) 应该被画了框线（颜色 = colorForLabel(0)）
         const std::uint8_t after0 = before[10 * 100 * 3 + 10 * 3 + 0];
@@ -115,7 +116,7 @@ int main()
     {
         BatchResult r = makeTestResult(100, 100);
         r.frameNames = { "bus" };          // 模拟图片源：原文件名主干
-        renderer.drawResult(r, classNames);
+        renderer.drawResult(r, classNames, RenderOptions{});
 
         const std::string outDir = "test_renderer_out";
         std::error_code ec;
@@ -135,7 +136,7 @@ int main()
     {
         BatchResult r = makeTestResult(100, 100);
         r.firstFrameIndex = 7;             // frameNames 为空
-        renderer.drawResult(r, classNames);
+        renderer.drawResult(r, classNames, RenderOptions{});
 
         const std::string outDir = "test_renderer_out_fb";
         std::error_code ec;
@@ -154,7 +155,7 @@ int main()
     // ---------------------------------------------------------------
     {
         BatchResult r = makeTestResult(100, 100);
-        renderer.drawResult(r, classNames);
+        renderer.drawResult(r, classNames, RenderOptions{});
         renderer.show(r, "test_renderer_window");
         cv::destroyAllWindows();
         check(true, "[3] show() called without crash");
@@ -165,7 +166,7 @@ int main()
     // ---------------------------------------------------------------
     {
         BatchResult empty;
-        renderer.drawResult(empty, classNames);
+        renderer.drawResult(empty, classNames, RenderOptions{});
         renderer.save(empty, "test_renderer_out_empty");
         renderer.show(empty, "test_renderer_empty");
         check(true, "[4] empty result handled without crash");

@@ -33,6 +33,20 @@
 
 namespace trt_alpha::renderer {
 
+//! 渲染展示选项（纯 POD，只影响"怎么画"，不影响推理结果）。
+//!
+//! 这些是【按模型】的参数：pose 的关键点阈值、seg 的掩码透明度，不同任务默认值
+//! 不同，放 base 会让任务间隐式耦合。它们由调用方从 <model>.ini 的 [render] 节
+//! 读取后传入；渲染器仍然不知道具体模型，只是消费一份选项。
+//!
+//! 默认值 == 上游 ultralytics 的口径（Annotator.kpts 的 conf_thres、
+//! Annotator.masks 的 alpha）。
+struct RenderOptions
+{
+    float kptConfThresh = 0.25f;   //!< 关键点置信度阈值：低于此值不画点 / 不连骨架
+    float maskAlpha = 0.5f;        //!< 实例分割掩码混合 alpha
+};
+
 class IRenderer
 {
 public:
@@ -43,11 +57,14 @@ public:
 
     //! Draw a whole batch of results (in place, back into result.views' memory).
     //! It walks result.views[0..validCount-1] and dispatches automatically
-    //! according to detections / segmentations / classifications.
+    //! according to detections / segmentations / obbs / classifications /
+    //! semantics / depths / keypoints (only what the model produced is filled).
     //! classNames is the array of "class name + colour" (from
-    //! ModelConfig.classNames).
+    //! ModelConfig.classNames). options carries the per-model rendering knobs
+    //! (keypoint threshold / mask alpha / ...) read from <model>.ini [render].
     virtual void drawResult(core::BatchResult& result,
-                            const std::vector<core::ClassInfo>& classNames) const = 0;
+                            const std::vector<core::ClassInfo>& classNames,
+                            const RenderOptions& options) const = 0;
 
     //! Save: every valid image goes to <outputDir>/<frame source name>.jpg
     //!   * image source = the original filename (data/bus.jpg -> <outputDir>/bus.jpg)

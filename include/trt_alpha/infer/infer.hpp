@@ -31,8 +31,9 @@
 //    * on construction: read the ini (base + special merged), apply the p
 //      overrides, print, then build the pool
 //    * run()   -- synchronous, never renders, returns one batch of Result
-//    * async() -- asynchronous; when show || save is set, Pipeline renders by
-//      itself, otherwise the caller gets Result
+//    * async() -- asynchronous; the pipeline draws the results whenever draw /
+//      show / save is on (draw is ON by default), so each Result carries both the
+//      raw frame and the annotated copy
 //    * every parameter is named in snake_case, matching the ini
 // =============================================================================
 #pragma once
@@ -40,9 +41,12 @@
 #include "trt_alpha/cls/types.hpp"
 #include "trt_alpha/core/batch_result.hpp"
 #include "trt_alpha/core/buffer_view.hpp"
+#include "trt_alpha/depth/types.hpp"
 #include "trt_alpha/det/types.hpp"
 #include "trt_alpha/kpt/types.hpp"
+#include "trt_alpha/obb/types.hpp"
 #include "trt_alpha/seg/types.hpp"
+#include "trt_alpha/sem/types.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -72,6 +76,16 @@ enum class ModelType
     efficientdet,
     yunet,
     u2net,
+    yolov26,
+    // YOLOV26 task variants (same backbone, different head). Each maps 1:1 to a
+    // registration name and to a config in configs/. Append-only: the enum order
+    // must stay in lock-step with kModelNames[] in infer.cpp.
+    yolov26_cls,
+    yolov26_depth,
+    yolov26_obb,
+    yolov26_pose,
+    yolov26_seg,
+    yolov26_sem,
 };
 
 // -----------------------------------------------------------------------------
@@ -87,6 +101,25 @@ enum class QueuePolicy
 };
 
 // -----------------------------------------------------------------------------
+//  SaveOption -- save switch + directory in one field (mirrors CLI `--save [dir]`).
+//    p.save = true;        -> save to the default save/<net>/
+//    p.save = "my_path";   -> save to my_path/
+//    p.save = false;       -> do not save (default)
+//  Accepts bool and string (literal or std::string). Source type is irrelevant:
+//  image / video / camera / URL all follow the same rule.
+// -----------------------------------------------------------------------------
+struct SaveOption
+{
+    bool        enabled = false;   //!< whether to save at all
+    std::string dir;               //!< empty = the default save/<net>/
+
+    SaveOption() = default;
+    SaveOption(bool b) : enabled(b) {}                                 // = true / false
+    SaveOption(const char* d) : enabled(true), dir(d != nullptr ? d : "") {}
+    SaveOption(const std::string& d) : enabled(true), dir(d) {}
+};
+
+// -----------------------------------------------------------------------------
 //  InferParams -- the Infer constructor parameters.
 //
 //  Required:
@@ -98,7 +131,7 @@ enum class QueuePolicy
 //    * load time:   engine / class_names_file / batch_size / dst_h / dst_w
 //    * run time:    conf_thresh / iou_thresh / top_k
 //    * concurrency: workers / max_queue_size / result_queue_size / policy
-//    * output:      save_dir / show_window
+//    * output:      show_window
 //
 //  InferParams only (not present in the ini):
 //    * save / show / loop
@@ -110,8 +143,12 @@ struct InferParams
     std::string config_path;
 
     // ---- Source (source or camera_id, one of them) ----
-    std::string source;             // image / video / RTSP / HTTP URL
-    int         camera_id = -1;
+    //! One string covering every input kind; the type is detected internally
+    //! (datasource::resolveSource, the same rule as the CLI `--source`):
+    //!   "data/bus.jpg" -> image,  "data/" -> image directory (one level),
+    //!   "demo.mp4" -> local video,  "rtsp://..." -> stream,  "0" -> camera id.
+    std::string source;
+    int         camera_id = -1;     // explicit camera id (alternative to source="0")
     bool        loop = false;       // loop the video (only when source is a video)
 
     // ---- Override the ini (load time) ----
@@ -127,10 +164,16 @@ struct InferParams
     int   top_k       = -1;
 
     // ---- Output (InferParams only) ----
-    bool        save = false;
-    std::string save_dir;           // empty = use the ini
+    //! Save switch + directory: true -> save/<net>/, "path" -> path/.
+    SaveOption  save;
     bool        show = false;
     std::string show_window;        // empty = use the ini
+    //! Draw the results (boxes / masks / keypoints / ...) into an annotated copy,
+    //! exposed as Frame::rendered(). ON by default: a plain run already hands back
+    //! raw source + annotated copy + results. It does NOT write to disk or open a
+    //! window -- that stays the job of save / show. Set it to false when you only
+    //! want the data and want to skip the per-frame draw + copy entirely.
+    bool        draw = true;
 
     // ---- Override the ini (concurrency) ----
     int         workers = -1;
@@ -160,12 +203,35 @@ public:
     }
 
     [[nodiscard]] core::BufferView image() const;
+
+    //! The rendered (annotated) copy of this frame -- boxes / masks / keypoints /
+    //! ... already drawn on. Filled only when a renderer ran (InferParams.draw /
+    //! show / save); returns an empty view otherwise. `image()` above always stays
+    //! the raw, untouched source, so a single run can hand back both.
+    [[nodiscard]] core::BufferView rendered() const;
     [[nodiscard]] const std::vector<det::Detection>& boxes() const;
     [[nodiscard]] const std::vector<seg::Segmentation>& masks() const;
     [[nodiscard]] const std::vector<kpt::KeypointResult>& keypoints() const;
     [[nodiscard]] const std::vector<cls::ClassScore>& classifications() const;
+    [[nodiscard]] const std::vector<obb::ObbDetection>& obbs() const;
+    //! Dense depth map, float metres (NOT uint8). Empty when the model is not depth.
+    [[nodiscard]] const depth::DepthMap& depth() const;
+    //! Dense semantic map, uint8 class ids. Empty when the model is not semantic.
+    [[nodiscard]] const sem::SemanticMask& semantic() const;
 
 private:
+    //! True when m_index is a real (non-padding) frame slot within `count` entries.
+    //! A partial batch zero-fills the tail up to the engine batch size; those slots
+    //! must not be handed back as if they were results.
+    [[nodiscard]] bool validSlot(std::size_t count) const noexcept
+    {
+        if (m_result == nullptr || m_index >= count) {
+            return false;
+        }
+        return m_result->validCount <= 0 ||
+               m_index < static_cast<std::size_t>(m_result->validCount);
+    }
+
     const core::BatchResult* m_result = nullptr;
     std::size_t m_index = 0;
 };
@@ -179,7 +245,19 @@ public:
     Result() = default;
     explicit Result(core::BatchResult&& r) : m_result(std::move(r)) {}
 
-    [[nodiscard]] std::size_t size() const noexcept { return m_result.views.size(); }
+    //! Number of *result* frames in this batch. A partial batch is zero-filled by
+    //! the source up to the engine's batch size; those padding slots live in the
+    //! buffer (views) but are NOT results -- frame iteration and the flattening
+    //! accessors skip them. Falls back to the raw view count when validCount was
+    //! never set (defensive: hand-built results in unit tests).
+    [[nodiscard]] std::size_t size() const noexcept
+    {
+        const std::size_t total = m_result.views.size();
+        const int valid = m_result.validCount;
+        return (valid > 0 && static_cast<std::size_t>(valid) < total)
+                   ? static_cast<std::size_t>(valid)
+                   : total;
+    }
     [[nodiscard]] int valid_count() const noexcept { return m_result.validCount; }
     [[nodiscard]] int source_id() const noexcept { return m_result.sourceId; }
     [[nodiscard]] std::uint64_t first_frame_index() const noexcept
@@ -197,6 +275,9 @@ public:
     [[nodiscard]] std::vector<seg::Segmentation> masks() const;
     [[nodiscard]] std::vector<kpt::KeypointResult> keypoints() const;
     [[nodiscard]] std::vector<cls::ClassScore> classifications() const;
+    [[nodiscard]] std::vector<obb::ObbDetection> obbs() const;
+    [[nodiscard]] std::vector<depth::DepthMap> depths() const;
+    [[nodiscard]] std::vector<sem::SemanticMask> semantics() const;
 
 private:
     core::BatchResult m_result;
@@ -217,8 +298,9 @@ public:
     Stream(const Stream&) = delete;
     Stream& operator=(const Stream&) = delete;
 
-    //! Fetch the next batch (blocking). false = end of stream, or render mode
-    //! (which produces no Result).
+    //! Fetch the next batch (blocking). false = end of stream.
+    //! Available with or without a renderer: when show/save is set the pipeline
+    //! renders first and hands the rendered result back here.
     bool get(Result& out);
 
     //! Stop explicitly (thread-safe, idempotent).
@@ -253,9 +335,9 @@ public:
     Infer& operator=(Infer&&) noexcept;
 
     //! Asynchronous: returns a Stream.
-    //! When show || save is set, Pipeline starts a render thread and consumes
-    //! results itself (Stream::get() returns false). Otherwise the caller uses
-    //! Stream::get() to fetch Result.
+    //! Results are always available via Stream::get(): when show/save is set the
+    //! pipeline renders first (and saves / shows) then hands the rendered result
+    //! back; otherwise the caller gets the raw result.
     [[nodiscard]] Stream async();
 
 private:

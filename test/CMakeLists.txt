@@ -31,6 +31,7 @@ add_subdirectory(test_yolov8_seg)
 add_subdirectory(test_u2net)
 add_subdirectory(test_yolov8_pose)
 add_subdirectory(test_infer)
+add_subdirectory(test_yolov26_tasks)
 
 # -----------------------------------------------------------------------------
 # 注册到 CTest：在 build 目录执行
@@ -46,6 +47,7 @@ set(TRT_ALPHA_TEST_TARGETS
     test_yolov3 test_yolov4 test_yolov5 test_yolov6 test_yolov7
     test_yolov8 test_yolov26 test_yolox test_yolor test_yolonas test_efficientdet
     test_yunet test_yolov8_seg test_u2net test_yolov8_pose test_infer
+    test_yolov26_tasks
 )
 foreach(_t IN LISTS TRT_ALPHA_TEST_TARGETS)
     if(TARGET ${_t})
