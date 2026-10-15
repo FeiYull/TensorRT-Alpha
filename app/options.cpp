@@ -12,11 +12,19 @@
 namespace trt_alpha::app {
 namespace {
 
-//! 取下一个参数，越界抛异常。
+//! 下一个 token 是否"长得像选项"：'-' 开头、且不是负数。
+//! 用来把 `--batch --show` 这种"值被下一个选项顶掉"判为缺值，
+//! 而不是把选项名当成值收下（那样只会得到一个误导性的报错）。
+bool looksLikeOption(const std::string& t)
+{
+    return t.size() > 1 && t[0] == '-' && !(t[1] >= '0' && t[1] <= '9');
+}
+
+//! 取下一个参数，越界或下一个 token 是选项（缺值）抛异常。
 std::string nextArg(const std::vector<std::string>& args, std::size_t& i,
                     const std::string& flag)
 {
-    if (i + 1 >= args.size())
+    if (i + 1 >= args.size() || looksLikeOption(args[i + 1]))
     {
         throw std::runtime_error("missing value for " + flag);
     }
@@ -40,6 +48,29 @@ int parseInt(const std::string& text, const std::string& flag)
     {
         throw std::runtime_error("invalid int for " + flag + ": '" + text + "'");
     }
+}
+
+//! 取下一个参数并解析为 int（缺值 / 非整数抛异常）。数值范围由调用方校验。
+int nextIntArg(const std::vector<std::string>& args, std::size_t& i,
+               const std::string& flag)
+{
+    return parseInt(nextArg(args, i, flag), flag);
+}
+
+//! 取下一个参数并解析为「正整数」。
+//! 显式写了这个选项就必须给 > 0 的值：-1 是"未指定（退回 INI）"的内部哨兵，
+//! 不允许用户显式写出来冒用 —— 否则 `--batch -1` 会被当成"没传 --batch"
+//! 静默退回 INI 默认值（`--batch 0` 却报错，行为不一致）。
+int nextPositiveIntArg(const std::vector<std::string>& args, std::size_t& i,
+                       const std::string& flag)
+{
+    const int v = nextIntArg(args, i, flag);
+    if (v <= 0)
+    {
+        throw std::runtime_error(flag + " must be > 0 (got " +
+                                 std::to_string(v) + ")");
+    }
+    return v;
 }
 
 //! 解析 "WxH"（大小写 x / X 均可），非法抛异常。
@@ -114,8 +145,8 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
         else if (a == "--config")   { opt.config = nextArg(args, i, a); }
         else if (a == "--engine")   { opt.engine = nextArg(args, i, a); }
         else if (a == "--net")      { opt.net = nextArg(args, i, a); }
-        else if (a == "--batch")    { opt.batch = parseInt(nextArg(args, i, a), a); }
-        else if (a == "--workers")  { opt.workers = parseInt(nextArg(args, i, a), a); }
+        else if (a == "--batch")    { opt.batch = nextPositiveIntArg(args, i, a); }
+        else if (a == "--workers")  { opt.workers = nextPositiveIntArg(args, i, a); }
         else if (a == "--root")     { opt.root = nextArg(args, i, a); }
         else if (a == "--save")
         {
@@ -189,9 +220,9 @@ BenchOptions parseBenchOptions(const std::vector<std::string>& args)
         if      (a == "--engine") { opt.engine = nextArg(args, i, a); }
         else if (a == "--config") { opt.config = nextArg(args, i, a); }
         else if (a == "--net")    { opt.net = nextArg(args, i, a); }
-        else if (a == "--batch")  { opt.batch = parseInt(nextArg(args, i, a), a); }
-        else if (a == "--iters")  { opt.iters = parseInt(nextArg(args, i, a), a); }
-        else if (a == "--warmup") { opt.warmup = parseInt(nextArg(args, i, a), a); }
+        else if (a == "--batch")  { opt.batch = nextPositiveIntArg(args, i, a); }
+        else if (a == "--iters")  { opt.iters = nextIntArg(args, i, a); }
+        else if (a == "--warmup") { opt.warmup = nextIntArg(args, i, a); }
         else if (a == "--src")    { parseSize(nextArg(args, i, a), a, opt.srcW, opt.srcH); }
         else if (a == "--root")   { opt.root = nextArg(args, i, a); }
         else

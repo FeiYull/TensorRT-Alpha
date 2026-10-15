@@ -315,9 +315,22 @@ bool OpenCVSource::readOneImage(cv::Mat& out)
     {
         return false;
     }
-    out = cv::imread(m_imagePaths[m_imageIndex], cv::IMREAD_COLOR);
+    const std::string& path = m_imagePaths[m_imageIndex];
+    out = cv::imread(path, cv::IMREAD_COLOR);
     ++m_imageIndex;
-    return !out.empty();
+
+    // 文件在磁盘上存在（requireFile / 目录枚举都过了），却解不出像素 ——
+    // 说明它根本不是图片 / 已损坏 / 编码不受支持（典型：把 .txt 当 --source 传进来）。
+    // 这里绝不能像"源已耗尽"那样返回 false：那会让 Pipeline 正常收尾、run 以
+    // exit 0 静默结束，用户以为跑成功了。显式抛错 -> sourceLoop 捕获 -> 退出码 1。
+    if (out.empty())
+    {
+        throw std::runtime_error(
+            "OpenCVSource: cannot decode image '" +
+            core::Paths::toDisplay(fs::path(path)) +
+            "' (not an image / corrupted / unsupported codec)");
+    }
+    return true;
 }
 
 bool OpenCVSource::readOneFrame(cv::Mat& out)
