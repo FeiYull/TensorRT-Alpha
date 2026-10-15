@@ -4,7 +4,6 @@ add_executable(test_yolov26_tasks test_yolov26_tasks.cpp)
 # ocv::ocv 只用于可选段 [8]/[9]/[10]/[11]：读图造 Batch。
 target_link_libraries(test_yolov26_tasks
     PRIVATE
-        trt_alpha_core
         trt::trt
         ocv::ocv
         $<LINK_LIBRARY:WHOLE_ARCHIVE,trt_alpha_core>

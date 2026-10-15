@@ -6,7 +6,6 @@ add_executable(trt_alpha
 
 target_link_libraries(trt_alpha
     PRIVATE
-        trt_alpha_core
         trt::trt
         ocv::ocv
         $<LINK_LIBRARY:WHOLE_ARCHIVE,trt_alpha_core>

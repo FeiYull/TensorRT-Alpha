@@ -212,6 +212,17 @@ void installImpl() noexcept
 
 #else  // POSIX
 
+//! async-signal-safe 版 stderr 写：只调 write()，不碰 stdio（stdio 内部带锁，
+//! 崩在持锁点会自死锁，日志反而出不来）。
+//!
+//! 返回值故意丢弃 ---- 进程马上 abort，写失败也无从补救。但 GCC 的
+//! -Wunused-result 不认 (void) 强转（Clang 才认），所以必须把结果落到一个
+//! [[maybe_unused]] 局部量里：语义等价，且 GCC/MSVC 都不产生告警。
+inline void writeStderr(const char* data, std::size_t len) noexcept
+{
+    [[maybe_unused]] const ssize_t written = ::write(STDERR_FILENO, data, len);
+}
+
 //! 信号上下文只能用 async-signal-safe 调用：write() 可以，fprintf/fflush 不行
 //! （stdio 内部带锁，崩在持锁点会自死锁，日志反而出不来）。
 void writeFatal(const char* what) noexcept
@@ -223,9 +234,9 @@ void writeFatal(const char* what) noexcept
     const char* p = what;
     std::size_t n = 0;
     while (p[n] != '\0') { ++n; }
-    (void)::write(STDERR_FILENO, kHead, sizeof(kHead) - 1);
-    (void)::write(STDERR_FILENO, what, n);
-    (void)::write(STDERR_FILENO, kTail, sizeof(kTail) - 1);
+    writeStderr(kHead, sizeof(kHead) - 1);
+    writeStderr(what, n);
+    writeStderr(kTail, sizeof(kTail) - 1);
 }
 
 void signalHandler(int sig) noexcept

@@ -209,15 +209,24 @@ private:
     nvinfer1::ICudaEngine* m_engine = nullptr;   // non-owning
 };
 
+//! Options for building an engine from ONNX (see TrtEngine::buildFromOnnx).
+//!
+//! Defined at namespace scope rather than nested inside TrtEngine: GCC rejects
+//! constructing a nested type (whose members carry default member initializers)
+//! inside a default argument of its own enclosing class. Hoisting it keeps the
+//! `= BuildOptions{}` default argument legal on GCC as well as MSVC.
+struct TrtEngineBuildOptions
+{
+    std::size_t workspaceBytes = 1ULL << 30;
+    bool fp16 = true;
+};
+
 //! Compatibility shell: holds a shared_ptr<Engine> + an exclusive Context.
 class TrtEngine
 {
 public:
-    struct BuildOptions
-    {
-        std::size_t workspaceBytes = 1ULL << 30;
-        bool fp16 = true;
-    };
+    //! Nested spelling kept for source compatibility.
+    using BuildOptions = TrtEngineBuildOptions;
 
     //! Legacy constructor: deserializes its own engine copy (independent, not shared).
     explicit TrtEngine(const std::string& engineFile);
@@ -228,7 +237,7 @@ public:
     //! ONNX -> engine (TODO).
     static void buildFromOnnx(const std::string& onnxFile,
                               const std::string& engineFile,
-                              const BuildOptions& options = {});
+                              const BuildOptions& options = BuildOptions{});
 
     TrtEngine(const TrtEngine&) = delete;
     TrtEngine& operator=(const TrtEngine&) = delete;

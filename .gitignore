@@ -70,8 +70,10 @@ build/
 *src_legacy
 *test_legacy
 *.jpg
+*.jpeg
+*.png
+*.mp4
 # *FileTree.txt
-*data/
 *save/
 *FileTree.txt
 *.github
@@ -79,7 +81,6 @@ build/
 *log*.txt
 *.github
 *z_cmd.txt
-*.ps1
 *docs/
 *.log
 *logs/
@@ -100,3 +101,4 @@ build/
 *.git_commit_msg.txt
 
 *common.txt
+*onnx/

@@ -1,4 +1,77 @@
-* text=auto
-*.cpp text eol=lf
-*.hpp text eol=lf
-*.h   text eol=lf
+# =============================================================================
+#  Line-ending / attribute policy   (cross-platform: Windows + Linux)
+# -----------------------------------------------------------------------------
+#  Rule of thumb: the REPOSITORY always stores LF for text files; the working
+#  tree gets whatever `eol=` says below.
+#
+#  MSVC, CMake and GCC all accept LF, so there is no reason to keep CRLF in
+#  C++ sources -- and one single policy kills the whole "same file, different
+#  line endings on two machines" family of bugs:
+#     * a patch / hunk stops matching (a plain string search returns 0 hits),
+#     * git shows the entire file as changed,
+#     * a CRLF shell script dies with `bash: $'\r': command not found`.
+#
+#  Windows-only scripts stay CRLF (cmd.exe and .ps1 are fussier about it).
+# =============================================================================
+
+# --- default: text, stored and checked out as LF -----------------------------
+* text=auto eol=lf
+
+# --- scripts: the platform decides ------------------------------------------
+*.sh          text eol=lf
+*.bash        text eol=lf
+*.bat         text eol=crlf
+*.cmd         text eol=crlf
+*.ps1         text eol=crlf
+
+# --- C / C++ / CUDA sources and headers -------------------------------------
+*.c           text eol=lf
+*.cc          text eol=lf
+*.cpp         text eol=lf
+*.cu          text eol=lf
+*.cuh         text eol=lf
+*.h           text eol=lf
+*.hpp         text eol=lf
+*.inl         text eol=lf
+
+# --- build system / text config ---------------------------------------------
+*.cmake       text eol=lf
+CMakeLists.txt text eol=lf
+*.ini         text eol=lf
+*.json        text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+*.txt         text eol=lf
+*.md          text eol=lf
+
+# --- Visual Studio project files: keep CRLF ---------------------------------
+*.sln             text eol=crlf
+*.vcxproj         text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.vcxproj.user    text eol=crlf
+
+# --- binaries: never let git touch them -------------------------------------
+*.trt      binary
+*.engine   binary
+*.plan     binary
+*.onnx     binary
+*.weights  binary
+*.jpg      binary
+*.jpeg     binary
+*.png      binary
+*.bmp      binary
+*.gif      binary
+*.mp4      binary
+*.avi      binary
+*.mkv      binary
+*.exe      binary
+*.dll      binary
+*.lib      binary
+*.pdb      binary
+*.so       binary
+*.dylib    binary
+*.a        binary
+*.bin      binary
+*.zip      binary
+*.7z       binary
+*.pdf      binary

@@ -1,0 +1,33 @@
+# =============================================================================
+#  EditorConfig -- keeps every editor (VS Code, Visual Studio, CLion, ...)
+#  writing files the same way.
+#
+#  .gitattributes fixes the REPOSITORY side; this file fixes the EDITOR side,
+#  i.e. it stops new files from being born with CRLF or without a final
+#  newline.  Together they are what "one codebase, two platforms" needs.
+# =============================================================================
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Windows-only scripts prefer CRLF
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# Data / config files read better with 2 spaces
+[*.{json,yml,yaml}]
+indent_size = 2
+
+# Makefile really needs tabs
+[{Makefile,**.mk}]
+indent_style = tab
+
+# Markdown: two trailing spaces mean a hard line break, do not strip them
+[*.md]
+trim_trailing_whitespace = false
