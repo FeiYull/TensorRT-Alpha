@@ -92,6 +92,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(OpenCV)
 include(TensorRT)
+include(DeployRuntime)   # 提供 trt_alpha_deploy_runtime(<target>)：把第三方 DLL 拷到 exe 旁
 
 
 # =============================================================================

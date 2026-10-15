@@ -68,6 +68,12 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
 cmake --build build -j
 ```
 
+> **Linux 走 RPATH，不拷贝**：CMake 会把 `-DOpenCV_DIR` / `-DTensorRT_ROOT` 指向的
+> 库目录写进可执行文件的 RPATH，**构建完直接跑即可，不需要设 `LD_LIBRARY_PATH`**
+> ——注意 Linux 加载器并不搜索可执行文件所在目录，"拷 `.so` 到 exe 旁"默认无效，
+> 必须靠 RPATH。RPATH 里同时含 `$ORIGIN`，所以把库和 `trt_alpha` 放同一目录也能跑。
+> 实现见 `cmake/DeployRuntime.cmake`。
+
 **Windows**
 
 ```powershell
@@ -83,6 +89,26 @@ cmake --build build --config Release -j 16
 |---|---|
 | Windows | `build\bin\Release\trt_alpha.exe`（另有各 `sample_*` / `test_*`） |
 | Linux | `build/bin/trt_alpha` |
+
+**运行时 DLL 自动部署（Windows）**
+
+构建时会自动把 OpenCV / TensorRT / CUDA 的运行时 DLL 拷到 exe 同级目录
+（`build\bin\<Config>\`），所以**不需要**把这些库目录加进系统 `PATH`：
+
+| 来源 | 实际拷贝的 DLL |
+|---|---|
+| OpenCV | `opencv_world*.dll`（按配置自动选 Debug 版）+ `opencv_videoio_ffmpeg*.dll` |
+| TensorRT | `<TensorRT_ROOT>/bin` 下的 `nvinfer_10` / `nvinfer_plugin_10` / `nvonnxparser_10` / `nvinfer_dispatch_10` / `nvinfer_lean_10` / `nvinfer_vc_plugin_10` |
+| CUDA | `cudart64_*.dll` |
+
+> exe 同级目录命中 Windows 加载器的**最高优先级**（exe 目录 → 系统目录 → 当前目录 → `PATH`），
+> 高于 `PATH`，所以换 OpenCV / TensorRT 版本时只需改 `-DOpenCV_DIR` / `-DTensorRT_ROOT`
+> 重新构建，不必再动系统环境变量。增量构建走 `copy_if_different`，内容没变不重复写盘。
+>
+> 默认**不**拷 `nvinfer_builder_resource_*.dll`（按 SM 架构各一份、合计约 2.8 GB，
+> 只有从 ONNX 现场构建 engine 时才加载）——需要时加 `-DTRT_ALPHA_DEPLOY_BUILDER=ON`。
+> 同样默认不拷 cuBLAS / cuDNN（当前引擎实测不会加载）——需要时加
+> `-DTRT_ALPHA_DEPLOY_CUDA_MATH=ON`。实现见 `cmake/DeployRuntime.cmake`。
 
 跑单测：`ctest --test-dir build -C Release --output-on-failure`
 

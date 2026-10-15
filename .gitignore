@@ -82,7 +82,6 @@ build/
 *.ps1
 *docs/
 *.log
-*.txt
 *logs/
 *z_demo_dead_key.ini
 *out/
@@ -97,3 +96,7 @@ build/
 # README 首页大图要进仓库：放行 .github/（上面 *github 规则把它整目录忽略了）
 !.github/
 !.github/**
+
+*.git_commit_msg.txt
+
+*common.txt
