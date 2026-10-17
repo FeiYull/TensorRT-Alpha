@@ -33,7 +33,7 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 <summary><b>Roadmap</b></summary>
 
 
-- **TODO**: support for docker
+
 - **TODO**: edge devices such as Nvidia Nano (testing planned)
 - **TODO**: GStreamer support — make OpenCV detachable and replace it with a GStreamer data source
 - **TODO**: `trt_alpha build` — one-command ONNX → engine serialization
@@ -86,7 +86,6 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 <p align="center"><sub>YOLO26n per-frame stage cost　·　1080p / imgsz 640 / batch=2 folded per frame　·　excluding the H2D upload and the postprocess D2H</sub></p>
 
 ## Installation
-
 
 <details open>
 <summary><small>Linux</small></summary>
@@ -181,7 +180,7 @@ yolo export model=yolo26n.pt format=onnx imgsz=640 batch=2 opset=17 simplify=Tru
 trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 ```
 
-More: [Exporting and serializing](docs/export_and_serialize.md)
+More: [Exporting and serializing](docs/export_and_serialize.md)　or　[Serialization parameters per model](docs/serialize_engines.md)
 
 </details>
 
