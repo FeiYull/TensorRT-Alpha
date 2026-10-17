@@ -77,6 +77,21 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 
 </details>
 
+## Bit-exact Accuracy Alignment
+
+<details open>
+<summary><b>example:yolov26</b></summary>
+
+<p align="center">
+  <img src=".github/yolov26_compare_w070.webp" alt="YOLO26 task family: this repository (left) vs PyTorch (right)">
+</p>
+
+<p align="center"><sub>Partial alignment results — bit-exact for <b>every model</b></sub></p>
+
+More: [Disabling rectangular inference when aligning](docs/rect_false.md)
+
+</details>
+
 ## Performance Preview
 
 <p align="center">
@@ -271,21 +286,6 @@ More: [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infe
 | u2net | ✅ | — | — | ✅ |
 
 </div>
-
-</details>
-
-## Bit-exact Accuracy Alignment
-
-<details open>
-<summary><b>example:yolov26</b></summary>
-
-<p align="center">
-  <img src=".github/yolov26-Offical(left)vsOurs(right).jpg" alt="yolov26 official (left) vs ours (right)">
-</p>
-
-<p align="center"><sub>Left: official ultralytics PyTorch inference　·　Right: this repository's TensorRT inference — aligned for <b>every model</b></sub></p>
-
-More: [Disabling rectangular inference when aligning](docs/rect_false.md)
 
 </details>
 

@@ -77,6 +77,21 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 
 </details>
 
+## 严格精度对齐
+
+<details open>
+<summary><b>example:yolov26</b></summary>
+
+<p align="center">
+  <img src=".github/yolov26_compare_w070.webp" alt="YOLO26 task family: this repository (left) vs PyTorch (right)">
+</p>
+
+<p align="center"><sub> 部分对齐效果展示 —— 对齐了<b>所有模型</b>的精度</sub></p>
+
+更多参考：[对齐时，关闭矩形推理](docs/rect_false.md)
+
+</details>
+
 ## 部分性能展示
 
 <p align="center">
@@ -274,21 +289,6 @@ int main(){
 
 </details>
 
-## 严格精度对齐
-
-<details open>
-<summary><b>example:yolov26</b></summary>
-
-<p align="center">
-  <img src=".github/yolov26-Offical(left)vsOurs(right).jpg" alt="yolov26 official (left) vs ours (right)">
-</p>
-
-<p align="center"><sub>左：ultralytics 官方 PyTorch 推理　·　右：本仓库 TensorRT 推理 —— 对齐了<b>所有模型</b>的精度</sub></p>
-
-更多参考：[对齐时，关闭矩形推理](docs/rect_false.md)
-
-</details>
-
 ## 目录结构
 
 <details open>
@@ -316,8 +316,8 @@ scripts/             平台脚本（linux/ = 引擎序列化、参数矩阵测�
 
 ## 其他
 
-### [1.配置文件](docs/config.md)
-### [2.量化](docs/quantization.md)
+#### [1.配置文件](docs/config.md)
+#### [2.量化](docs/quantization.md)
 
 ## Citation
 ```bibtex
