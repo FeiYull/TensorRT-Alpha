@@ -33,11 +33,11 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 <summary><b>近期计划</b></summary>
 
 
-- **TODO**：support for docker
+
 - **TODO**：Nvidia Nano 等多款边缘设备（计划测试中）
 - **TODO**：支持 GStreamer —— 可拆卸 OpenCV，替换为 GStreamer 数据源
 - **TODO**：`trt_alpha build` —— ONNX → engine 一键序列化
-- **TODO**：更细粒度的性能测试 —— 用 **Nsight Systems** 剖析整条流水线的时间线（H2D / 推理 / D2H / 后处理 / 渲染的排布与空泡），用 **Nsight Compute** 逐个 CUDA kernel 剖析（占用率、访存、瓶颈定位）
+- **TODO**：展示更细粒度的性能测试 —— 用 **Nsight Systems** 剖析整条流水线的时间线（H2D / 推理 / D2H / 后处理 / 渲染的排布与空泡），用 **Nsight Compute** 逐个 CUDA kernel 剖析（占用率、访存、瓶颈定位）
 - **TODO**：YOLO11 等更多模型系列
 
 </details>
@@ -77,8 +77,15 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 
 </details>
 
-## 安装依赖
+## 部分性能展示
 
+<p align="center">
+  <img src=".github/stage_compare_linear.png" alt="YOLO26n per-frame stage cost: TensorRT GPU vs ultralytics CPU" width="100%">
+</p>
+
+<p align="center"><sub>YOLO26n 单帧三段耗时　·　1080p / imgsz 640 / batch=2 折算到每帧　·　不含 H2D 上传与后处理 D2H</sub></p>
+
+## 安装依赖
 
 <details open>
 <summary><small>Linux</small></summary>
@@ -90,6 +97,8 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 | [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 |
 | [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
 | CUDA | 12.9 |
+
+具体参考：[Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](docs/install_with_docker.md)
 
 </details>
 
@@ -104,25 +113,22 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 | [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-12.9.zip?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
 | CUDA | 12.9 |
 
+具体参考：[Windows](docs/install_for_windows.md)
+
 </details>
 
 ## 快速开始
 
 <details>
-<summary><b>1. 拉代码</b></summary>
+<summary><b>1. 拉代码与编译</b></summary>
 
 ```bash
 git clone -b v2-dev https://github.com/FeiYull/TensorRT-Alpha.git
 cd TensorRT-Alpha
 ```
 
-</details>
-
 <details>
-<summary><b>2. 编译</b></summary>
-
-<details>
-<summary><small>Windows（PowerShell）</small></summary>
+<summary><small>Windows（PowerShell）下编译</small></summary>
 
 ```powershell
 cmake -S D:\VS2022_Project\TensorRT-Alpha `
@@ -143,7 +149,7 @@ cmake --build build --config Release -j 24
 </details>
 
 <details>
-<summary><small>Ubuntu 24.04</small></summary>
+<summary><small>Ubuntu 24.04环境下编译</small></summary>
 
 ```bash
 cmake -S ~/workspace/TensorRT-Alpha -B ~/workspace/TensorRT-Alpha/build \
@@ -163,111 +169,35 @@ cmake --build build -j24
 </details>
 
 <details>
-<summary><b>3. 导出 ONNX</b></summary>
-
-ONNX 由 [ultralytics](https://github.com/ultralytics/ultralytics) 官方仓库导出，先把仓库拉下来：
+<summary><b>2. 序列化模型</b></summary>
 
 ```bash
-git clone https://github.com/ultralytics/ultralytics
-cd ultralytics
-pip install -e .
+# ONNX：用 ultralytics 官方命令行导出
+pip install ultralytics
+yolo export model=yolo26n.pt format=onnx imgsz=640 batch=2 opset=17 simplify=True
+
+# 序列化：ONNX -> engine
+trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 ```
 
-```python
-from ultralytics import YOLO
-
-# model = YOLO("yolo26n-cls.pt")
-model = YOLO("yolo26n-obb.pt")
-# model = YOLO("yolo26n-pose.pt")
-# model = YOLO("yolo26n-seg.pt")
-# model = YOLO("yolo26n-depth.pt")
-
-model.export(
-    format="onnx",
-    batch=2,
-    imgsz=640,
-    dynamic=False,
-    simplify=True,
-    opset=17,
-    nms=None,
-)
-```
-
-> 注：各任务的 ONNX **按模型原生分辨率导出**（det / pose / seg = 640，depth = 768，obb / sem = 1024，cls = 224），与仓库 `engines/` 里现成的引擎一致；换分辨率要用同尺寸重建引擎。
-
-</details>
-
-<details>
-<summary><b>4. 用 trtexec 编译模型</b></summary>
-
-```bash
-# FP32：本仓库用于验证精度的指令（关掉 TF32，避免 fp32 精度漂移）
-trtexec --onnx=sample.onnx --saveEngine=sample.trt --noTF32
-
-# FP16：必须显式加 --fp16，否则 TensorRT 会按 FP32 计算
-trtexec --onnx=yolo26n_fp16.onnx --saveEngine=yolov26n_fp16.trt --fp16
-
-# INT8：用 Python 端 PTQ 导出的 Q/DQ 量化 ONNX，再配 --int8
-trtexec --onnx=yolo26n_int8.onnx --saveEngine=yolov26n_int8.trt --int8
-
-# 让 TensorRT 自行挑最优精度组合
-trtexec --onnx=sample.onnx --saveEngine=sample.trt --best
-```
-
-> 注：`--noTF32` **只在 FP32 引擎上用于精度对齐**；FP16 / INT8 引擎别加（那是关掉 TF32 张量核的开关，对已量化的图只会白白牺牲速度）。`--fp16` 与 `--int8` 也**不要同时给**，TensorRT 10.16 对 weakly-typed 量化网络会直接 build 失败。
-
-</details>
-
-<details>
-<summary><b>5. CLI 执行</b></summary>
-
-```bash
-BIN=./build/bin/Release/trt_alpha          # Windows：.\build\bin\Release\trt_alpha.exe
-
-# 列出所有已注册模型
-$BIN list
-
-# ---------- YOLO26 全任务族 ----------
-# 目标检测（默认读 configs/yolov26.ini -> engines/yolov26n.trt）
-$BIN run --net yolov26       --source data/bus.jpg    --show
-# 实例分割
-$BIN run --net yolov26_seg   --source data/bus.jpg    --save
-# 姿态估计
-$BIN run --net yolov26_pose  --source data/zidane.jpg --show
-# 旋转框检测（DOTA）
-$BIN run --net yolov26_obb   --source data/boats.mp4  --save
-# 图像分类
-$BIN run --net yolov26_cls   --source data/dog.jpg    --show
-# 深度估计
-$BIN run --net yolov26_depth --source data/road0.jpg  --save
-# 语义分割
-$BIN run --net yolov26_sem   --source data/road1.jpg  --save
-$BIN run --net yolov26_sem   --source data/road1.jpg  --save MY_SAVE_PATH
-
-# ---------- 输入源自动判别 ----------
-$BIN run --net yolov26 --source data/                            # 图片目录（每张独立推理）
-$BIN run --net yolov26 --source data/people.mp4 --show           # 本地视频
-$BIN run --net yolov26 --source 0 --show                         # 摄像头 0
-$BIN run --net yolov26 --source rtsp://192.168.1.10:554/stream1  # RTSP / RTMP / HTTP(S) / UDP
-
-# ---------- 换引擎 / 调 batch / 多 worker ----------
-$BIN run --net yolov26 --source data/ --engine engines/yolov26n_fp16.trt --save
-$BIN run --net yolov26 --source data/ --engine engines/yolov26n_int8.trt --save
-$BIN run --net yolov26 --source data/ --batch 2 --workers 4 --save   # yolov26 引擎静态 batch=2
-
-# ---------- 性能测量 ----------
-$BIN bench --net yolov26 --iters 100 --warmup 10
-$BIN bench --engine engines/yolov26n_fp16.trt --batch 2 --iters 200 --warmup 20
-```
-
-> 注：`--source data/` 表示传进去一个路径，默认只读取图片，不管模型支持 batch 为多少，实际推理的时候自动退化为 batch=1。
+更多参考：[导出与序列化](docs/export_and_serialize.md)
 
 </details>
 
 <details open>
-<summary><b>6. 快速使用源码</b></summary>
+<summary><b>3. 执行</b></summary>
 
-更多和具体使用参考：[`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infer.cpp)
+```bash
+./trt_alpha run --net yolov26 --source data/bus.jpg --show
+./trt_alpha run --net yolov26 --source data/xxx.mp4 --save
+./trt_alpha run --net yolov26 --source rtsp:xxxxx --engine yolov26.trt --save output/det/
+# 加载量化模型
+./trt_alpha run --net yolov26 --source data/xxx.mp4 --engine yolov26_fp16.trt
+```
+
+更多参考：[CLI 完整用法](docs/cli.md)
+
+源码里直接调用：
 
 ```cpp
 #include "trt_alpha/infer/infer.hpp"
@@ -285,6 +215,8 @@ int main(){
     return 1;
 }
 ```
+
+更多参考：[`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infer.cpp)
 
 </details>
 
@@ -353,90 +285,7 @@ int main(){
 
 <p align="center"><sub>左：ultralytics 官方 PyTorch 推理　·　右：本仓库 TensorRT 推理 —— 对齐了<b>所有模型</b>的精度</sub></p>
 
-<details>
-<summary><small>注：为什么要关闭矩形推理（rect=False）</small></summary>
-
-在使用仓库代码部署模型的时候，兼顾高效和精度，yolov26 等模型都关闭了**矩形推理**：
-
-```python
-from ultralytics import YOLO
-
-# model = YOLO("yolo26n-cls.pt")
-model = YOLO("yolo26n-obb.pt")
-# model = YOLO("yolo26n-pose.pt")
-# model = YOLO("yolo26n-seg.pt")
-# model = YOLO("yolo26n-depth.pt")
-
-results = model(
-    r"Data/boats.jpg",
-    rect=False,     # close rectangle inference!
-    save=True,
-    project="./save",
-    name="output",
-    exist_ok=True,
-)
-```
-
-静态引擎走**正方形 letterbox**，与 `rect=False` 完全一致；开着矩形推理去对拍，坐标会整体偏移。
-
-</details>
-
-</details>
-
-## 配置文件
-
-<details>
-<summary><b>ini格式的配置文件说明</b></summary>
-
-配置分两级，**优先级从高到低**：
-
-```
-调用 API / 命令行参数   >   configs/<model>.ini   >   configs/base.ini
-```
-
-- **`configs/base.ini`**：所有模型共享的默认值（归一化参数、后处理阈值、线程池、输出目录等）。
-- **`configs/<model>.ini`**：单个模型的覆盖项（引擎路径、类别文件、batch、该模型特有的阈值）。
-- **调用 API / 命令行参数**：**最高优先级**，运行期直接覆盖上面两层。例如 `--engine` 覆盖 INI 里的 `engine=`、`--batch` 覆盖 `batch_size`、`--workers` 覆盖 `[pool].workers`、`--config` 换掉整个模型 INI；高层 `InferParams` 里的字段同理。
-
-
-
-`configs/yolov26.ini` ：
-
-```ini
-[model]
-engine = engines/yolov26n.trt
-class_names_file = data/classes/coco80.txt
-input_output_names = images,output0
-num_class = 80
-# extra: 每 anchor 的额外通道（seg = 32 / pose = 51）。det 用 0。
-# extra = 0
-
-[input]
-batch_size = 2
-
-[postprocess]
-conf_thresh = 0.25
-iou_thresh = 0.7
-top_k = 300
-```
-
-</details>
-
-## 性能
-
-<details open>
-<summary><b>展开查看性能数据</b></summary>
-
-YOLO26n，batch = 2，Ubuntu 24.04 + RTX 5060 Ti，trtexec `--loadEngine` 200 次迭代（100 次平均）：
-
-**yolo26-det（640×640）精度对比**
-
-| 引擎 | 序列化参数 | GPU 延迟 | 吞吐 | 体积 |
-|---|---|---|---|---|
-| `yolov26n.trt`（FP32） | `--noTF32` | 2.401 ms | 302.4 qps | 13.03 MB |
-| **`yolov26n_fp16.trt`（FP16）** | **`--fp16`** | **1.708 ms** | **383.4 qps** | 8.20 MB  |
-
-
+更多参考：[对齐时，关闭矩形推理](docs/rect_false.md)
 
 </details>
 
@@ -464,6 +313,11 @@ scripts/             平台脚本（linux/ = 引擎序列化、参数矩阵测�
 ```
 
 </details>
+
+## 其他
+
+### [1.配置文件](docs/config.md)
+### [2.量化](docs/quantization.md)
 
 ## Citation
 ```bibtex

@@ -481,7 +481,17 @@ Stream Infer::async()
         }
         pcfg.saveDir = core::Paths::resolveSaveDir(
             saveDir, registry_name(m_impl->params.model_type));
-        if (!m_impl->params.show_window.empty()) pcfg.showWindow = m_impl->params.show_window;
+        // 窗口名：params.show_window > ini output.show_window > "trt_alpha:<net>"。
+        // 默认带注册名，和 run 命令保持同一口径（多模型同开时窗口不互相覆盖）。
+        const std::string iniWindow =
+            m_impl->pool->modelConfig().getString("output.show_window", "");
+        if (!m_impl->params.show_window.empty()) {
+            pcfg.showWindow = m_impl->params.show_window;
+        } else if (!iniWindow.empty()) {
+            pcfg.showWindow = iniWindow;
+        } else {
+            pcfg.showWindow = std::string("trt_alpha:") + registry_name(m_impl->params.model_type);
+        }
 
         // 登记输入源：save() 据此拒绝覆盖原图（输出 == 输入的最后一道闸门）
         if (m_impl->params.save.enabled && !core::Paths::isUrl(m_impl->params.source)) {

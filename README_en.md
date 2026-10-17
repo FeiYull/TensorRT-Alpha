@@ -77,6 +77,14 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 
 </details>
 
+## Performance Preview
+
+<p align="center">
+  <img src=".github/stage_compare_linear.png" alt="YOLO26n per-frame stage cost: TensorRT GPU vs ultralytics CPU" width="100%">
+</p>
+
+<p align="center"><sub>YOLO26n per-frame stage cost　·　1080p / imgsz 640 / batch=2 folded per frame　·　excluding the H2D upload and the postprocess D2H</sub></p>
+
 ## Installation
 
 
@@ -91,6 +99,8 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 | [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
 | CUDA | 12.9 |
 
+Detailed steps: [Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](docs/install_with_docker.md)
+
 </details>
 
 <details open>
@@ -104,25 +114,22 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 | [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-12.9.zip?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
 | CUDA | 12.9 |
 
+Detailed steps: [Windows](docs/install_for_windows.md)
+
 </details>
 
 ## Quick Start
 
 <details>
-<summary><b>1. Clone</b></summary>
+<summary><b>1. Clone and build</b></summary>
 
 ```bash
 git clone -b v2-dev https://github.com/FeiYull/TensorRT-Alpha.git
 cd TensorRT-Alpha
 ```
 
-</details>
-
 <details>
-<summary><b>2. Build</b></summary>
-
-<details>
-<summary><small>Windows (PowerShell)</small></summary>
+<summary><small>Build on Windows (PowerShell)</small></summary>
 
 ```powershell
 cmake -S D:\VS2022_Project\TensorRT-Alpha `
@@ -143,7 +150,7 @@ cmake --build build --config Release -j 24
 </details>
 
 <details>
-<summary><small>Ubuntu 24.04</small></summary>
+<summary><small>Build on Ubuntu 24.04</small></summary>
 
 ```bash
 cmake -S ~/workspace/TensorRT-Alpha -B ~/workspace/TensorRT-Alpha/build \
@@ -163,111 +170,35 @@ Output: `build/bin/Release/trt_alpha`. For a Debug build, reconfigure with `-DCM
 </details>
 
 <details>
-<summary><b>3. Export ONNX</b></summary>
-
-The ONNX files are exported by the official [ultralytics](https://github.com/ultralytics/ultralytics) repository — clone it first:
+<summary><b>2. Serialize the model</b></summary>
 
 ```bash
-git clone https://github.com/ultralytics/ultralytics
-cd ultralytics
-pip install -e .
+# ONNX: exported with the official ultralytics CLI
+pip install ultralytics
+yolo export model=yolo26n.pt format=onnx imgsz=640 batch=2 opset=17 simplify=True
+
+# serialization: ONNX -> engine
+trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 ```
 
-```python
-from ultralytics import YOLO
-
-# model = YOLO("yolo26n-cls.pt")
-model = YOLO("yolo26n-obb.pt")
-# model = YOLO("yolo26n-pose.pt")
-# model = YOLO("yolo26n-seg.pt")
-# model = YOLO("yolo26n-depth.pt")
-
-model.export(
-    format="onnx",
-    batch=2,
-    imgsz=640,
-    dynamic=False,
-    simplify=True,
-    opset=17,
-    nms=None,
-)
-```
-
-> Note: each task's ONNX is exported at the model's **native resolution** (det / pose / seg = 640, depth = 768, obb / sem = 1024, cls = 224), matching the ready-made engines under `engines/`; if you change the resolution you have to rebuild the engine at the same size.
-
-</details>
-
-<details>
-<summary><b>4. Build the engine with trtexec</b></summary>
-
-```bash
-# FP32: the command used in this repository for accuracy validation (TF32 off, to avoid fp32 drift)
-trtexec --onnx=sample.onnx --saveEngine=sample.trt --noTF32
-
-# FP16: --fp16 is mandatory, otherwise TensorRT computes in FP32
-trtexec --onnx=yolo26n_fp16.onnx --saveEngine=yolov26n_fp16.trt --fp16
-
-# INT8: use the Q/DQ quantized ONNX produced by the Python-side PTQ, plus --int8
-trtexec --onnx=yolo26n_int8.onnx --saveEngine=yolov26n_int8.trt --int8
-
-# let TensorRT pick the best precision combination on its own
-trtexec --onnx=sample.onnx --saveEngine=sample.trt --best
-```
-
-> Note: `--noTF32` is **only for FP32 engines** (accuracy alignment); never add it to FP16 / INT8 engines — it turns off the TF32 tensor cores and, on an already-quantized graph, only costs you speed. Also **do not pass `--fp16` and `--int8` together**: TensorRT 10.16 fails the build outright on weakly-typed quantized networks.
-
-</details>
-
-<details>
-<summary><b>5. Run the CLI</b></summary>
-
-```bash
-BIN=./build/bin/Release/trt_alpha          # Windows: .\build\bin\Release\trt_alpha.exe
-
-# list every registered model
-$BIN list
-
-# ---------- the whole YOLO26 task family ----------
-# object detection (reads configs/yolov26.ini -> engines/yolov26n.trt by default)
-$BIN run --net yolov26       --source data/bus.jpg    --show
-# instance segmentation
-$BIN run --net yolov26_seg   --source data/bus.jpg    --save
-# pose estimation
-$BIN run --net yolov26_pose  --source data/zidane.jpg --show
-# oriented bounding boxes (DOTA)
-$BIN run --net yolov26_obb   --source data/boats.mp4  --save
-# image classification
-$BIN run --net yolov26_cls   --source data/dog.jpg    --show
-# depth estimation
-$BIN run --net yolov26_depth --source data/road0.jpg  --save
-# semantic segmentation
-$BIN run --net yolov26_sem   --source data/road1.jpg  --save
-$BIN run --net yolov26_sem   --source data/road1.jpg  --save MY_SAVE_PATH
-
-# ---------- automatic source detection ----------
-$BIN run --net yolov26 --source data/                            # image directory (each image inferred on its own)
-$BIN run --net yolov26 --source data/people.mp4 --show           # local video
-$BIN run --net yolov26 --source 0 --show                         # webcam 0
-$BIN run --net yolov26 --source rtsp://192.168.1.10:554/stream1  # RTSP / RTMP / HTTP(S) / UDP
-
-# ---------- swap engine / tune batch / more workers ----------
-$BIN run --net yolov26 --source data/ --engine engines/yolov26n_fp16.trt --save
-$BIN run --net yolov26 --source data/ --engine engines/yolov26n_int8.trt --save
-$BIN run --net yolov26 --source data/ --batch 2 --workers 4 --save   # the yolov26 engine has a static batch of 2
-
-# ---------- benchmarking ----------
-$BIN bench --net yolov26 --iters 100 --warmup 10
-$BIN bench --engine engines/yolov26n_fp16.trt --batch 2 --iters 200 --warmup 20
-```
-
-> Note: `--source data/` passes in a path; only images are read by default, and regardless of the model's batch size the actual inference degrades to batch = 1.
+More: [Exporting and serializing](docs/export_and_serialize.md)
 
 </details>
 
 <details open>
-<summary><b>6. Use it from C++ source</b></summary>
+<summary><b>3. Run</b></summary>
 
-For more details and real usage, see [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infer.cpp)
+```bash
+./trt_alpha run --net yolov26 --source data/bus.jpg --show
+./trt_alpha run --net yolov26 --source data/xxx.mp4 --save
+./trt_alpha run --net yolov26 --source rtsp:xxxxx --engine yolov26.trt --save output/det/
+# load a quantized engine
+./trt_alpha run --net yolov26 --source data/xxx.mp4 --engine yolov26_fp16.trt
+```
+
+More: [Full CLI reference](docs/cli.md)
+
+Called directly from C++:
 
 ```cpp
 #include "trt_alpha/infer/infer.hpp"
@@ -285,6 +216,8 @@ int main(){
     return 1;
 }
 ```
+
+More: [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infer.cpp)
 
 </details>
 
@@ -353,88 +286,7 @@ int main(){
 
 <p align="center"><sub>Left: official ultralytics PyTorch inference　·　Right: this repository's TensorRT inference — aligned for <b>every model</b></sub></p>
 
-<details>
-<summary><small>Note: why rectangle inference is disabled (rect=False)</small></summary>
-
-When deploying a model with this repository's code, both efficiency and accuracy matter, so yolov26 and the other models all run with **rectangle inference disabled**:
-
-```python
-from ultralytics import YOLO
-
-# model = YOLO("yolo26n-cls.pt")
-model = YOLO("yolo26n-obb.pt")
-# model = YOLO("yolo26n-pose.pt")
-# model = YOLO("yolo26n-seg.pt")
-# model = YOLO("yolo26n-depth.pt")
-
-results = model(
-    r"Data/boats.jpg",
-    rect=False,     # close rectangle inference!
-    save=True,
-    project="./save",
-    name="output",
-    exist_ok=True,
-)
-```
-
-A static engine uses **square letterboxing**, which matches `rect=False` exactly; comparing against rectangle inference shifts every coordinate.
-
-</details>
-
-</details>
-
-## Configuration
-
-<details>
-<summary><b>ini configuration file reference</b></summary>
-
-Configuration has two levels, in **descending priority**:
-
-```
-API / command line arguments   >   configs/<model>.ini   >   configs/base.ini
-```
-
-- **`configs/base.ini`**: defaults shared by every model (normalization parameters, postprocess thresholds, thread pool, output directory, ...).
-- **`configs/<model>.ini`**: per-model overrides (engine path, class file, batch, thresholds specific to that model).
-- **API / command line arguments**: **highest priority** — they override both layers above at runtime. For example `--engine` overrides `engine=` in the ini, `--batch` overrides `batch_size`, `--workers` overrides `[pool].workers`, `--config` swaps the whole model ini; the same applies to fields in the high-level `InferParams`.
-
-
-
-`configs/yolov26.ini`:
-
-```ini
-[model]
-engine = engines/yolov26n.trt
-class_names_file = data/classes/coco80.txt
-input_output_names = images,output0
-num_class = 80
-# extra: extra channels per anchor (seg = 32 / pose = 51). det uses 0.
-# extra = 0
-
-[input]
-batch_size = 2
-
-[postprocess]
-conf_thresh = 0.25
-iou_thresh = 0.7
-top_k = 300
-```
-
-</details>
-
-## Performance
-
-<details open>
-<summary><b>Show benchmark results</b></summary>
-
-YOLO26n, batch = 2, Ubuntu 24.04 + RTX 5060 Ti, trtexec `--loadEngine` with 200 iterations (averaged over 100):
-
-**yolo26-det (640×640), precisions compared**
-
-| Engine | Serialization flags | GPU latency | Throughput | Size |
-|---|---|---|---|---|
-| `yolov26n.trt` (FP32) | `--noTF32` | 2.401 ms | 302.4 qps | 13.03 MB |
-| **`yolov26n_fp16.trt` (FP16)** | **`--fp16`** | **1.708 ms** | **383.4 qps** | 8.20 MB |
+More: [Disabling rectangular inference when aligning](docs/rect_false.md)
 
 </details>
 
@@ -462,6 +314,11 @@ scripts/             platform scripts (linux/ = engine serialization, parameter-
 ```
 
 </details>
+
+## Other
+
+### [1. Configuration](docs/config.md)
+### [2. Quantization](docs/quantization.md)
 
 ## Citation
 ```bibtex

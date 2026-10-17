@@ -4,6 +4,7 @@
 #include "trt_alpha/core/buffer.hpp"
 
 #include "trt_alpha/core/logger.hpp"
+#include "trt_alpha/core/memory_pool.hpp"
 
 #include <cuda_runtime.h>
 
@@ -45,7 +46,8 @@ void checkCudaMalloc(cudaError_t err, std::size_t bytes)
 }  // namespace
 
 Buffer::Buffer(std::uint8_t* data, int width, int height, int channels,
-               int stride, DataType dtype, MemorySpace space) noexcept
+               int stride, DataType dtype, MemorySpace space,
+               std::weak_ptr<MemoryPool> pool, std::size_t capacity) noexcept
     : m_data(data)
     , m_width(width)
     , m_height(height)
@@ -53,6 +55,8 @@ Buffer::Buffer(std::uint8_t* data, int width, int height, int channels,
     , m_stride(stride)
     , m_dtype(dtype)
     , m_space(space)
+    , m_pool(std::move(pool))
+    , m_capacity(capacity)
 {
 }
 
@@ -71,8 +75,15 @@ void Buffer::release() noexcept
     {
         cudaFree(m_data);
     }
+    else if (std::shared_ptr<MemoryPool> pool = m_pool.lock())
+    {
+        // 必须把 allocate() 返回的 Block 原样交回（release 靠 capacity 记账，
+        // 并靠 outstanding 注册表查重复归还）。
+        pool->release(MemoryPool::Kind::Host, MemoryPool::Block{m_data, m_capacity});
+    }
     else
     {
+        // 池已销毁（进程退出路径）：直接释放，保证无泄漏
         delete[] m_data;
     }
     m_data = nullptr;
@@ -86,21 +97,19 @@ std::shared_ptr<Buffer> Buffer::createHost(int width, int height, int channels,
     const std::size_t bytes = static_cast<std::size_t>(stride) *
                               static_cast<std::size_t>(height);
 
-    std::uint8_t* data = new (std::nothrow) std::uint8_t[bytes];
-    if (data == nullptr)
-    {
-        TRT_LOG_ERROR("Buffer::createHost: allocation failed for " << bytes
-                      << " bytes (Host)");
-        throw std::runtime_error("Buffer::createHost: allocation failed for " +
-                                 std::to_string(bytes) + " bytes");
-    }
+    // 走池：Windows 上 >512KB 的 new[]/delete[] 直落 VirtualAlloc/VirtualFree，
+    // 页会被丢弃，下一批 memcpy 又要全额缺页（实测 12MB 块约 2ms）。复用则页常驻。
+    // allocate() 失败会抛异常（不再需要调用方自己判空）。
+    const std::shared_ptr<MemoryPool>& pool = MemoryPool::instance();
+    const MemoryPool::Block block = pool->allocate(MemoryPool::Kind::Host, bytes);
 
     TRT_LOG_DEBUG("Buffer: createHost " << width << "x" << height
                   << "x" << channels << " " << nameOf(dtype)
-                  << " (" << bytes << " bytes)");
+                  << " (" << bytes << " bytes, cap=" << block.capacity << ")");
 
     return std::shared_ptr<Buffer>(
-        new Buffer(data, width, height, channels, stride, dtype, MemorySpace::Host));
+        new Buffer(static_cast<std::uint8_t*>(block.ptr), width, height, channels,
+                   stride, dtype, MemorySpace::Host, pool, block.capacity));
 }
 
 std::shared_ptr<Buffer> Buffer::createDevice(int width, int height, int channels,
@@ -120,7 +129,7 @@ std::shared_ptr<Buffer> Buffer::createDevice(int width, int height, int channels
 
     return std::shared_ptr<Buffer>(
         new Buffer(static_cast<std::uint8_t*>(ptr), width, height, channels, stride,
-                   dtype, MemorySpace::Device));
+                   dtype, MemorySpace::Device, {}, 0));
 }
 
 std::shared_ptr<Buffer> Buffer::fromHostData(const std::uint8_t* srcData,
@@ -147,14 +156,9 @@ std::shared_ptr<Buffer> Buffer::fromHostData(const std::uint8_t* srcData,
     const std::size_t dstBytes = static_cast<std::size_t>(dstStride) *
                                  static_cast<std::size_t>(height);
 
-    std::uint8_t* data = new (std::nothrow) std::uint8_t[dstBytes];
-    if (data == nullptr)
-    {
-        TRT_LOG_ERROR("Buffer::fromHostData: allocation failed for " << dstBytes
-                      << " bytes");
-        throw std::runtime_error("Buffer::fromHostData: allocation failed for " +
-                                 std::to_string(dstBytes) + " bytes");
-    }
+    const std::shared_ptr<MemoryPool>& pool = MemoryPool::instance();
+    const MemoryPool::Block block = pool->allocate(MemoryPool::Kind::Host, dstBytes);
+    std::uint8_t* data = static_cast<std::uint8_t*>(block.ptr);
 
     for (int y = 0; y < height; ++y)
     {
@@ -168,7 +172,8 @@ std::shared_ptr<Buffer> Buffer::fromHostData(const std::uint8_t* srcData,
                   << " (srcStride=" << srcStride << ", dstStride=" << dstStride << ")");
 
     return std::shared_ptr<Buffer>(
-        new Buffer(data, width, height, channels, dstStride, dtype, MemorySpace::Host));
+        new Buffer(data, width, height, channels, dstStride, dtype,
+                   MemorySpace::Host, pool, block.capacity));
 }
 
 BufferView Buffer::view() const noexcept

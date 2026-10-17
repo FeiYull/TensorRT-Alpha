@@ -184,7 +184,7 @@ int runCommand(const std::vector<std::string>& args)
     const int qTask   = modelCfg.getInt("pool.max_queue_size", 16);
     const int qResult = modelCfg.getInt("pool.result_queue_size", 32);
 
-    // 渲染线程数：0 / 不写 = auto（Pipeline 在"只落盘"时按 CPU 核数取 1~4，
+    // 渲染线程数：0 / 不写 = auto（Pipeline 在"只落盘"时按 CPU 核数取 1~8，
     // --show / exposeProcessed 一律强制 1）。负数由 Pipeline 兜底改回 auto。
     const int rThreads = modelCfg.getInt("pool.render_threads", 0);
 
@@ -210,8 +210,10 @@ int runCommand(const std::vector<std::string>& args)
     }
     modelCfg.markRead("output.save_dir");   // 框里显示最终生效目录，来源如实标注
 
-    // 窗口名只有 --show 时才真正用到，但读一下即可见
-    const std::string showWindow = modelCfg.getString("output.show_window", "trt_alpha");
+    // 窗口名只有 --show 时才真正用到。默认带注册名 —— 同时开两个模型时窗口
+    // 不会互相顶掉（imshow 会复用同名窗口）。ini 显式写了就原样使用。
+    const std::string showWindow =
+        modelCfg.getString("output.show_window", "trt_alpha:" + opt.net);
 
     // 渲染选项：按模型（<model>.ini 的 [render] 节），不放 base —— pose 的
     // 关键点阈值、seg 的掩码透明度，不同任务默认值不同。在 pool 构造前读，
@@ -222,6 +224,10 @@ int runCommand(const std::vector<std::string>& args)
         modelCfg.getFloat("render.kpt_conf_thresh", renderOptions.kptConfThresh);
     renderOptions.maskAlpha =
         modelCfg.getFloat("render.mask_alpha", renderOptions.maskAlpha);
+
+    // JPEG 质量（只影响 --save 落盘）：1..100，默认 95 = OpenCV 默认值。
+    // 必须在这里就读 —— 配置框在本函数稍后才打印，晚读会被误标成 [unused]。
+    const int jpegQuality = modelCfg.getInt("output.jpeg_quality", 95);
 
     // 推理池
     trt_alpha::core::InferencePool pool(
@@ -319,6 +325,10 @@ int runCommand(const std::vector<std::string>& args)
     {
         renderer.addInputSource(trt_alpha::core::Paths::resolve(srcCfg.path).string());
     }
+
+    // JPEG 质量（只影响 --save 落盘）：1..100，默认 95 = OpenCV 默认值。
+    // 读取在函数前半段（见 jpegQuality），保证配置框不会把该键误标 [unused]。
+    renderer.setJpegQuality(jpegQuality);
 
     // 队列满时策略：ini 的 pool.queue_full_policy 显式指定 > 按源类型自动。
     //   实时源（摄像头 / RTSP / HTTP 流）→ drop_oldest：宁可丢旧帧，也不让延迟累积

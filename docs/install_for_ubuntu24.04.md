@@ -58,6 +58,8 @@ cmake --install opencv-4.8.1-build          # no sudo
 
 Result: `/home/feiyull/thirdparty/opencv4.8.1/{bin,include,lib,share}`
 
+Three similar names, do not mix them up: `opencv-4.8.1/` is the extracted source, `opencv-4.8.1-build/` is the build tree, and `opencv4.8.1/` (no hyphen) is the install prefix. Step 3 passes `-DOpenCV_DIR=<prefix>/lib/cmake/opencv4`, because `OpenCVConfig.cmake` is installed there, not at the prefix root.
+
 ## 3. Build the repository
 
 ```bash

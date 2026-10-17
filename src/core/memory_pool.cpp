@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <new>
 #include <stdexcept>
 #include <string>
 
@@ -23,6 +24,22 @@ void checkCuda(cudaError_t err, const char* op, std::size_t bytes)
                                 cudaGetErrorString(err);
         TRT_LOG_ERROR(msg);
         throw std::runtime_error(msg);
+    }
+}
+
+//! Really free one block. Always called outside the lock (cudaFree and the host
+//! deallocator are both heavyweight).
+void freeBlock(MemoryPool::Kind kind, void* ptr) noexcept
+{
+    if (ptr == nullptr)
+    {
+        return;
+    }
+    switch (kind)
+    {
+    case MemoryPool::Kind::Device:     cudaFree(ptr);        break;
+    case MemoryPool::Kind::PinnedHost: cudaFreeHost(ptr);    break;
+    case MemoryPool::Kind::Host:       ::operator delete[](ptr); break;
     }
 }
 
@@ -46,15 +63,17 @@ const std::shared_ptr<MemoryPool>& MemoryPool::instance()
 }
 
 MemoryPool::MemoryPool(std::size_t deviceCacheLimitBytes,
-                       std::size_t pinnedCacheLimitBytes)
+                       std::size_t pinnedCacheLimitBytes,
+                       std::size_t hostCacheLimitBytes)
 {
     state(Kind::Device).cacheLimit = deviceCacheLimitBytes;
     state(Kind::PinnedHost).cacheLimit = pinnedCacheLimitBytes;
+    state(Kind::Host).cacheLimit = hostCacheLimitBytes;
 }
 
 MemoryPool::~MemoryPool()
 {
-    for (int k = 0; k < 2; ++k)
+    for (int k = 0; k < 3; ++k)
     {
         KindState& st = m_state[k];
         std::lock_guard<std::mutex> lock(st.mutex);
@@ -62,14 +81,7 @@ MemoryPool::~MemoryPool()
         {
             for (void* ptr : entry.second)
             {
-                if (k == static_cast<int>(Kind::Device))
-                {
-                    cudaFree(ptr);
-                }
-                else
-                {
-                    cudaFreeHost(ptr);
-                }
+                freeBlock(static_cast<Kind>(k), ptr);
             }
         }
         st.freeBlocks.clear();
@@ -118,15 +130,26 @@ MemoryPool::Block MemoryPool::allocate(Kind kind, std::size_t bytes)
         }
     }
 
-    // ---- 2) 未命中：锁外做重量级 CUDA 分配（不阻塞其它线程命中）----
+    // ---- 2) 未命中：锁外做重量级分配（不阻塞其它线程命中）----
     void* ptr = nullptr;
-    if (kind == Kind::Device)
+    switch (kind)
     {
+    case Kind::Device:
         checkCuda(cudaMalloc(&ptr, capacity), "cudaMalloc", capacity);
-    }
-    else
-    {
+        break;
+    case Kind::PinnedHost:
         checkCuda(cudaMallocHost(&ptr, capacity), "cudaMallocHost", capacity);
+        break;
+    case Kind::Host:
+        ptr = ::operator new[](capacity, std::nothrow);
+        if (ptr == nullptr)
+        {
+            const std::string msg = "MemoryPool[host]: allocation failed for " +
+                                    std::to_string(capacity) + " bytes";
+            TRT_LOG_ERROR(msg);
+            throw std::runtime_error(msg);
+        }
+        break;
     }
 
     // ---- 3) 锁内记账 ----
@@ -176,14 +199,7 @@ void MemoryPool::release(Kind kind, Block block) noexcept
     }
     if (realFree)
     {
-        if (kind == Kind::Device)
-        {
-            cudaFree(block.ptr);
-        }
-        else
-        {
-            cudaFreeHost(block.ptr);
-        }
+        freeBlock(kind, block.ptr);
         TRT_LOG_DEBUG("MemoryPool[" << kindName(kind)
                       << "]: release " << block.capacity
                       << " bytes -> real free (cache limit reached)");
@@ -211,17 +227,10 @@ void MemoryPool::releaseUnused(Kind kind)
         st.freeBlocks.clear();
         st.stats.cachedBytes = 0;
     }
-    // 真释放放锁外：避免持锁执行重量级 CUDA 调用
+    // 真释放放锁外：避免持锁执行重量级调用
     for (void* ptr : toFree)
     {
-        if (kind == Kind::Device)
-        {
-            cudaFree(ptr);
-        }
-        else
-        {
-            cudaFreeHost(ptr);
-        }
+        freeBlock(kind, ptr);
     }
     TRT_LOG_INFO("MemoryPool[" << kindName(kind) << "]: releaseUnused freed "
                 << toFree.size() << " block(s)");
@@ -243,7 +252,13 @@ void MemoryPool::setCacheLimit(Kind kind, std::size_t bytes)
 
 const char* MemoryPool::kindName(Kind kind) noexcept
 {
-    return kind == Kind::Device ? "device" : "pinned-host";
+    switch (kind)
+    {
+    case Kind::Device:     return "device";
+    case Kind::PinnedHost: return "pinned-host";
+    case Kind::Host:       return "host";
+    }
+    return "unknown";
 }
 
 }  // namespace trt_alpha::core

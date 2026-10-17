@@ -39,6 +39,12 @@ public:
 
     [[nodiscard]] bool protectsInputs() const noexcept { return !m_inputPaths.empty(); }
 
+    //! JPEG quality used by save() -- 1..100, 95 == OpenCV's own default.
+    //! Out-of-range values are clamped (and reported), never silently applied.
+    //! Must be called before start(): save() only reads it, so save stays const
+    //! and the several render threads need no extra locking.
+    void setJpegQuality(int quality);
+
     void drawResult(core::BatchResult& result,
                     const std::vector<core::ClassInfo>& classNames,
                     const RenderOptions& options) const override;
@@ -52,6 +58,10 @@ public:
 private:
     //! The set of normalised input file paths (see pathKey in the cpp).
     std::unordered_set<std::string> m_inputPaths;
+
+    //! JPEG quality for save() (see setJpegQuality). Written once before start(),
+    //! only read afterwards -- hence no locking around the const save().
+    int m_jpegQuality = 95;
 
     //! Output directory cache. save() is called once per frame and is const, so
     //! the expensive part (create_directories + weakly_canonical) cannot be done

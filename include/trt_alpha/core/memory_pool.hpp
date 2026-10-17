@@ -6,6 +6,11 @@
 //  Problems it solves:
 //    * cudaMalloc / cudaFree / cudaMallocHost are heavyweight calls (tens of us
 //      and up); allocating frequently drags down high-throughput scenarios
+//    * plain host memory: on Windows every malloc/free of a multi-megabyte block
+//      goes straight through VirtualAlloc/VirtualFree, so the pages are discarded
+//      and the next fill pays every page fault again (measured ~2 ms for a 12 MB
+//      block). Recycling keeps the pages resident, which is what the pageable
+//      Host kind below is for
 //    * repeated allocate-free cycles caused by multiple model instances /
 //      dynamic batches / changing video-stream sizes lead to fragmentation
 //
@@ -22,9 +27,9 @@
 //    * Lifetime: instance() returns a shared_ptr and RAII containers hold a
 //      weak_ptr; if the pool is destroyed first at process exit, containers
 //      degrade to a direct cudaFree, so there is no use-after-free
-//    * Cache limits: device / pinned each have a byte ceiling (512 MiB / 256 MiB
-//      by default); returns beyond it are truly freed, so the pool cannot grow
-//      without bound
+//    * Cache limits: device / pinned / host each have a byte ceiling (512 MiB /
+//      256 MiB / 512 MiB by default); returns beyond it are truly freed, so the
+//      pool cannot grow without bound
 //
 //  [Efficiency design]
 //    * Exact-size free lists: std::map<capacity, blocks> plus lower_bound
@@ -63,6 +68,7 @@ public:
     {
         Device,        //!< device memory (cudaMalloc)
         PinnedHost,    //!< page-locked host memory (cudaMallocHost)
+        Host,          //!< pageable host memory (operator new[] / delete[])
     };
 
     //! A block taken from the pool. capacity is the bytes actually held
@@ -92,7 +98,8 @@ public:
 
     //! Constructor (normally use instance(); direct construction helps tests).
     explicit MemoryPool(std::size_t deviceCacheLimitBytes = 512ULL << 20,
-                        std::size_t pinnedCacheLimitBytes = 256ULL << 20);
+                        std::size_t pinnedCacheLimitBytes = 256ULL << 20,
+                        std::size_t hostCacheLimitBytes = 512ULL << 20);
     ~MemoryPool();
 
     MemoryPool(const MemoryPool&) = delete;
@@ -137,7 +144,7 @@ private:
         return m_state[static_cast<int>(kind)];
     }
 
-    KindState m_state[2];
+    KindState m_state[3];
 };
 
 }  // namespace trt_alpha::core

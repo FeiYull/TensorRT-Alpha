@@ -18,8 +18,9 @@
 //    * Tight allocation: stride = width * channels * sizeOf(dtype) (no padding)
 //    * Copy and move are disabled: a class that owns memory is never passed by
 //      value, only by shared_ptr
-//    * Device currently allocates straight through cudaMalloc; the
-//      implementation will switch to MemoryPool once it lands
+//    * Host memory comes from MemoryPool (Kind::Host) so the pageable block is
+//      recycled instead of being handed back to the OS on every batch; Device
+//      still allocates straight through cudaMalloc
 // =============================================================================
 #pragma once
 
@@ -31,6 +32,8 @@
 #include <memory>
 
 namespace trt_alpha::core {
+
+class MemoryPool;   //!< only ever held weakly; defined in memory_pool.hpp
 
 //! Owning memory container. Not copyable, not movable (passed only via shared_ptr).
 class Buffer
@@ -96,7 +99,8 @@ public:
 
 private:
     Buffer(std::uint8_t* data, int width, int height, int channels,
-           int stride, DataType dtype, MemorySpace space) noexcept;
+           int stride, DataType dtype, MemorySpace space,
+           std::weak_ptr<MemoryPool> pool, std::size_t capacity) noexcept;
 
     void release() noexcept;
 
@@ -107,6 +111,9 @@ private:
     int m_stride = 0;
     DataType m_dtype = DataType::UInt8;
     MemorySpace m_space = MemorySpace::Host;
+
+    std::weak_ptr<MemoryPool> m_pool;   //!< set when the block came from the pool (Host)
+    std::size_t m_capacity = 0;         //!< bytes actually held (>= byteSize())
 };
 
 }  // namespace trt_alpha::core

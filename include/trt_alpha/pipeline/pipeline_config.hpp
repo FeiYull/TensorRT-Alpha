@@ -75,7 +75,7 @@ struct PipelineConfig
     //! popProcessed (e.g. Infer::async) set it true.
     bool exposeProcessed = false;
 
-    //! Number of render threads. 0 = auto: pick a small pool when the only
+    //! Number of render threads. 0 = auto: pick a pool of up to 8 when the only
     //! output is "annotated frames to disk" (each frame is encoded on its own,
     //! so the work parallelises cleanly), otherwise 1.
     //! Forced to 1 whenever showEnabled or exposeProcessed is set -- those need
@@ -88,6 +88,10 @@ struct PipelineConfig
     std::string saveDir = "save";
     bool showEnabled = false;
     std::string showWindow = "trt_alpha";
+    //!< Window title for --show. The CLI / Infer layers override it with
+    //!< "trt_alpha:<registered name>" so that two models can be shown at once
+    //!< without fighting over the same window; this bare default only applies
+    //!< to callers that build a PipelineConfig directly.
 
     // ---- Timeout when waiting for sources to stop (ms) ----
     int stopTimeoutMs = 2000;

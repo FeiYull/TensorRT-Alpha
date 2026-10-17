@@ -816,6 +816,12 @@ void OpenCVRenderer::save(const core::BatchResult& result,
     const std::size_t n =
         std::min<std::size_t>(result.views.size(),
                               static_cast<std::size_t>(std::max(0, result.validCount)));
+
+    // JPEG quality is fixed for the whole call -> build the encoder params once
+    // instead of per frame. 95 is what imwrite uses when no params are passed,
+    // so the default path is byte-for-byte unchanged.
+    const std::vector<int> encodeParams{cv::IMWRITE_JPEG_QUALITY, m_jpegQuality};
+
     for (std::size_t i = 0; i < n; ++i)
     {
         const cv::Mat image = matFromView(result.views[i]);
@@ -858,7 +864,7 @@ void OpenCVRenderer::save(const core::BatchResult& result,
             }
         }
 
-        if (!cv::imwrite(out.string(), image))
+        if (!cv::imwrite(out.string(), image, encodeParams))
         {
             TRT_LOG_ERROR("OpenCVRenderer::save: imwrite failed: " << out.string());
         }
@@ -867,6 +873,27 @@ void OpenCVRenderer::save(const core::BatchResult& result,
             TRT_LOG_DEBUG("OpenCVRenderer: saved " << out.string());
         }
     }
+}
+
+void OpenCVRenderer::setJpegQuality(int quality)
+{
+    // 1..100 is what libjpeg accepts; 0 would silently mean "libjpeg default",
+    // so clamp instead of passing it through -- a silently different quality is
+    // exactly the kind of surprise this framework refuses to ship.
+    int q = quality;
+    if (q < 1)
+    {
+        TRT_LOG_WARN("OpenCVRenderer: jpeg quality " << quality
+                     << " out of range [1, 100], clamped to 1");
+        q = 1;
+    }
+    else if (q > 100)
+    {
+        TRT_LOG_WARN("OpenCVRenderer: jpeg quality " << quality
+                     << " out of range [1, 100], clamped to 100");
+        q = 100;
+    }
+    m_jpegQuality = q;
 }
 
 void OpenCVRenderer::addInputSource(const std::string& resolvedPath)

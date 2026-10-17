@@ -202,10 +202,20 @@ void OpenCVSource::openVideo()
     }
 
     const fs::path p = core::Paths::requireFile(m_cfg.path, "video");
-    if (!m_capture.open(p.string()))
+
+    // 显式钉住 FFmpeg：Windows 上 CAP_ANY 可能绑到 MSMF 插件，同一个 1080p 文件
+    // 实测解码 7.1 ms/帧 vs FFmpeg 3.0 ms/帧（差 2.4x）。URL 分支上面已经钉过，
+    // 这里是为了本地文件也行为一致、不随机器/构建漂移。
+    if (!m_capture.open(p.string(), cv::CAP_FFMPEG))
     {
-        throw std::runtime_error("OpenCVSource: cannot open video: " +
-                                 core::Paths::toDisplay(p));
+        TRT_LOG_WARN("OpenCVSource: CAP_FFMPEG could not open '"
+                     << core::Paths::toDisplay(p)
+                     << "', retrying with the backend default");
+        if (!m_capture.open(p.string()))
+        {
+            throw std::runtime_error("OpenCVSource: cannot open video: " +
+                                     core::Paths::toDisplay(p));
+        }
     }
 }
 

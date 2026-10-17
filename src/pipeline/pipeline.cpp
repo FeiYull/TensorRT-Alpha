@@ -26,9 +26,15 @@ namespace {
 
 //! Auto render-thread count for a "save to disk only" pipeline.
 //! Encoding an annotated frame (imwrite -> JPEG) is per-frame independent and
-//! dominates --save wall time, so it parallelises almost linearly. Capped at 4:
-//! past that the encoder saturates memory bandwidth and starts stealing CPU
-//! from the inference workers (which only do CUDA launches, but still need a core).
+//! dominates --save wall time, so it scales nearly linearly with the thread
+//! count until the page cache / writeback becomes the limit.
+//! Measured on this box (32 threads, 1080p, 3262 frames, wall clock): no --save
+//! 15.0 s, --save at rt=4 21.2 s, rt=6 16.0 s, rt=8 16.2 s, rt=12 16.4 s,
+//! rt=16 18.8 s. The old cap of 4 was therefore the worst possible choice --
+//! 8 is where the curve flattens, and the frame rate there matches the
+//! no-save one. Past 8 the threads only fight over writeback.
+//! The inference worker needs one core (it is mostly CUDA launches), so even
+//! hw/4 render threads leave plenty behind.
 int autoRenderThreads()
 {
     unsigned hw = std::thread::hardware_concurrency();
@@ -36,7 +42,7 @@ int autoRenderThreads()
     {
         hw = 4;   // unknown -> assume a small box
     }
-    return std::min(4, std::max(1, static_cast<int>(hw / 4)));
+    return std::min(8, std::max(1, static_cast<int>(hw / 4)));
 }
 
 }  // namespace
@@ -217,6 +223,13 @@ void Pipeline::start()
     TRT_LOG_INFO("Pipeline: started (" << m_cfg.sources.size() << " source + "
                  << renderThreads << " render = "
                  << (m_cfg.sources.size() + renderThreads) << " threads)");
+
+    // 窗口名是拼出来的（"trt_alpha:<net>"），配置框里显示的是 ini 原值，
+    // 所以这里单独打一行，出问题时能直接看到最终标题。
+    if (m_cfg.showEnabled)
+    {
+        TRT_LOG_INFO("Pipeline: show window title = '" << m_cfg.showWindow << "'");
+    }
 }
 
 void Pipeline::sourceLoop(std::size_t sourceIndex)
