@@ -98,9 +98,18 @@ include(DeployRuntime)   # 提供 trt_alpha_deploy_runtime(<target>)：把第三
 # =============================================================================
 # 统一输出目录
 # =============================================================================
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# 按构建类型分子目录：多配置生成器用 $<CONFIG>，单配置生成器用 CMAKE_BUILD_TYPE。
+# 产物：bin/Debug/trt_alpha、bin/Release/trt_alpha（Windows 仍是 bin\Release\trt_alpha.exe）。
+# 注意：单配置生成器（Unix Makefiles / Ninja）下 `cmake --build build --config Release`
+# 的 --config 会被忽略，切配置必须重新 `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug`。
+if(CMAKE_CONFIGURATION_TYPES)
+  set(_trt_alpha_cfg "$<CONFIG>")
+else()
+  set(_trt_alpha_cfg "${CMAKE_BUILD_TYPE}")
+endif()
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/${_trt_alpha_cfg}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/${_trt_alpha_cfg}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/${_trt_alpha_cfg}")
 
 
 # =============================================================================

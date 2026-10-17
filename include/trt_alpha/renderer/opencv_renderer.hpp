@@ -18,6 +18,7 @@
 
 #include "trt_alpha/renderer/i_renderer.hpp"
 
+#include <mutex>
 #include <string>
 #include <unordered_set>
 
@@ -51,6 +52,17 @@ public:
 private:
     //! The set of normalised input file paths (see pathKey in the cpp).
     std::unordered_set<std::string> m_inputPaths;
+
+    //! Output directory cache. save() is called once per frame and is const, so
+    //! the expensive part (create_directories + weakly_canonical) cannot be done
+    //! in the constructor -- it is memoised on first use instead. save() may also
+    //! be called by several render threads at once, hence mutable + a mutex.
+    mutable std::mutex m_outDirMutex;
+    mutable std::string m_outDirPath;      //!< the outputDir the cache was built for
+    mutable std::string m_outDirCanon;     //!< ... and its normalised form
+    mutable bool m_outDirReady = false;    //!< an attempt has been made
+    mutable bool m_outDirOk = false;       //!< ... and it succeeded
+    mutable bool m_outDirWarnedOverwrite = false;
 };
 
 }  // namespace trt_alpha::renderer

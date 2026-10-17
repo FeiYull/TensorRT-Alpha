@@ -81,7 +81,6 @@ build/
 *log*.txt
 *.github
 *z_cmd.txt
-*docs/
 *.log
 *logs/
 *z_demo_dead_key.ini
@@ -102,3 +101,4 @@ build/
 
 *common.txt
 *onnx/
+*.code-workspace

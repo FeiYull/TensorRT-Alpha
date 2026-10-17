@@ -75,6 +75,14 @@ struct PipelineConfig
     //! popProcessed (e.g. Infer::async) set it true.
     bool exposeProcessed = false;
 
+    //! Number of render threads. 0 = auto: pick a small pool when the only
+    //! output is "annotated frames to disk" (each frame is encoded on its own,
+    //! so the work parallelises cleanly), otherwise 1.
+    //! Forced to 1 whenever showEnabled or exposeProcessed is set -- those need
+    //! the frames drawn / handed back in order (and cv::imshow is not
+    //! thread-safe). A renderer-less pipeline always ends up with 0.
+    int renderThreads = 0;
+
     // ---- Save / show ----
     bool saveEnabled = false;
     std::string saveDir = "save";

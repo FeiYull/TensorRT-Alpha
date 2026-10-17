@@ -769,24 +769,49 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
 void OpenCVRenderer::save(const core::BatchResult& result,
                           const std::string& outputDir) const
 {
-    if (outputDir.empty())
+    // 输出目录准备（create_directories + weakly_canonical）每个目录只做一次。
+    // save() 是 const、每帧都被调用，而且 --save 并行时会被多个渲染线程同时调用，
+    // 所以缓存用 mutable + 互斥保护。失败也只尝试一次、只报一次，免得逐帧刷屏。
+    fs::path canonDir;
     {
-        TRT_LOG_WARN("OpenCVRenderer::save: empty outputDir, skipping");
-        return;
-    }
-    std::error_code ec;
-    fs::create_directories(outputDir, ec);
-    if (ec)
-    {
-        TRT_LOG_ERROR("OpenCVRenderer::save: cannot create dir " << outputDir
-                      << " (" << ec.message() << ")");
-        return;
-    }
+        std::lock_guard<std::mutex> lock(m_outDirMutex);
+        if (!m_outDirReady || m_outDirPath != outputDir)
+        {
+            m_outDirPath = outputDir;
+            m_outDirReady = true;
+            m_outDirOk = false;
+            m_outDirCanon.clear();
+            m_outDirWarnedOverwrite = false;
 
-    // 输出目录规范化只做一次（每帧做一次 weakly_canonical 太贵）。
-    // 之后每帧只需把文件名拼上去 —— 目录已规范，拼接结果无需再次解析。
-    fs::path canonDir = fs::weakly_canonical(outputDir, ec);
-    if (ec) { canonDir = fs::path(outputDir); }
+            if (outputDir.empty())
+            {
+                TRT_LOG_WARN("OpenCVRenderer::save: empty outputDir, skipping");
+            }
+            else
+            {
+                std::error_code ec;
+                fs::create_directories(outputDir, ec);
+                if (ec)
+                {
+                    TRT_LOG_ERROR("OpenCVRenderer::save: cannot create dir " << outputDir
+                                  << " (" << ec.message() << ")");
+                }
+                else
+                {
+                    // 目录规范化只做一次；之后每帧只需把文件名拼上去。
+                    const fs::path canon = fs::weakly_canonical(outputDir, ec);
+                    m_outDirCanon = ec ? outputDir : canon.string();
+                    m_outDirOk = true;
+                    TRT_LOG_INFO("OpenCVRenderer: saving into " << m_outDirCanon);
+                }
+            }
+        }
+        if (!m_outDirOk)
+        {
+            return;
+        }
+        canonDir = fs::path(m_outDirCanon);
+    }
 
     const std::size_t n =
         std::min<std::size_t>(result.views.size(),
@@ -819,12 +844,18 @@ void OpenCVRenderer::save(const core::BatchResult& result,
             continue;
         }
 
-        // 同名已存在（不是本次输入）时允许覆盖（用户口径），但必须留痕
+        // 同名已存在（不是本次输入）时允许覆盖（用户口径），但必须留痕。
+        // 整个视频重跑时每一帧都会命中 —— 逐帧刷屏没有意义，每个输出目录只报一次。
         std::error_code existsEc;
         if (fs::exists(out, existsEc))
         {
-            TRT_LOG_WARN("OpenCVRenderer::save: overwriting existing file: "
-                         << out.string());
+            std::lock_guard<std::mutex> lock(m_outDirMutex);
+            if (!m_outDirWarnedOverwrite)
+            {
+                m_outDirWarnedOverwrite = true;
+                TRT_LOG_WARN("OpenCVRenderer::save: overwriting existing file(s), e.g. "
+                             << out.string() << " (reported once per output dir)");
+            }
         }
 
         if (!cv::imwrite(out.string(), image))
@@ -833,7 +864,7 @@ void OpenCVRenderer::save(const core::BatchResult& result,
         }
         else
         {
-            TRT_LOG_INFO("OpenCVRenderer: saved " << out.string());
+            TRT_LOG_DEBUG("OpenCVRenderer: saved " << out.string());
         }
     }
 }

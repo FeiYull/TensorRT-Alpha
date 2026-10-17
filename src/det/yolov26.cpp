@@ -308,6 +308,12 @@ void YoloV26::preprocess()
     {
         throw std::runtime_error("yolov26: preprocess kernel launch failed");
     }
+#if TRT_ALPHA_LOG_MIN_LEVEL <= TRT_ALPHA_LOG_LEVEL_DEBUG
+    // 分阶段计时专用：不在这里等，preprocess 只能量到"入队"，letterbox 的 GPU
+    // 时间会一路拖到 postprocess 末尾那次同步，三段就没法拆开。仅 DEBUG 构建生效，
+    // Release 下是零成本（不影响语义，后面那次同步仍然照做）。
+    m_stream.synchronize();
+#endif
     TRT_LOG_DEBUG("YoloV26::preprocess: done (batch=" << m_batch << ")");
 }
 
@@ -319,6 +325,10 @@ void YoloV26::infer()
     {
         throw std::runtime_error("yolov26: enqueueV3 failed");
     }
+#if TRT_ALPHA_LOG_MIN_LEVEL <= TRT_ALPHA_LOG_LEVEL_DEBUG
+    // 同上：等引擎真正跑完，infer 这一段才是网络执行时间（含 H2D 后的排队）。
+    m_stream.synchronize();
+#endif
     TRT_LOG_DEBUG("YoloV26::infer: enqueueV3 done (batch=" << m_batch << ")");
 }
 

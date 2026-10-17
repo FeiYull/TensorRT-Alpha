@@ -1,135 +1,312 @@
-![TensorRT-Alpha inference pipeline](.github/trt_alpha_pipeline.svg)
-
-<h3 align="center">TensorRT-Alpha</h3>
-
 <p align="center">
-把 CV 模型从 PyTorch / ONNX 一路加速到 TensorRT 的 <b>工业级 C++ 推理框架</b><br/>
-数据源 → 组批 → GPU 前处理 → 推理 → GPU 后处理 → 渲染 / 落盘，全程零 CPU 往返
+  <img src=".github/trt_alpha_pipeline.svg" alt="TensorRT-Alpha inference pipeline" width="100%">
 </p>
 
+
 <p align="center">
-  <img alt="CUDA" src="https://img.shields.io/badge/CUDA-12.x-76B900">
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-0078D6?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTAgMy40NDkgOS43NSAyLjF2OS40NTFIMG0xMC45NDktOS42MDJMMjQgMHYxMS40SDEwLjk0OU0wIDEyLjZoOS43NXY5LjQ1MUwwIDIwLjY5OU0xMC45NDkgMTIuNkgyNFYyNGwtMTIuOS0xLjgwMSIvPjwvc3ZnPg%3D%3D&logoColor=white">
+  <img alt="Linux" src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black">
   <img alt="TensorRT" src="https://img.shields.io/badge/TensorRT-10.x-76B900">
+  <img alt="CUDA" src="https://img.shields.io/badge/CUDA-12.x-76B900">
   <img alt="C++" src="https://img.shields.io/badge/C++-17-00599C">
-  <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-555">
 </p>
 
----
+<p align="center">
+  <a href="README_en.md">English</a> | 简体中文
+</p>
 
-## 优势
+## 简介
 
-- **GPU 端到端**：预处理（resize / letterbox / cvtColor / hwc2chw / normalize）、推理、后处理（decode / NMS / scale_boxes）全部自己写的 CUDA 算子，不落 CPU。
-- **逐位对齐 OpenCV**：`INTER_LINEAR` / `copyMakeBorder` / `cvtColor` 复刻 OpenCV 4.8.1，1000 张 VOC 共 12.288 亿元素 `max|d| = 0`。换掉 `cv::resize` 不影响任何一张图的结果。
-- **多 Batch + 多 Context 并发**：`1 engine + N context`，每个 worker 独占一条 `cudaStream`，`H2D → preprocess → enqueueV3 → postprocess → D2H` 串成一条流水线。
-- **工业级内存池**：显存 / 页锁定（pinned）内存池化复用，稳态下 `cudaMalloc` 近乎为零。
-- **模块解耦**：`core` 层零 OpenCV、零 nvonnxparser；数据源与渲染器是接口，可换成 FFmpeg / GStreamer / Qt / DeepStream。跨层只靠 `BatchResult` 一个契约。
-- **配置即意图，引擎是唯一真相源**：INI 里写的 batch / shape 与引擎 profile 不符时**显式报错退出**，绝不静默改值 —— 线上不会出现“跑得到但结果不对”。
-- **易扩展**：新增一个模型 = 1 个头 + 1 个源文件 + 1 行注册 + 1 个 INI。
+<details open>
+<summary><b>特色简介</b></summary>
 
-## 未来计划
+C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**：
 
-- **GStreamer 数据源**：硬解 + 多路 RTSP 接入，与现有 `OpenCVSource` 并存、可切换（规划中）。
-- YOLO26 其余任务头：seg / obb / cls / depth / tracking。
-- 更多模型系列：YOLO11 等。
-- `trt_alpha build`：ONNX → engine 一键序列化。
+- **端到端 GPU 推理**：数据源 → 组批 → GPU 前处理 → 推理 → GPU 后处理 → 渲染 / 保存，全程零 CPU 往返。
+- **多 batch 推理**：`1 engine + N context` 并发，每个 worker 独占一条 `cudaStream`。
+- **无损复刻原始 PyTorch 推理**：对齐 ultralytics 官方实现，见 [严格精度对齐](#严格精度对齐)。
+- **多种输入源**：图片、图片目录、视频流（RTSP / RTMP / HTTP(S) / UDP）、webcam、URL —— 一个 `--source` 自动判别。
 
----
+</details>
 
-## 环境要求
+<details>
+<summary><b>近期计划</b></summary>
 
-| 依赖 | 版本 | 说明 |
-|---|---|---|
-| OS | Windows 10/11 · Linux | 已实测 |
-| C++ | C++17 | |
-| CMake | ≥ 3.25 | |
-| CUDA | 12.x | 需 `nvcc` + `cudart` |
-| TensorRT | 10.x（兼容 8.x） | 需 `nvinfer` + `nvonnxparser` |
-| OpenCV | ≥ 4.5 | 仅数据源 / 渲染器用到 |
-| 显卡 | 计算能力 7.5+ | `CMakeLists.txt` 会自动探测本机架构 |
 
-> 基准环境：RTX 5060 Ti · CUDA 12.9 · TensorRT 10.16.1.11 · OpenCV 4.8.1 · VS2022。
+- **TODO**：support for docker
+- **TODO**：Nvidia Nano 等多款边缘设备（计划测试中）
+- **TODO**：支持 GStreamer —— 可拆卸 OpenCV，替换为 GStreamer 数据源
+- **TODO**：`trt_alpha build` —— ONNX → engine 一键序列化
+- **TODO**：更细粒度的性能测试 —— 用 **Nsight Systems** 剖析整条流水线的时间线（H2D / 推理 / D2H / 后处理 / 渲染的排布与空泡），用 **Nsight Compute** 逐个 CUDA kernel 剖析（占用率、访存、瓶颈定位）
+- **TODO**：YOLO11 等更多模型系列
 
-## 编译
+</details>
+
+<details>
+<summary><b>更新日志</b></summary>
+
+- 2026.10.16 💖 release v1.0
+- 2026.10.15 🐧 Linux 支持：GCC 13 移植、行尾 / 编辑器策略归一、引擎序列化脚本；Windows 运行时 DLL 自动部署；参数解析与源探测硬化 + `run` 全参数矩阵测试脚本
+- 2026.10.14 🧠 YOLO26 全任务族补齐：cls / depth / obb / pose / seg / sem；首页架构图
+- 2026.10.12 🎯 YOLO26-det 接入：后处理算子族（decode / NMS / 融合 / 向量化），命名统一 `yolo26` → `yolov26`
+- 2026.10.11 ⚡ 逐位对齐 OpenCV 的 CUDA 预处理算子族（resize / copyMakeBorder / cvtColor / hwc2chw / normalize + 融合核）
+- 2026.10.10 📦 legacy CUDA 核归档到 `kernels/legacy/`，公开头注释全面英译
+- 2026.10.07 🔍 代码评审硬化：batch 上限守卫、丢帧策略、覆盖输入守卫；CTest 入场（32 项）
+- 2026.10.06 🛡️ 运行期配置透视（`logConfigBox` + 死键 `[unused]` 判定）；URL 流（rtsp / rtmp / http(s) / udp）+ 目录源 + 输出目录规则
+- 2026.10.05 🔢 输入布局抽象（轴字母串 `Layout`）；静态 / 动态 batch 语义统一，以引擎 profile 为唯一真相源
+- 2026.10.04 📄 两级配置：新增 `configs/base.ini`，模型 ini 只保留特有字段
+- 2026.10.03 ⚙️ 高层 `Infer` API（`InferParams` / `Infer` / `Stream` / `Result`）+ renderer 可插拔
+- 2026.10.01 🚀 `1 engine + N context`：共享 `ICudaEngine`，4 worker 显存 ~356 → 309 MiB
+- 2026.09.30 🧩 目录按任务拆分 `det` / `seg` / `kpt`；CLI `--net` 支持全部模型并自动推导 `configs/<net>.ini`
+- 2026.09.29 🎯 任务类型扩展：YOLOv8-seg / U2Net（seg）、YOLOv8-pose（kpt）
+- 2026.09.28 🔥 YOLOv3 / YOLOv4 / YOLO-NAS / EfficientDet / YuNet 接入（det 共 11 个）
+- 2026.09.27 ⚡ 新增 `trt_alpha bench`（分步耗时 + p50/p90/p99 + FPS）；YOLOv5 / v6 / v7 / YOLOX / YOLOR 接入
+- 2026.09.26 🖥️ CLI `list` / `run` 端到端推理；日志模块与内存池收尾
+- 2026.09.25 🔧 三级流水线骨架（source → pool → render）完成
+- 2026.09.24 🎉 全面重构：新框架 `core` + `kernels`，第一个模型 YOLOv8 跑通
+- 2026.09.20 🔥 重构框架，实现更高性能，解决历史遗留 bug
+- ...
+- 2023.01.01 🔥 更新 yolov3, yolov4, yolov5, yolov6
+- 2023.01.04 🍅 更新 yolov7, yolox, yolor
+- 2023.01.05 🎉 更新 u2net, libfacedetection
+- 2023.01.08 🚀 全网最快支持 yolov8 的 tensorrt 部署
+- 2023.01.20 🍏 更新 efficientdet, pphumanseg
+- 2023.12.09 🍁 更新 yolov8-pose
+- 2023.12.19 🍉 更新 yolov8-seg
+- 2023.12.27 💖 更新 yolonas
+
+</details>
+
+## 安装依赖
+
+
+<details open>
+<summary><small>Linux</small></summary>
+
+| 依赖 | 版本 |
+|---|---|
+| gcc | 13.3.0 |
+| C++ | C++17 |
+| [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 |
+| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
+| CUDA | 12.9 |
+
+</details>
+
+<details open>
+<summary><small>Windows</small></summary>
+
+| 依赖 | 版本 |
+|---|---|
+| Visual Studio | 2017 / 2019 / 2022 |
+| C++ | C++17 |
+| [OpenCV](https://release-assets.githubusercontent.com/github-production-release-asset/5108051/2d11b48c-60e6-4f11-acc4-158da7fcb799?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-10-16T02%3A28%3A08Z&rscd=attachment%3B+filename%3Dopencv-4.8.1-windows.exe&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-10-16T01%3A27%3A29Z&ske=2026-10-16T02%3A28%3A08Z&sks=b&skv=2018-11-09&sig=OcWdIQ0t5iJThr4cjQEp%2BbsEw865e73NiQWS4Fsz0V8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5MjExODU1OCwibmJmIjoxNzkyMTE0OTU4LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.THYDLnoAwzXO-Ha4OP4HwG83NRh5N-X5_1xaqFRjxFA&response-content-disposition=attachment%3B%20filename%3Dopencv-4.8.1-windows.exe&response-content-type=application%2Foctet-stream) | >= 4.5 |
+| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-12.9.zip?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
+| CUDA | 12.9 |
+
+</details>
+
+## 快速开始
+
+<details>
+<summary><b>1. 拉代码</b></summary>
 
 ```bash
-# 当前开发分支是 v2-dev（main 是 2023 年的老架构，已归档）
 git clone -b v2-dev https://github.com/FeiYull/TensorRT-Alpha.git
 cd TensorRT-Alpha
 ```
 
-**Linux**
+</details>
 
-```bash
-sudo apt install build-essential cmake libopencv-dev
-# TensorRT 用官方 tar 包解压到 /usr/local/TensorRT（或任意目录，下面用 -DTensorRT_ROOT 指路）
+<details>
+<summary><b>2. 编译</b></summary>
 
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-      -DTensorRT_ROOT=/usr/local/TensorRT
-cmake --build build -j
-```
-
-> **Linux 走 RPATH，不拷贝**：CMake 会把 `-DOpenCV_DIR` / `-DTensorRT_ROOT` 指向的
-> 库目录写进可执行文件的 RPATH，**构建完直接跑即可，不需要设 `LD_LIBRARY_PATH`**
-> ——注意 Linux 加载器并不搜索可执行文件所在目录，"拷 `.so` 到 exe 旁"默认无效，
-> 必须靠 RPATH。RPATH 里同时含 `$ORIGIN`，所以把库和 `trt_alpha` 放同一目录也能跑。
-> 实现见 `cmake/DeployRuntime.cmake`。
-
-**Windows**
+<details>
+<summary><small>Windows（PowerShell）</small></summary>
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+cmake -S D:\VS2022_Project\TensorRT-Alpha `
+      -B D:\VS2022_Project\TensorRT-Alpha\build `
+      -G "Visual Studio 17 2022" -A x64 `
       -DOpenCV_DIR=D:/ThirdParty/opencv/build/x64/vc16/lib `
       -DTensorRT_ROOT=D:/ThirdParty/TensorRT-10.16.1.11
-cmake --build build --config Release -j 16
+
+cmake --build build --config Debug   -j 24
+cmake --build build --config Release -j 24
+
+# 验证
+./build/bin/Debug/trt_alpha.exe list
+
 ```
 
-产物：
 
-| 平台 | 可执行文件 |
-|---|---|
-| Windows | `build\bin\Release\trt_alpha.exe`（另有各 `sample_*` / `test_*`） |
-| Linux | `build/bin/trt_alpha` |
+</details>
 
-**运行时 DLL 自动部署（Windows）**
+<details>
+<summary><small>Ubuntu 24.04</small></summary>
 
-构建时会自动把 OpenCV / TensorRT / CUDA 的运行时 DLL 拷到 exe 同级目录
-（`build\bin\<Config>\`），所以**不需要**把这些库目录加进系统 `PATH`：
+```bash
+cmake -S ~/workspace/TensorRT-Alpha -B ~/workspace/TensorRT-Alpha/build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DOpenCV_DIR=/home/feiyull/thirdparty/opencv4.8.1/lib/cmake/opencv4 \
+      -DTensorRT_ROOT=/home/feiyull/thirdparty/TensorRT-10.16.1.11
 
-| 来源 | 实际拷贝的 DLL |
-|---|---|
-| OpenCV | `opencv_world*.dll`（按配置自动选 Debug 版）+ `opencv_videoio_ffmpeg*.dll` |
-| TensorRT | `<TensorRT_ROOT>/bin` 下的 `nvinfer_10` / `nvinfer_plugin_10` / `nvonnxparser_10` / `nvinfer_dispatch_10` / `nvinfer_lean_10` / `nvinfer_vc_plugin_10` |
-| CUDA | `cudart64_*.dll` |
+cmake --build build -j24
+# 验证
+./build/bin/Release/trt_alpha list
+```
 
-> exe 同级目录命中 Windows 加载器的**最高优先级**（exe 目录 → 系统目录 → 当前目录 → `PATH`），
-> 高于 `PATH`，所以换 OpenCV / TensorRT 版本时只需改 `-DOpenCV_DIR` / `-DTensorRT_ROOT`
-> 重新构建，不必再动系统环境变量。增量构建走 `copy_if_different`，内容没变不重复写盘。
->
-> 默认**不**拷 `nvinfer_builder_resource_*.dll`（按 SM 架构各一份、合计约 2.8 GB，
-> 只有从 ONNX 现场构建 engine 时才加载）——需要时加 `-DTRT_ALPHA_DEPLOY_BUILDER=ON`。
-> 同样默认不拷 cuBLAS / cuDNN（当前引擎实测不会加载）——需要时加
-> `-DTRT_ALPHA_DEPLOY_CUDA_MATH=ON`。实现见 `cmake/DeployRuntime.cmake`。
+产物：`build/bin/Release/trt_alpha`。要 Debug 就换成 `-DCMAKE_BUILD_TYPE=Debug` 重配一次，产物进 `build/bin/Debug/`。
 
-跑单测：`ctest --test-dir build -C Release --output-on-failure`
+</details>
 
-> **不在仓库里的东西**（`.gitignore` 已忽略，需自行准备）：
-> ① `.trt` / `.onnx` 引擎与权重；② `data/` 下的图片、视频与 `data/classes/*.txt` 类别文件。
-> 引擎可以用 `trtexec` 自己导，或用[老仓库网盘](https://share.weiyun.com/3T3mZKBm)里现成的 ONNX。
+</details>
 
----
+<details>
+<summary><b>3. 导出 ONNX</b></summary>
 
-## 支持列表
+ONNX 由 [ultralytics](https://github.com/ultralytics/ultralytics) 官方仓库导出，先把仓库拉下来：
+
+```bash
+git clone https://github.com/ultralytics/ultralytics
+cd ultralytics
+pip install -e .
+```
+
+```python
+from ultralytics import YOLO
+
+# model = YOLO("yolo26n-cls.pt")
+model = YOLO("yolo26n-obb.pt")
+# model = YOLO("yolo26n-pose.pt")
+# model = YOLO("yolo26n-seg.pt")
+# model = YOLO("yolo26n-depth.pt")
+
+model.export(
+    format="onnx",
+    batch=2,
+    imgsz=640,
+    dynamic=False,
+    simplify=True,
+    opset=17,
+    nms=None,
+)
+```
+
+> 注：各任务的 ONNX **按模型原生分辨率导出**（det / pose / seg = 640，depth = 768，obb / sem = 1024，cls = 224），与仓库 `engines/` 里现成的引擎一致；换分辨率要用同尺寸重建引擎。
+
+</details>
+
+<details>
+<summary><b>4. 用 trtexec 编译模型</b></summary>
+
+```bash
+# FP32：本仓库用于验证精度的指令（关掉 TF32，避免 fp32 精度漂移）
+trtexec --onnx=sample.onnx --saveEngine=sample.trt --noTF32
+
+# FP16：必须显式加 --fp16，否则 TensorRT 会按 FP32 计算
+trtexec --onnx=yolo26n_fp16.onnx --saveEngine=yolov26n_fp16.trt --fp16
+
+# INT8：用 Python 端 PTQ 导出的 Q/DQ 量化 ONNX，再配 --int8
+trtexec --onnx=yolo26n_int8.onnx --saveEngine=yolov26n_int8.trt --int8
+
+# 让 TensorRT 自行挑最优精度组合
+trtexec --onnx=sample.onnx --saveEngine=sample.trt --best
+```
+
+> 注：`--noTF32` **只在 FP32 引擎上用于精度对齐**；FP16 / INT8 引擎别加（那是关掉 TF32 张量核的开关，对已量化的图只会白白牺牲速度）。`--fp16` 与 `--int8` 也**不要同时给**，TensorRT 10.16 对 weakly-typed 量化网络会直接 build 失败。
+
+</details>
+
+<details>
+<summary><b>5. CLI 执行</b></summary>
+
+```bash
+BIN=./build/bin/Release/trt_alpha          # Windows：.\build\bin\Release\trt_alpha.exe
+
+# 列出所有已注册模型
+$BIN list
+
+# ---------- YOLO26 全任务族 ----------
+# 目标检测（默认读 configs/yolov26.ini -> engines/yolov26n.trt）
+$BIN run --net yolov26       --source data/bus.jpg    --show
+# 实例分割
+$BIN run --net yolov26_seg   --source data/bus.jpg    --save
+# 姿态估计
+$BIN run --net yolov26_pose  --source data/zidane.jpg --show
+# 旋转框检测（DOTA）
+$BIN run --net yolov26_obb   --source data/boats.mp4  --save
+# 图像分类
+$BIN run --net yolov26_cls   --source data/dog.jpg    --show
+# 深度估计
+$BIN run --net yolov26_depth --source data/road0.jpg  --save
+# 语义分割
+$BIN run --net yolov26_sem   --source data/road1.jpg  --save
+$BIN run --net yolov26_sem   --source data/road1.jpg  --save MY_SAVE_PATH
+
+# ---------- 输入源自动判别 ----------
+$BIN run --net yolov26 --source data/                            # 图片目录（每张独立推理）
+$BIN run --net yolov26 --source data/people.mp4 --show           # 本地视频
+$BIN run --net yolov26 --source 0 --show                         # 摄像头 0
+$BIN run --net yolov26 --source rtsp://192.168.1.10:554/stream1  # RTSP / RTMP / HTTP(S) / UDP
+
+# ---------- 换引擎 / 调 batch / 多 worker ----------
+$BIN run --net yolov26 --source data/ --engine engines/yolov26n_fp16.trt --save
+$BIN run --net yolov26 --source data/ --engine engines/yolov26n_int8.trt --save
+$BIN run --net yolov26 --source data/ --batch 2 --workers 4 --save   # yolov26 引擎静态 batch=2
+
+# ---------- 性能测量 ----------
+$BIN bench --net yolov26 --iters 100 --warmup 10
+$BIN bench --engine engines/yolov26n_fp16.trt --batch 2 --iters 200 --warmup 20
+```
+
+> 注：`--source data/` 表示传进去一个路径，默认只读取图片，不管模型支持 batch 为多少，实际推理的时候自动退化为 batch=1。
+
+</details>
+
+<details open>
+<summary><b>6. 快速使用源码</b></summary>
+
+更多和具体使用参考：[`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infer.cpp)
+
+```cpp
+#include "trt_alpha/infer/infer.hpp"
+
+int main(){
+    trt_alpha::InferParams p;     
+    p.model_type  = trt_alpha::ModelType::yolov26; // det, pose, cls, obb, depth
+    p.source = "xxx.jpg";                          // xx.jpg, xx.mp4, camera_id, url, images' path
+    trt_alpha::Infer  model(p);   trt_alpha::Stream stream = model.async();    trt_alpha::Result r;
+    while (stream.get(r)){
+        // here:get the results of inference
+        // ......
+    }
+    stream.stop();
+    return 1;
+}
+```
+
+</details>
+
+## 模型支持
+
+<details open>
+<summary><b>模型矩阵</b></summary>
 
 `✅` 已跑通并实测 · `🚧` 规划中 · `—` 未提供
+
+<div align="center">
 
 | model | fp32 | fp16 | int8 | onnx |
 |---|:---:|:---:|:---:|:---:|
 | **YOLO26** | | | | |
-| yolo26-det | ✅ | ✅ | ✅ ¹ | ✅ |
-| yolo26-seg | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo26-obb | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo26-cls | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo26-depth | 🚧 | 🚧 | 🚧 | 🚧 |
+| yolo26-det | ✅ | ✅ | ✅ | ✅ |
+| yolo26-seg | ✅ | ✅ | ✅ | ✅ |
+| yolo26-obb | ✅ | ✅ | ✅ | ✅ |
+| yolo26-cls | ✅ | ✅ | ✅ | ✅ |
+| yolo26-depth | ✅ | ✅ | ✅ | ✅ |
+| yolo26-sem | ✅ | ✅ | ✅ | ✅ |
+| yolo26-pose | ✅ | ✅ | ✅ | ✅ |
 | yolo26-tracking | 🚧 | 🚧 | 🚧 | 🚧 |
 | **YOLO11** | | | | |
 | yolo11-det | 🚧 | 🚧 | 🚧 | 🚧 |
@@ -137,156 +314,167 @@ cmake --build build --config Release -j 16
 | yolo11-obb | 🚧 | 🚧 | 🚧 | 🚧 |
 | yolo11-cls | 🚧 | 🚧 | 🚧 | 🚧 |
 | yolo11-pose | 🚧 | 🚧 | 🚧 | 🚧 |
-| **其他（沿用 v1 资产）** | | | | |
-| yolov3 / yolov4 / yolov5 / yolov6 / yolov7 / yolov8 | ✅ | — | — | ✅ |
-| yolov8-seg / yolov8-pose | ✅ | — | — | ✅ |
-| yolox / yolor | ✅ | — | — | ✅ |
-| yolo_nas / efficientdet | ✅ | — | — | ✅ |
-| yunet / u2net | ✅ | — | — | ✅ |
 
-- `fp32` / `fp16` / `int8` = 已实测跑通的引擎精度；`onnx` = 已提供导出流程或现成下载。
-- ¹ YOLO26 的 INT8 由 Python 端 PTQ（Q/DQ 显式量化）产出，只走 ONNX 全流程；TensorRT 的 `IInt8Calibrator` 自 **10.13 起废弃、11.0 移除**，**不要指望 `trtexec --int8` 帮你校准**。详见 [已知问题](#已知问题)。
+</div>
 
----
+**其他（沿用 legacy 资产）**
 
-## 快速使用
+<div align="center">
 
-```powershell
-# 列出全部已注册模型
-.\build\bin\Release\trt_alpha.exe list
+| model | fp32 | fp16 | int8 | onnx |
+|---|:---:|:---:|:---:|:---:|
+| yolov3 | ✅ | — | — | ✅ |
+| yolov4 | ✅ | — | — | ✅ |
+| yolov5 | ✅ | — | — | ✅ |
+| yolov6 | ✅ | — | — | ✅ |
+| yolov7 | ✅ | — | — | ✅ |
+| yolov8 | ✅ | — | — | ✅ |
+| yolov8-pose | ✅ | — | — | ✅ |
+| yolov8-seg | ✅ | — | — | ✅ |
+| yolox | ✅ | — | — | ✅ |
+| yolor | ✅ | — | — | ✅ |
+| yolo_nas | ✅ | — | — | ✅ |
+| efficientdet | ✅ | — | — | ✅ |
+| yunet | ✅ | — | — | ✅ |
+| u2net | ✅ | — | — | ✅ |
 
-# 输入源统一走 --source，类型自动判别（图片 / 目录 / 视频 / 流 / 摄像头 id）
-.\build\bin\Release\trt_alpha.exe run --source data/bus.jpg --net yolov26 --show          # 单张图片
-.\build\bin\Release\trt_alpha.exe run --source data/ --net yolov26 --save                # 图片目录（每次推理只处理一张；混尺寸也安全）
-.\build\bin\Release\trt_alpha.exe run --source data/people.mp4 --net yolov26 --show      # 本地视频
-.\build\bin\Release\trt_alpha.exe run --source 0 --net yolov26 --show                    # 摄像头 0
-.\build\bin\Release\trt_alpha.exe run --source rtsp://192.168.1.10:554/stream1 --net yolov8 --show   # RTSP / RTMP / HTTP(S) / UDP 流
+</div>
 
-# 换引擎（默认读 configs/<net>.ini 里的 engine=）
-.\build\bin\Release\trt_alpha.exe run --source data/ --net yolov26 --engine engines/yolov26n_fp16.trt --save
+</details>
 
-# 性能测量：延迟 / 吞吐 / 分步耗时
-.\build\bin\Release\trt_alpha.exe bench --net yolov26 --iters 100 --warmup 10
+## 严格精度对齐
+
+<details open>
+<summary><b>example:yolov26</b></summary>
+
+<p align="center">
+  <img src=".github/yolov26-Offical(left)vsOurs(right).jpg" alt="yolov26 official (left) vs ours (right)">
+</p>
+
+<p align="center"><sub>左：ultralytics 官方 PyTorch 推理　·　右：本仓库 TensorRT 推理 —— 对齐了<b>所有模型</b>的精度</sub></p>
+
+<details>
+<summary><small>注：为什么要关闭矩形推理（rect=False）</small></summary>
+
+在使用仓库代码部署模型的时候，兼顾高效和精度，yolov26 等模型都关闭了**矩形推理**：
+
+```python
+from ultralytics import YOLO
+
+# model = YOLO("yolo26n-cls.pt")
+model = YOLO("yolo26n-obb.pt")
+# model = YOLO("yolo26n-pose.pt")
+# model = YOLO("yolo26n-seg.pt")
+# model = YOLO("yolo26n-depth.pt")
+
+results = model(
+    r"Data/boats.jpg",
+    rect=False,     # close rectangle inference!
+    save=True,
+    project="./save",
+    name="output",
+    exist_ok=True,
+)
 ```
 
-Linux 把前缀换成 `./build/bin/` 即可。常用参数：`--net` `--source <path|url|id>` `--engine` `--config` `--batch` `--workers` `--save [dir]` `--show`。
+静态引擎走**正方形 letterbox**，与 `rect=False` 完全一致；开着矩形推理去对拍，坐标会整体偏移。
 
-> `--source` 的判别规则（与高层 `InferParams.source` 同一套）：URL → 流；纯数字 → 摄像头 id；视频后缀 → 本地视频；其余 → 图片（目录会自动按目录处理）。所以命令行不再有 `--image` / `--images` / `--video` / `--url` / `--camera`。
+</details>
 
-## 代码里怎么用
+</details>
 
-最简路径 —— 高层 `Infer` API（完整版见 [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infer.cpp)）：
+## 配置文件
 
-```cpp
-#include "trt_alpha/infer/infer.hpp"
+<details>
+<summary><b>ini格式的配置文件说明</b></summary>
 
-trt_alpha::InferParams p;
-p.model_type  = trt_alpha::ModelType::yolov8;   // 另有 yolov8_seg / yolov8_pose / yolov26 全任务族（yolov26_cls / yolov26_seg / yolov26_pose / yolov26_obb / yolov26_depth / yolov26_sem）/ u2net 等
-p.config_path = "configs/yolov8.ini";
-p.source      = "data/bus.jpg";
+配置分两级，**优先级从高到低**：
 
-trt_alpha::Infer model(p);
-auto stream = model.async();
-
-trt_alpha::Result r;
-while (stream.get(r))                       // 一批一批取
-    for (auto& f : r.frames())              // 一帧一帧看
-    {
-        auto raw = f.image();               // 原图：原始像素，不带框
-        auto ann = f.rendered();            // 渲染图：框 / 掩码 / 关键点已画好（p.draw = false 时为空）
-        for (auto& b : f.boxes())           // 结果：坐标 / 掩码都已是【原图尺寸】
-            std::cout << b.label << " " << b.confidence
-                      << " [" << b.left << "," << b.top << "," << b.right << "," << b.bottom << "]\n";
-    }
-stream.stop();
+```
+调用 API / 命令行参数   >   configs/<model>.ini   >   configs/base.ini
 ```
 
-想手工组装组件（数据源 / 推理池 / 渲染器 / 流水线），看 [`samples/sample_yolov26/sample_yolov26.cpp`](samples/sample_yolov26/sample_yolov26.cpp)。
+- **`configs/base.ini`**：所有模型共享的默认值（归一化参数、后处理阈值、线程池、输出目录等）。
+- **`configs/<model>.ini`**：单个模型的覆盖项（引擎路径、类别文件、batch、该模型特有的阈值）。
+- **调用 API / 命令行参数**：**最高优先级**，运行期直接覆盖上面两层。例如 `--engine` 覆盖 INI 里的 `engine=`、`--batch` 覆盖 `batch_size`、`--workers` 覆盖 `[pool].workers`、`--config` 换掉整个模型 INI；高层 `InferParams` 里的字段同理。
 
-> YOLO26 三种入口都可用：CLI（`--net yolov26`）、高层 `Infer`（`ModelType::yolov26`，见 [`sample_infer`](samples/sample_infer/sample_infer.cpp)）、手工组装（`sample_yolov26`）。
-> 高层 `Infer` 还登记了 YOLO26 全任务族（`yolov26_cls / _seg / _pose / _obb / _depth / _sem`）：只换 `model_type` + `config_path`，取数代码不变。
-> 默认一次给齐三样：`frame.image()` **原图**、`frame.rendered()` **渲染图**、以及各任务结果 —— `frame.boxes()/keypoints()/masks()/obbs()/classifications()`，`frame.depth()`（float 米）/ `frame.semantic()`（uint8 类别图）；**坐标与掩码统一为原图尺寸**（seg 的 `mask` 是网络尺寸、`maskOrig` 是原图尺寸）。
-> 渲染默认开（`p.draw = true`）但**不落盘、不显示**；要存盘 / 弹窗再开 `p.save` / `p.show`，只要数据可 `p.draw = false` 省掉每帧绘制 + 拷贝。
 
----
+
+`configs/yolov26.ini` ：
+
+```ini
+[model]
+engine = engines/yolov26n.trt
+class_names_file = data/classes/coco80.txt
+input_output_names = images,output0
+num_class = 80
+# extra: 每 anchor 的额外通道（seg = 32 / pose = 51）。det 用 0。
+# extra = 0
+
+[input]
+batch_size = 2
+
+[postprocess]
+conf_thresh = 0.25
+iou_thresh = 0.7
+top_k = 300
+```
+
+</details>
 
 ## 性能
 
-YOLO26n，640×640，batch = 2，trtexec `--loadEngine` 200 次迭代：
+<details open>
+<summary><b>展开查看性能数据</b></summary>
 
-| 引擎 | GPU 延迟 | 吞吐 | 体积 |
-|---|---|---|---|
-| `yolov26n.trt`（FP32） | 2.555 ms | 304 qps | 13.0 MB |
-| **`yolov26n_fp16.trt`（FP16）** | **1.736 ms** | **375 qps** | 8.32 MB |
-| `yolov26n_int8.trt`（INT8） | 1.885 ms | 355 qps | 9.72 MB |
+YOLO26n，batch = 2，Ubuntu 24.04 + RTX 5060 Ti，trtexec `--loadEngine` 200 次迭代（100 次平均）：
 
-小模型上 **FP16 是最优解**：INT8 反而比它慢 8.6%（head 保持浮点 + Q/DQ 反量化开销），价值只在体积。
-三个引擎的 I/O 恒为 `fp32 [2,3,640,640]` / `fp32 [2,84,8400]`，**换精度不需要改一行 C++**。
+**yolo26-det（640×640）精度对比**
 
-## 已知问题
+| 引擎 | 序列化参数 | GPU 延迟 | 吞吐 | 体积 |
+|---|---|---|---|---|
+| `yolov26n.trt`（FP32） | `--noTF32` | 2.401 ms | 302.4 qps | 13.03 MB |
+| **`yolov26n_fp16.trt`（FP16）** | **`--fp16`** | **1.708 ms** | **383.4 qps** | 8.20 MB  |
 
-- **INT8 检测头被量化**：检测头最后一层输出卷积也插了 Q/DQ，logits 被标定量程封顶，置信度上限偏低（FP32 下 `0.8606` → INT8 下 `0.8592`），偶尔出现重复伪框。生产建议用 **FP32 / FP16**；修复方向（导出时把该卷积排除量化）在计划内。
 
----
+
+</details>
 
 ## 目录结构
 
+<details open>
+<summary><b>目录树</b></summary>
+
 ```
-app/                 CLI（run / bench / list）
-cmake/               OpenCV / TensorRT / CUDA 探测
+app/                 CLI（run / bench / list / build）
+cmake/               OpenCV / TensorRT / CUDA 探测 + 运行时部署
 configs/             模型 INI（base.ini + <model>.ini 两级）
 data/                图片 / 视频 / classes（需自行放入）
 include/trt_alpha/   公共头
   ├── core/          引擎 / 内存池 / 队列 / 池 / 模型注册（零 OpenCV）
-  ├── datasource/    数据源接口（OpenCV 实现）
+  ├── datasource/    数据源接口（OpenCV 实现，可替换为 GStreamer）
   ├── pipeline/      三级流水线调度
   ├── renderer/      渲染接口（OpenCV 实现）
   ├── kernels/       CUDA 算子（ops/ = 预处理 / 后处理算子族，legacy/ = 旧实现归档）
-  └── det|seg|kpt|cls/  任务类型与模型
+  └── det|seg|kpt|cls|depth|sem|obb/  任务类型与模型
 src/                 实现
-samples/             使用示例
+samples/             使用示例（含 sample_infer 高层 API 示例）
 test/                单元测试（CTest）
+scripts/             平台脚本（linux/ = 引擎序列化、参数矩阵测试）
 ```
 
----
+</details>
 
-## 更新日志
-
-### v1（2023，老架构，见 `main` 分支）
-
-- 2023.01.01 🔥 yolov3 / yolov4 / yolov5 / yolov6
-- 2023.01.04 🍅 yolov7 / yolox / yolor
-- 2023.01.05 🎉 u2net / libfacedetection
-- 2023.01.08 🚀 全网最快支持 yolov8 的 TensorRT 部署
-- 2023.01.20 🍏 efficientdet / pphumanseg
-- 2023.12.09 🍁 yolov8-pose
-- 2023.12.19 🍉 yolov8-seg
-- 2023.12.27 💖 yolo-nas
-
-### v2（2026，全面重构，`v2-dev` 分支）
-
-- 2026.09.24 🎉 架构推倒重写：`core` + `kernels`，第一个模型 YoloV8 跑通
-- 2026.09.25–27 三级流水线骨架、工业级内存池、日志系统、CLI（`list` / `run` / `bench`）
-- 2026.09.28–30 v1 模型全量移植：yolov3 ~ yolov8、yolox、yolor、yolo-nas、efficientdet、yunet、u2net、yolov8-pose、yolov8-seg
-- 2026.10.01 🔥 `1 engine + N context` 并发，每个 worker 独占 context + stream
-- 2026.10.03–05 高层 `Infer` API、输入布局抽象（轴字母串）、batch 语义统一到引擎 profile、两级配置 `base.ini`
-- 2026.10.07 🛡️ 代码评审硬化（丢帧策略、batch 上限校验、内存池双重归还、CTest 入场）
-- 2026.10.10 📦 legacy CUDA 核归档到 `kernels/legacy/`，公开头注释全面英译
-- 2026.10.11 ⚡ 逐位对齐 OpenCV 的 CUDA 预处理算子族（resize / copyMakeBorder / cvtColor / hwc2chw / normalize + 融合核）+ 对拍样例
-- 2026.10.12 🚀 **YOLO26-det 接入**：后处理算子族（decode / NMS / 融合 / 向量化）、`extra` 通道预留、静态 batch 与图片源语义收口
-- 2026.10.12 🧪 Python 端 PTQ 导出 FP16 / INT8 引擎，三档精度实测
-- 2026.10.13 📖 首页架构示意图 + README
-
----
-
-## 引用
-
-```
+## Citation
+```bibtex
 @misc{FeiYull_TensorRT-Alpha,
   author = {FeiYull},
-  title  = {TensorRT-Alpha},
-  year   = {2023},
+  title = {TensorRT-Alpha},
+  year = {2023},
   publisher = {GitHub},
-  howpublished = {https://github.com/FeiYull/TensorRT-Alpha}
+  journal = {GitHub repository},
+  howpublished = {https://github.com/FeiYull/tensorrt-alpha}
 }
 ```
+
+

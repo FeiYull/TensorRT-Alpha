@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1232 390" width="1232" height="390" role="img" aria-label="TensorRT-Alpha inference pipeline overview">
   <title>TensorRT-Alpha inference pipeline</title>
-  <desc>Sources (image, camera, url) feed an input queue of batches held in pinned memory. preprocess, inference and postprocess run on the GPU; each worker owns one thread, one execution context and one cudaStream that carries the whole pre-infer-post chain. Results land in a second pinned-memory queue, then are rendered per task: det, seg, pose, obb, cls, depth.</desc>
+  <desc>Sources (image, camera, url) feed an input queue of batches held in pinned memory. preprocess, inference and postprocess run on the GPU; each worker owns one thread, one execution context and one cudaStream that carries the whole pre-infer-post chain. preprocess and postprocess are hand-written, vectorized (vec) and fused into a single CUDA C kernel launch each, so no intermediate tensor ever round-trips through the CPU. Results land in a second pinned-memory queue, then are rendered per task: det, seg, pose, obb, cls, depth.</desc>
   <defs>
     <linearGradient id="bgGrad" x1="0" y1="0" x2="0.4" y2="1">
       <stop offset="0" stop-color="#E5E8EC"/>
@@ -37,12 +37,17 @@
     <pattern id="wmTile" width="400" height="152" patternUnits="userSpaceOnUse" patternTransform="rotate(-17 0 0)">
       <text x="6" y="34" fill="none" stroke="#20262E" stroke-width="1.6" font-size="30" font-weight="700" letter-spacing="3" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" opacity="0.03">TensorRT-Alpha</text>
     </pattern>
+    <linearGradient id="titleGrad" gradientUnits="userSpaceOnUse" x1="30" y1="20" x2="248" y2="40">
+      <stop offset="0.00" stop-color="#E0218A"/>
+      <stop offset="0.50" stop-color="#8B5CF6"/>
+      <stop offset="1.00" stop-color="#2563EB"/>
+    </linearGradient>
   </defs>
   <rect width="1232" height="390" fill="url(#bgGrad)"/>
   <rect width="1232" height="390" fill="url(#grid)"/>
   <rect x="3" y="3" width="1226" height="384" rx="22" fill="none" stroke="#79828E" stroke-width="3"/>
   <g font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">
-    <text x="30" y="44" font-size="30" font-weight="700" fill="#20262E" letter-spacing="-0.8">TensorRT-Alpha</text>
+    <text x="30" y="44" font-size="30" font-weight="700" fill="url(#titleGrad)" letter-spacing="-0.8">TensorRT-Alpha</text>
     <text x="30" y="66" font-size="13" fill="#535B66" letter-spacing="0.4">C++ &#183; CUDA &#183; TensorRT inference framework</text>
   </g>
   <g font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">
@@ -106,9 +111,19 @@
   </g>
   <text x="205" y="300.0" font-size="12" fill="#D6E9FF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">pinned memory</text>
   <rect x="304" y="80.0" width="132" height="236" rx="16" fill="url(#gpuGrad)" stroke="#4E8300" stroke-width="2" filter="url(#soft)"/>
-  <text x="370" y="204" font-size="18" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">preprocess</text>
+  <text x="370" y="200" font-size="18" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">preprocess</text>
+  <line x1="322" y1="216" x2="418" y2="216" stroke="#FFFFFF" stroke-width="1.2" opacity="0.38"/>
+  <text x="370" y="240" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" letter-spacing="0.3">vec + fused</text>
+  <text x="370" y="258" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" letter-spacing="0.3">CUDA C kernel</text>
+  <rect x="316" y="270" width="108" height="20" rx="10" fill="#FFFFFF" opacity="0.93"/>
+  <text x="370" y="284" font-size="10.5" font-weight="700" fill="#3F6B00" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">high performance</text>
   <rect x="718" y="80.0" width="134" height="236" rx="16" fill="url(#gpuGrad)" stroke="#4E8300" stroke-width="2" filter="url(#soft)"/>
-  <text x="785" y="204" font-size="18" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">postprocess</text>
+  <text x="785" y="200" font-size="18" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">postprocess</text>
+  <line x1="736" y1="216" x2="834" y2="216" stroke="#FFFFFF" stroke-width="1.2" opacity="0.38"/>
+  <text x="785" y="240" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" letter-spacing="0.3">vec + fused</text>
+  <text x="785" y="258" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" letter-spacing="0.3">CUDA C kernel</text>
+  <rect x="731" y="270" width="108" height="20" rx="10" fill="#FFFFFF" opacity="0.93"/>
+  <text x="785" y="284" font-size="10.5" font-weight="700" fill="#3F6B00" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">high performance</text>
   <rect x="456" y="80.0" width="242" height="236" rx="16" fill="url(#gpuGrad)" stroke="#4E8300" stroke-width="2" filter="url(#soft)"/>
   <text x="577" y="121.0" font-size="18" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">inference</text>
   <path d="M 504 139.0 Q 492 139.0 492 153.0 L 492 191.0 Q 492 205.0 480 205.0 Q 492 205.0 492 219.0 L 492 258.0 Q 492 272.0 504 272.0" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" opacity="0.92"/>

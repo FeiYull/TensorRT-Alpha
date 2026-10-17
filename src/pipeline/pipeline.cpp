@@ -17,9 +17,29 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace trt_alpha::pipeline {
+
+namespace {
+
+//! Auto render-thread count for a "save to disk only" pipeline.
+//! Encoding an annotated frame (imwrite -> JPEG) is per-frame independent and
+//! dominates --save wall time, so it parallelises almost linearly. Capped at 4:
+//! past that the encoder saturates memory bandwidth and starts stealing CPU
+//! from the inference workers (which only do CUDA launches, but still need a core).
+int autoRenderThreads()
+{
+    unsigned hw = std::thread::hardware_concurrency();
+    if (hw == 0)
+    {
+        hw = 4;   // unknown -> assume a small box
+    }
+    return std::min(4, std::max(1, static_cast<int>(hw / 4)));
+}
+
+}  // namespace
 
 Pipeline::Pipeline(PipelineConfig cfg)
     : m_cfg(std::move(cfg))
@@ -110,6 +130,45 @@ void Pipeline::validateConfig()
         TRT_LOG_WARN("Pipeline: queueFullPolicy=Block without a renderer; the caller "
                      "must keep draining popResult() or the source thread will block");
     }
+
+    // 渲染线程数：0 = auto。落盘是"顺序无关"的纯 CPU 编码，每帧独立，可以并行；
+    // --show / exposeProcessed 要求严格按序（cv::imshow 也非线程安全），必须单线程。
+    // 未指定（0）且没有渲染器时保持 0 —— 没有渲染线程可起。
+    if (m_cfg.renderer == nullptr)
+    {
+        if (m_cfg.renderThreads != 0)
+        {
+            TRT_LOG_WARN("Pipeline: no renderer, renderThreads=" << m_cfg.renderThreads
+                         << " ignored -> 0");
+            m_cfg.renderThreads = 0;
+        }
+    }
+    else if (m_cfg.showEnabled || m_cfg.exposeProcessed)
+    {
+        if (m_cfg.renderThreads != 1)
+        {
+            TRT_LOG_WARN("Pipeline: showEnabled / exposeProcessed needs the frames in "
+                         "order, forcing render_threads=" << m_cfg.renderThreads
+                         << " -> 1");
+            m_cfg.renderThreads = 1;
+        }
+    }
+    else if (m_cfg.renderThreads < 0)
+    {
+        TRT_LOG_WARN("Pipeline: renderThreads=" << m_cfg.renderThreads
+                     << " is invalid, falling back to auto");
+        m_cfg.renderThreads = autoRenderThreads();
+    }
+    else if (m_cfg.renderThreads == 0)
+    {
+        m_cfg.renderThreads = m_cfg.saveEnabled ? autoRenderThreads() : 1;
+    }
+
+    if (m_cfg.renderer != nullptr && m_cfg.renderThreads > 1)
+    {
+        TRT_LOG_INFO("Pipeline: render_threads=" << m_cfg.renderThreads
+                     << " (frame order on disk is not guaranteed)");
+    }
 }
 
 void Pipeline::start()
@@ -129,9 +188,16 @@ void Pipeline::start()
     // ---- 起渲染线程（仅 renderer != nullptr 时）----
     if (m_cfg.renderer != nullptr)
     {
-        TRT_LOG_INFO("Pipeline: launching render thread");
-        m_renderThread = std::thread([this] { renderLoop(); });
-        TRT_LOG_INFO("Pipeline: render thread launched");
+        const std::size_t n =
+            (m_cfg.renderThreads > 0) ? static_cast<std::size_t>(m_cfg.renderThreads)
+                                      : std::size_t{1};
+        TRT_LOG_INFO("Pipeline: launching " << n << " render thread(s)");
+        m_renderThreads.reserve(n);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            m_renderThreads.emplace_back([this] { renderLoop(); });
+        }
+        TRT_LOG_INFO("Pipeline: render thread(s) launched");
     }
     else
     {
@@ -147,7 +213,7 @@ void Pipeline::start()
     }
     TRT_LOG_INFO("Pipeline: all source threads launched");
 
-    const std::size_t renderThreads = (m_cfg.renderer != nullptr) ? 1 : 0;
+    const std::size_t renderThreads = m_renderThreads.size();
     TRT_LOG_INFO("Pipeline: started (" << m_cfg.sources.size() << " source + "
                  << renderThreads << " render = "
                  << (m_cfg.sources.size() + renderThreads) << " threads)");
@@ -462,11 +528,15 @@ void Pipeline::waitForCompletion()
         m_processedQueue->close();
     }
 
-    // 等渲染线程结束
-    if (m_renderThread.joinable())
+    // 等渲染线程结束（"save 独占"配置下可能不止一个）
+    for (auto& t : m_renderThreads)
     {
-        m_renderThread.join();
+        if (t.joinable())
+        {
+            t.join();
+        }
     }
+    m_renderThreads.clear();
 
     m_running.store(false);
 

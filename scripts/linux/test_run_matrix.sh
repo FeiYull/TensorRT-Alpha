@@ -65,8 +65,21 @@ fi
 [[ -z "$REPO" ]] && { echo "ERROR: cannot locate the repository root" >&2; exit 2; }
 
 cd "$REPO" || exit 2
-BIN="$REPO/build/bin/trt_alpha"
-[[ -x "$BIN" ]] || { echo "ERROR: $BIN not found or not executable" >&2; exit 2; }
+# Executable now lives under a per-config subdir: build/bin/{Release,Debug}/trt_alpha
+# (the older flat build/bin/trt_alpha is still accepted). Override with BIN=/path.
+if [[ -z "${BIN:-}" ]]; then
+    for cand in "$REPO/build/bin/Release/trt_alpha" \
+                "$REPO/build/bin/Debug/trt_alpha" \
+                "$REPO/build/bin/RelWithDebInfo/trt_alpha" \
+                "$REPO/build/bin/trt_alpha"; do
+        [[ -x "$cand" ]] && { BIN="$cand"; break; }
+    done
+fi
+if [[ -z "${BIN:-}" || ! -x "$BIN" ]]; then
+    echo "ERROR: trt_alpha not found under $REPO/build/bin/ - build it first" >&2
+    echo "       (looked in Release / Debug / RelWithDebInfo / flat)" >&2
+    exit 2
+fi
 
 TS="$(date +%Y%m%d-%H%M%S)"
 OUT="$REPO/save/_run_matrix/$TS"
@@ -74,6 +87,22 @@ LOGDIR="$OUT/logs"
 mkdir -p "$LOGDIR" || exit 2
 RESULTS="$OUT/results.tsv"
 : > "$RESULTS"
+
+# --------------------------------------------------------------------------
+# Ctrl+C must stop the whole run. Without a trap, `timeout` (which puts the
+# command into its own process group by default) makes the terminal signal
+# unreliable: it may only kill the current case and the loops keep going.
+# --------------------------------------------------------------------------
+on_signal() {
+    echo "" >&2
+    echo ">>> INTERRUPTED - stopping the matrix. Finished cases are kept in:" >&2
+    echo "    $RESULTS" >&2
+    exit 130
+}
+trap 'on_signal INT'  INT
+trap 'on_signal TERM' TERM
+trap 'on_signal HUP'  HUP
+trap 'on_signal QUIT' QUIT
 
 # --------------------------------------------------------------------------
 # Ctrl+C must stop the whole run. Without a trap, `timeout` (which puts the

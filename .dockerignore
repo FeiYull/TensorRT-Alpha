@@ -1,0 +1,59 @@
+# =============================================================================
+#  docker build 的构建上下文过滤（放仓库根目录，Docker 只认上下文根的这一份）
+#  用法： docker build -f docker/Dockerfile -t trt-alpha:latest .
+#  目的：把 4.2 GB 的仓库压到 ~250 MB，只保留源码 / 配置 / 少量测试图。
+#        这些东西本来就不该进镜像：模型、引擎、构建产物、跑测输出。
+# =============================================================================
+
+# --- 版本控制 ---
+.git
+.github
+.gitignore
+.gitattributes
+
+# --- 构建产物（镜像里会重新编） ---
+build/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+
+# --- 模型 / 引擎 / 实验产物（体积大，运行时用 -v 挂进来） ---
+onnx/
+engines/
+*.onnx
+*.trt
+*.plan
+
+# --- 跑测与性能分析输出 ---
+save/
+out/
+profile/
+*.nsys-rep
+*.ncu-rep
+
+# --- 大体积媒体样本（data/ 下的小图小视频保留，作为默认测试输入） ---
+*.avi
+*.mkv
+*.mov
+*.flv
+*.wmv
+*.mp4
+# 例外：这两个小视频留着，`--source data/boats.mp4` 开箱即用
+!data/boats.mp4
+!data/people.mp4
+
+# --- 本地试验田 / IDE ---
+demos/
+.vscode/
+.vs/
+.idea/
+__pycache__/
+*.pyc
+
+# --- 不参与构建的说明文档 ---
+docs/
+*.md
+!README.md

@@ -70,7 +70,7 @@ void sample_yolov26_det(const std::string& source)
     p.config_path = "configs/yolov26.ini";
     p.source      = source;
     p.draw        = true;                      // 产出渲染图（默认即 true）
-
+    
     trt_alpha::Infer  model(p);
     trt_alpha::Stream stream = model.async();
 

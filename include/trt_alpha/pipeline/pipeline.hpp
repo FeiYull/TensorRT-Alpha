@@ -7,12 +7,15 @@
 //    * data-source threads: one per source (N) -- read a frame -> submit -> push
 //      to the result queue
 //    * inference workers: already inside the pool (M) -- Pipeline does not touch them
-//    * render thread: 1 -- take from the result queue -> render -> save / show
-//  N + M + 1 threads in total.
+//    * render threads: R = PipelineConfig::renderThreads
+//      -- take from the result queue -> render -> save / show
+//      R == 1 whenever show / exposeProcessed is on; R can be > 1 for
+//      "save to disk only" (frames are independent there).
+//  N + M + R threads in total.
 //
 //  Call sequence:
 //    Pipeline p(cfg);
-//    p.start();               // start N source threads + 1 render thread
+//    p.start();               // start N source threads + R render threads
 //    p.waitForCompletion();   // block until every source ends and every result is rendered
 //
 //  Stopping:
@@ -60,7 +63,7 @@ public:
     Pipeline(Pipeline&&) = delete;
     Pipeline& operator=(Pipeline&&) = delete;
 
-    //! Start: launch N source threads + 1 render thread. Throws on failure.
+    //! Start: launch N source threads + R render threads. Throws on failure.
     void start();
 
     //! Request a stop (asynchronous, returns immediately). Thread-safe.
@@ -114,7 +117,7 @@ private:
 
     // Threads
     std::vector<std::thread> m_sourceThreads;
-    std::thread m_renderThread;
+    std::vector<std::thread> m_renderThreads;
 
     // Lifetime
     std::atomic<bool> m_running{false};

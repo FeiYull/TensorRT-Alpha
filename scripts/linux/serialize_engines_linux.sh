@@ -6,9 +6,14 @@
 #
 #  Rules encoded here (every one traced back to a source -- nothing guessed):
 #
-#   * yolov26*  ->  `--noTF32` only.  These ONNX carry a *static* batch, so no
+#   * yolov26*  ->  `--noTF32`.  These ONNX carry a *static* batch, so no
 #                  optimization profile may be supplied at all.
 #                  (per the project owner's instruction)
+#                  Precision variants:  yolov26n_fp16.onnx  ->  --fp16
+#                                      yolov26n_int8.onnx  ->  --int8
+#                  (`--fp16` is NOT optional -- without it TensorRT computes
+#                   the fp16 weights in FP32 and the speed-up is lost.
+#                   `--noTF32` is for FP32 engines only -- never add it here.)
 #
 #   * everything else  ->  the flags documented in the `main` branch README of
 #                  FeiYull/TensorRT-Alpha, with two deliberate changes:
@@ -137,9 +142,9 @@ serialize yolov26n-obb.onnx      yolov26n_obb.trt      --noTF32
 serialize yolov26n-pose.onnx     yolov26n_pose.trt     --noTF32
 serialize yolov26n-seg.onnx      yolov26n_seg.trt      --noTF32
 serialize yolov26n-sem.onnx      yolov26n_sem.trt      --noTF32
-serialize yolov26n_fp16.onnx     yolov26n_fp16.trt     --noTF32
+serialize yolov26n_fp16.onnx     yolov26n_fp16.trt     --fp16
 serialize yolov26n_fp32.onnx     yolov26n_fp32.trt     --noTF32
-serialize yolov26n_int8.onnx     yolov26n_int8.trt     --noTF32
+serialize yolov26n_int8.onnx     yolov26n_int8.trt     --int8
 
 # -----------------------------------------------------------------------------
 # 2) other static-batch models -- bare build, no profile possible

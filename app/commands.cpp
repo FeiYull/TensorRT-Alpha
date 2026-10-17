@@ -184,6 +184,10 @@ int runCommand(const std::vector<std::string>& args)
     const int qTask   = modelCfg.getInt("pool.max_queue_size", 16);
     const int qResult = modelCfg.getInt("pool.result_queue_size", 32);
 
+    // 渲染线程数：0 / 不写 = auto（Pipeline 在"只落盘"时按 CPU 核数取 1~4，
+    // --show / exposeProcessed 一律强制 1）。负数由 Pipeline 兜底改回 auto。
+    const int rThreads = modelCfg.getInt("pool.render_threads", 0);
+
     // 存盘目录：CLI --save <dir> > ini output.save_dir > 默认 save/<net>。
     // 谁显式给了目录就用谁的（原样，不拼子目录）。base.ini 不再写死 save_dir，
     // 否则 --save 无路径时会被它顶成 "save"，拿不到 save/<net> 的默认结构。
@@ -357,6 +361,7 @@ int runCommand(const std::vector<std::string>& args)
     pcfg.classNames = modelCfg.classNames;
     pcfg.renderOptions = renderOptions;
     pcfg.resultQueueSize = (qResult > 0) ? static_cast<std::size_t>(qResult) : std::size_t{32};
+    pcfg.renderThreads = rThreads;
     pcfg.queueFullPolicy = queuePolicy;
     pcfg.saveEnabled = opt.save;
     pcfg.saveDir = saveDir;
