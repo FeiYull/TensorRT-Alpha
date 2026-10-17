@@ -43,6 +43,8 @@ With `dynamic=False` the exported tensor is `[batch, 3, imgsz, imgsz]` and the o
 
 ## 2. Serialize the engine (`trtexec`)
 
+One command per model, all 21 registered ones: [serialize_engines.md](serialize_engines.md)
+
 ```bash
 trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 ```

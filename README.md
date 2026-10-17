@@ -180,7 +180,7 @@ yolo export model=yolo26n.pt format=onnx imgsz=640 batch=2 opset=17 simplify=Tru
 trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 ```
 
-更多参考：[导出与序列化](docs/export_and_serialize.md)
+更多参考：[导出与序列化](docs/export_and_serialize.md)　or　[各模型序列化参数](docs/serialize_engines.md)
 
 </details>
 
