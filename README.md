@@ -205,7 +205,7 @@ trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 
 ```bash
 ./trt_alpha run --net yolov26 --source data/bus.jpg --show
-./trt_alpha run --net yolov26 --source data/xxx.mp4 --save
+./trt_alpha run --net yolov26 --source data/xxx.mp4 --config configs/yolov26.ini --save
 ./trt_alpha run --net yolov26 --source rtsp:xxxxx --engine yolov26.trt --save output/det/
 # 加载量化模型
 ./trt_alpha run --net yolov26 --source data/xxx.mp4 --engine yolov26_fp16.trt

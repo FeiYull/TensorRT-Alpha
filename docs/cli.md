@@ -41,7 +41,7 @@ Current build registers 34 models: `efficientdet`, `u2net`, `yolo_nas`, `yolor`,
 |---|---|
 | `--source <value>` | input source, see the table above. Required |
 | `--net <name>` | model name, default `yolov8`. Also picks up `configs/<name>.ini` |
-| `--config <ini>` | explicit model INI, replacing `configs/<net>.ini` |
+| `--config <ini>` | explicit model INI, replacing `configs/<net>.ini`. Every key it accepts is documented in [configuration](config.md) |
 | `--engine <trt>` | override the INI's `engine=`. Wins over `--config` |
 | `--batch <n>` | override the INI's `batch_size`. A static engine rejects any value other than its own |
 | `--workers <n>` | inference-pool workers over the INI's `[pool].workers` |
@@ -59,7 +59,7 @@ trt_alpha run --net yolov26_pose  --source data/zidane.jpg --show
 trt_alpha run --net yolov26_obb   --source data/boats.mp4  --save
 trt_alpha run --net yolov26_cls   --source data/dog.jpg    --show
 trt_alpha run --net yolov26_depth --source data/road0.jpg  --save
-trt_alpha run --net yolov26_sem   --source data/road1.jpg  --save MY_SAVE_PATH
+trt_alpha run --net yolov26_sem   --source data/road1.jpg  --save home/feiyull/save
 
 # every source kind
 trt_alpha run --net yolov26 --source data/                            # image directory
@@ -81,7 +81,7 @@ Measures latency and throughput without any source: the frames are synthetic, so
 | Option | Meaning |
 |---|---|
 | `--net <name>` | model name, default `yolov8`; pulls `configs/<name>.ini` |
-| `--config <ini>` | explicit model INI |
+| `--config <ini>` | explicit model INI, keys documented in [configuration](config.md) |
 | `--engine <trt>` | override the INI's engine path |
 | `--batch <n>` | override the INI's `batch_size` |
 | `--iters <n>` | measured iterations, default `100` |

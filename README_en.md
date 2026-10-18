@@ -205,7 +205,7 @@ More: [Exporting and serializing](docs/export_and_serialize.md)
 
 ```bash
 ./trt_alpha run --net yolov26 --source data/bus.jpg --show
-./trt_alpha run --net yolov26 --source data/xxx.mp4 --save
+./trt_alpha run --net yolov26 --source data/xxx.mp4 --config configs/yolov26.ini --save
 ./trt_alpha run --net yolov26 --source rtsp:xxxxx --engine yolov26.trt --save output/det/
 # load a quantized engine
 ./trt_alpha run --net yolov26 --source data/xxx.mp4 --engine yolov26_fp16.trt
