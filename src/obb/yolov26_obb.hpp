@@ -44,7 +44,7 @@
 
 namespace trt_alpha::obb {
 
-class YoloV26Obb final : public IObbDetector
+class YoloV26Obb : public IObbDetector
 {
 public:
     YoloV26Obb() = default;
@@ -67,6 +67,10 @@ public:
         static const std::vector<core::TensorDesc> kEmpty;
         return m_engine ? m_engine->ioTensors() : kEmpty;
     }
+
+protected:
+    //! 运行时标签：日志 / 异常 / name() 都用它；YOLO11 子类只改这个值。
+    std::string m_tag = "yolov26_obb";
 
 private:
     void loadConfig(const core::ModelConfig& cfg);

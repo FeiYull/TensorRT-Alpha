@@ -38,7 +38,7 @@
 
 namespace trt_alpha::kpt {
 
-class YoloV26Pose final : public IKeypointer
+class YoloV26Pose : public IKeypointer
 {
 public:
     YoloV26Pose() = default;
@@ -61,6 +61,10 @@ public:
         static const std::vector<core::TensorDesc> kEmpty;
         return m_engine ? m_engine->ioTensors() : kEmpty;
     }
+
+protected:
+    //! 运行时标签：日志 / 异常 / name() 都用它；YOLO11 子类只改这个值。
+    std::string m_tag = "yolov26_pose";
 
 private:
     void loadConfig(const core::ModelConfig& cfg);

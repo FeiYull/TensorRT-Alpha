@@ -4,6 +4,7 @@
 #include "yolo_nas.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/kernels/candidates.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -284,7 +285,9 @@ void YoloNas::postprocess()
         const float* row = host + static_cast<std::size_t>(b) * m_objectsPerImage;
         const int count = std::clamp(static_cast<int>(row[0]), 0, m_topK);
         m_detections[static_cast<std::size_t>(b)].clear();
-        for (int i = 0; i < count; ++i)
+        // decode 用 atomicAdd 发槽位 ⇒ 数组顺序每次运行都不同。先取确定性全序
+        // （置信度降序），输出才可复现，也与 ultralytics 的绘制顺序一致。
+        for (int i : kernels::orderedCandidates(row, count, kernels::kObjectWidth))
         {
             const float* o = row + 1 + i * kernels::kObjectWidth;
             if (o[6] < 0.5f)

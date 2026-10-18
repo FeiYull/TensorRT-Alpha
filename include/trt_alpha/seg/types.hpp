@@ -39,7 +39,9 @@ struct Segmentation
     //! The same mask already un-letterboxed to the SOURCE-IMAGE size (srcW x srcH),
     //! CV_8UC1 0/255 -- usable directly (overlay / crop by `box` / cv::imwrite)
     //! without any resizing on the caller's side. `box` above lives in the very same
-    //! source-image coordinate system. Empty for models without an instance mask.
+    //! source-image coordinate system. Empty for models without an instance mask,
+    //! and EMPTY BY DEFAULT for yolo26-seg / yolo11-seg: producing it costs a full
+    //! resolution resize per instance, so it is opt-in via `[model] mask_orig = true`.
     core::BufferView maskOrig;
     std::shared_ptr<core::Buffer> maskOrigOwner;   //!< owner of `maskOrig`
 };

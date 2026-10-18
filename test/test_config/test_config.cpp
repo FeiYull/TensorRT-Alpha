@@ -10,6 +10,7 @@
 //    [6] input.layout：缺省为空 / 合法解析（含 5D） / 非法报错
 //    [7] origins：每个键的来源 + 保序
 //    [8] readKeys：区分"被读到的键"与死键（供 logConfigBox 标 [unused]）
+//    [9] requireScaleOnlyNorm：fused 家族只认 scale，mean/std 非恒等即报错
 //
 //  临时文件用绝对路径（Paths::resolve 对绝对路径原样返回，不走工程根）
 // =============================================================================
@@ -450,6 +451,69 @@ int main()
             ++g_failures;
         }
         removeTempFile(p);
+    }
+
+    // ---------------------------------------------------------------
+    // [9] requireScaleOnlyNorm：fused 预处理只认 scale，mean/std 不许静默失效
+    // ---------------------------------------------------------------
+    {
+        const std::string head =
+            "[model]\n"
+            "engine = a.trt\n"
+            "class_names_file = data/classes/coco80.txt\n"
+            "input_output_names = images,output0\n"
+            "\n"
+            "[normalize]\n";
+
+        const auto throwsWith = [&](const std::string& body) {
+            const fs::path p = writeTempFile("test_norm.ini", head + body);
+            bool threw = false;
+            try
+            {
+                const ModelConfig cfg = loadModelConfig(p.string());
+                trt_alpha::core::requireScaleOnlyNorm(cfg, "test_net");
+            }
+            catch (const std::runtime_error&) { threw = true; }
+            removeTempFile(p);
+            return threw;
+        };
+
+        // 9a：什么都不写（继承 base.ini 的 0/0/0 + 1/1/1）→ 放行
+        check(!throwsWith("scale = 255.0\n"), "[9a] identity inherited from base -> passes");
+
+        // 9b：显式写恒等值 → 放行
+        check(!throwsWith("scale = 255.0\nmean = 0,0,0\nstd = 1,1,1\n"),
+              "[9b] explicit identity -> passes");
+
+        // 9c：mean 非恒等 → 报错（不是静默忽略）
+        check(throwsWith("scale = 255.0\nmean = 104,117,123\n"),
+              "[9c] non-identity mean -> throws");
+
+        // 9d：std 非恒等 → 报错
+        check(throwsWith("scale = 255.0\nstd = 0.5,0.5,0.5\n"),
+              "[9d] non-identity std -> throws");
+
+        // 9e：三元组格式错误 → 报错
+        check(throwsWith("scale = 255.0\nmean = 104,117\n"),
+              "[9e] malformed mean -> throws");
+
+        // 9f：调用一次就把两个键记成"已消费"（配置框不再标 [unused]）
+        {
+            const fs::path p = writeTempFile("test_norm_read.ini", head + "scale = 255.0\n");
+            try
+            {
+                const ModelConfig cfg = loadModelConfig(p.string());
+                trt_alpha::core::requireScaleOnlyNorm(cfg, "test_net");
+                check(cfg.wasRead("normalize.mean") && cfg.wasRead("normalize.std"),
+                      "[9f] mean/std count as read after the check");
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "[FAIL] [9f] threw: " << e.what() << "\n";
+                ++g_failures;
+            }
+            removeTempFile(p);
+        }
     }
 
     std::cout << "====================\n";

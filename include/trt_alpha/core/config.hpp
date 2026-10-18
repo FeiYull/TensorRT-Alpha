@@ -31,6 +31,19 @@ struct TensorDesc;
 //! A malformed line or an unreadable file throws std::runtime_error.
 [[nodiscard]] std::vector<ClassInfo> loadClassNamesFile(const std::string& txtPath);
 
+//! Guard for models whose preprocess is the fused "dst = src / scale" kernel:
+//! mean / std have no slot in that kernel, so a non-identity value would be
+//! silently ignored. This turns that into a startup error instead.
+//!
+//! Considered a no-op (and the keys count as consumed, so the config box stops
+//! flagging them `[unused]`) when mean == (0,0,0) and std == (1,1,1), which is
+//! what every yolo engine in this repo was exported with.
+//!
+//! @param cfg the model config, already loaded
+//! @param who model tag used as the message prefix (e.g. "yolov26_seg")
+//! @throws std::runtime_error on a malformed triple, or on a non-identity value
+void requireScaleOnlyNorm(const ModelConfig& cfg, const std::string& who);
+
 // -----------------------------------------------------------------------------
 //  Config display: box up "the configuration actually in effect"
 // -----------------------------------------------------------------------------

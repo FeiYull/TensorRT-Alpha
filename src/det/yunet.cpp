@@ -4,6 +4,7 @@
 #include "yunet.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/kernels/candidates.hpp"
 #include "trt_alpha/kernels/cast.hpp"
 #include "trt_alpha/kernels/legacy/preprocess.hpp"
 
@@ -415,7 +416,9 @@ void YuNet::postprocess()
     {
         const float* row = host + std::size_t(b) * (1 + std::size_t(m_topK) * m_objectsRow);
         const int count = std::clamp(static_cast<int>(row[0]), 0, m_topK);
-        for (int i = 0; i < count; ++i)
+        // decode 用 atomicAdd 发槽位 ⇒ 数组顺序每次运行都不同。先取确定性全序
+        // （置信度降序），输出才可复现，也与 ultralytics 的绘制顺序一致。
+        for (int i : kernels::orderedCandidates(row, count, m_objectsRow))
         {
             const float* o = row + 1 + i * m_objectsRow;
             if (o[6] < 0.5f) { continue; }

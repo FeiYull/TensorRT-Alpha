@@ -19,15 +19,15 @@ API call / command-line flags   >   configs/<model>.ini   >   configs/base.ini
 | `layout` | per model (yolo family = `nchw`, efficientdet = `nhwc`) | Logical axis order. Only override it when the same model is swapped onto an engine with a different layout |
 | `batch_size` | `1` | Batch actually used for this run. A static engine requires it to **equal** the baked-in batch; a dynamic engine requires it to fall inside `[min, max]`. A mismatch is an **error and terminates** — never silently clamped |
 | `max_batch_size` | not checked | Contract for the engine's batch upper bound; a mismatch fails at startup |
-| `dst_h` / `dst_w` | — | **Normally leave these out**: the spatial dims come from the engine's declared shape and only produce a warning. They act as the intended value only when that engine dim is dynamic (`-1`) |
+| `dst_h` / `dst_w` | — | **Normally leave these out**: the spatial dims come from the engine's declared shape. Nothing is printed when they are absent; a value that disagrees with a static engine dim only raises a warning and the engine shape wins (it never errors). They act as the intended value only when that engine dim is dynamic (`-1`) |
 
 ### `[normalize]`
 
 | Key | Default | Meaning |
 |---|---|---|
-| `scale` | `255.0` | Normalization divisor |
-| `mean` | `0.0,0.0,0.0` | Per-channel mean, comma separated |
-| `std` | `1.0,1.0,1.0` | Per-channel std, comma separated |
+| `scale` | `255.0` | Normalization divisor. Honoured by every model |
+| `mean` | `0.0,0.0,0.0` | Per-channel mean, comma separated. **Only the legacy preprocess honours it** (`yolov3`-`yolov8`, `yolox`, `yolor`, `yolo_nas`, `yolov8_pose`, `yolov8_seg`, `u2net`). The fused preprocess (`yolov26` and `yolo11`, all tasks, plus `depth` / `sem`) has no slot for it: a non-identity value fails at startup instead of being silently dropped |
+| `std` | `1.0,1.0,1.0` | Per-channel std, same rule as `mean` |
 | `pad_value` | `114.0` | Letterbox fill value (matches ultralytics' 114) |
 
 ### `[postprocess]`
@@ -69,6 +69,10 @@ input_output_names = images,output0
 num_class = 80
 # extra: per-anchor extra channels (seg = 32 / pose = 51). 0 for det.
 # extra = 0
+# mask_orig: seg only. Also emit Segmentation::maskOrig (the source-sized mask).
+# Off by default: it is one full-resolution bilinear resize per instance
+# (~0.6 ms at 1912x1080) and the built-in renderer never reads it.
+# mask_orig = false
 
 [input]
 batch_size = 2
@@ -83,5 +87,6 @@ Any field present in `<model>.ini` overrides the value from `base.ini`. Task-spe
 
 ## Two traps
 
-- **Keys are looked up as `section.key`** (`IniParser::makeKey`). `render_threads` must therefore live under `[pool]`; put it under another section and it is stored as, say, `output.render_threads` and **silently never read**. The startup config box flags unread keys as `[unused]`, which is how you notice.
-- **Do not write the spatial dims (H/W) into the INI.** The engine's declared shape is the source of truth and a mismatching value only warns. Rebuild the engine if you need another resolution.
+- **Keys are looked up as `section.key`** (`IniParser::makeKey`). `render_threads` must therefore live under `[pool]`; put it under another section and it is stored as, say, `output.render_threads` and **silently never read**. The startup config box flags unread keys as `[unused]`, which is how you notice. Note that `base.ini` keys an individual task has no use for (`conf_thresh` on `cls`, `top_k` on `depth`) show up there too — that is expected, only a key you wrote in `<model>.ini` is a mistake.
+  The converse is guarded in code: a model whose preprocess cannot honour `mean` / `std` **fails at startup** instead of ignoring them (`core::requireScaleOnlyNorm`). A key that is accepted is a key that is used.
+- **Do not write the spatial dims (H/W) into the INI.** The engine's declared shape is the single source of truth. Nothing is logged while `dst_h` / `dst_w` are absent; if you do write a value that disagrees with a static engine dim you get `config size ... != engine declared shape, using engine shape (...)` and the **engine** shape is used. That line is a warning, not an error — the run continues. Rebuild the engine if you need another resolution.

@@ -9,6 +9,7 @@
 #include "trt_alpha/core/paths.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -191,6 +192,42 @@ ModelConfig loadModelConfig(const std::string& iniPath)
                  << ", extras=" << cfg.extras.size() << " entries)");
 
     return cfg;
+}
+
+void requireScaleOnlyNorm(const ModelConfig& cfg, const std::string& who)
+{
+    // 读这两个键本身就是"消费"：配置框不再把它们标 [unused]，因为它们的
+    // 存在与否现在是有意义的（恒等值放行，非恒等值直接失败）。
+    const std::string meanStr = cfg.getString("mean", "");
+    const std::string stdStr  = cfg.getString("std", "");
+
+    float mean[3] = {0.f, 0.f, 0.f};
+    float sd[3]   = {1.f, 1.f, 1.f};
+
+    if (!meanStr.empty() &&
+        std::sscanf(meanStr.c_str(), "%f,%f,%f", &mean[0], &mean[1], &mean[2]) != 3)
+    {
+        throw std::runtime_error(who + ": cfg 'mean' expects 3 comma-separated floats, got '" +
+                                 meanStr + "'");
+    }
+    if (!stdStr.empty() &&
+        std::sscanf(stdStr.c_str(), "%f,%f,%f", &sd[0], &sd[1], &sd[2]) != 3)
+    {
+        throw std::runtime_error(who + ": cfg 'std' expects 3 comma-separated floats, got '" +
+                                 stdStr + "'");
+    }
+
+    const bool identity = mean[0] == 0.f && mean[1] == 0.f && mean[2] == 0.f &&
+                          sd[0] == 1.f && sd[1] == 1.f && sd[2] == 1.f;
+    if (!identity)
+    {
+        throw std::runtime_error(
+            who + ": normalize.mean/std are not supported by this model "
+                  "(its fused preprocess applies 'scale' only), got mean='" + meanStr +
+                  "', std='" + stdStr + "'; remove them, or use a model whose "
+                  "preprocess honours mean/std (yolov3-8 / yolox / yolor / yolo_nas / "
+                  "yolov8_pose / yolov8_seg / u2net)");
+    }
 }
 
 std::vector<ClassInfo> loadClassNamesFile(const std::string& txtPath)

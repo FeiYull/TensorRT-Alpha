@@ -165,6 +165,59 @@ void drawBox(cv::Mat& image, const det::Detection& det,
     drawBoxColored(image, det, classNames, colorForLabel(det.label));
 }
 
+//! 一维双线性取样表（ATen `align_corners=False` 口径）。
+//!
+//! 一帧里每个实例的 letterbox 几何和目标尺寸都一样，所以这组系数每帧只需算一次，
+//! 而不是"每实例、每像素"各算一次。表里的每个值都是原逐像素写法里同名中间量的
+//! 逐位复制，因此换成查表后结果不变。
+struct AxisTaps
+{
+    std::vector<int>   i0;   //!< 第一个取样下标
+    std::vector<int>   i1;   //!< 第二个取样下标（已夹到 netLen-1）
+    std::vector<float> w0;   //!< i0 的权重
+    std::vector<float> w1;   //!< i1 的权重
+};
+
+AxisTaps buildTaps(int srcLen, int netLen)
+{
+    AxisTaps t;
+    const std::size_t n = static_cast<std::size_t>(srcLen);
+    t.i0.resize(n);
+    t.i1.resize(n);
+    t.w0.resize(n);
+    t.w1.resize(n);
+
+    const float r = static_cast<float>(netLen) / static_cast<float>(srcLen);
+    for (int i = 0; i < srcLen; ++i)
+    {
+        float s = r * (static_cast<float>(i) + 0.5f) - 0.5f;
+        if (s < 0.0f) { s = 0.0f; }
+        const int   a  = static_cast<int>(s);
+        const int   b  = std::min(a + 1, netLen - 1);
+        const float w1 = s - static_cast<float>(a);
+        t.i0[i] = a;
+        t.i1[i] = b;
+        t.w1[i] = w1;
+        t.w0[i] = 1.0f - w1;
+    }
+    return t;
+}
+
+//! 一张实例掩码放大到源图尺寸后的结果。
+//!   img     : srcH x srcW 的 0/255 单通道
+//!   rows    : 有前景的行号（升序）；其余行整行都是 0
+//!   xlo/xhi : 该行首个/末个前景列（只在 rows 里的行上有效）
+//!
+//! 记这两个范围是为了让合成阶段能跳过整行、以及跳过行内的空白段 —— 被跳过的地方
+//! 掩码恒为 0，而 m == 0 时合成公式的每一项都是恒等操作（见 drawSegmentations）。
+struct ScaledMask
+{
+    cv::Mat          img;
+    std::vector<int> rows;
+    std::vector<int> xlo;
+    std::vector<int> xhi;
+};
+
 //! 把网络坐标的掩码反 letterbox 回源图 —— 复刻 ultralytics `ops.scale_masks(
 //! mask, im.shape[:2])`（mode="bilinear"）再 `> 0.5` 二值化。
 //!
@@ -172,64 +225,88 @@ void drawBox(cv::Mat& image, const det::Detection& det,
 //! 必然错位。上游 Annotator.masks 正是靠这一步把带灰边的掩码还原到原图。
 //!
 //! 裁剪窗 == computeLetterBox(srcW, srcH, netW, netH) 的内容区（见
-//! scale_mask_yolov26.hpp 头部注释，与 ops.scale_masks 的 crop 逐字同口径）；
-//! bilinear 用 torch CUDA 内核的两段式写法（不能用 v00+fx*(v01-v00) 的代数等价式）。
-cv::Mat scaleMaskToSource(const seg::Segmentation& s, int srcW, int srcH)
+//! scale_mask_yolov26.hpp 头部注释，与 ops.scale_masks 的 crop 逐字同口径）。
+//!
+//! 两遍分离：原写法
+//!     t0 = wx0*v00 + wx1*v01 ;  t1 = wx0*v10 + wx1*v11 ;  val = wy0*t0 + wy1*t1
+//! 本来就是可分离的，所以水平那一步可以从"每个目标像素算一次"提到"每条 crop 行
+//! 算一次"：中间量完全相同（同一个表达式、同样 float32 舍入），乘加次数降到 1/4，
+//! 两层内循环也都变成连续访存。
+ScaledMask scaleMaskToSource(const seg::Segmentation& s, int srcW, int srcH,
+                             const AxisTaps& tx, const AxisTaps& ty,
+                             std::vector<float>& hbuf,
+                             int newW, int newH, int padL, int padT)
 {
+    ScaledMask out;
     const int netW = s.mask.width;
     const int netH = s.mask.height;
     if (netW <= 0 || netH <= 0 || srcW <= 0 || srcH <= 0 || s.mask.channels != 1)
     {
-        return {};
+        return out;
+    }
+    if (newW <= 0 || newH <= 0 || padL < 0 || padT < 0 ||
+        padL + newW > netW || padT + newH > netH)
+    {
+        return out;
+    }
+    if (static_cast<std::size_t>(newH) * static_cast<std::size_t>(srcW) > hbuf.size())
+    {
+        return out;
     }
 
-    // 裁剪窗（round = half-to-even，与 computeLetterBox 一致）
-    const double gain = std::min(static_cast<double>(netH) / srcH,
-                                 static_cast<double>(netW) / srcW);
-    const int newW = static_cast<int>(std::nearbyint(srcW * gain));
-    const int newH = static_cast<int>(std::nearbyint(srcH * gain));
-    const double dw = static_cast<double>(netW) - newW;
-    const double dh = static_cast<double>(netH) - newH;
-    const int padL = static_cast<int>(std::nearbyint(dw / 2.0 - 0.1));
-    const int padT = static_cast<int>(std::nearbyint(dh / 2.0 - 0.1));
+    const std::uint8_t* base   = s.mask.data;
+    const std::size_t   stride = static_cast<std::size_t>(s.mask.stride);
 
-    const std::uint8_t* base = s.mask.data;
-    const std::size_t stride = static_cast<std::size_t>(s.mask.stride);
-    const auto at = [&](int y, int x) -> float {
-        return base[y * stride + x] != 0 ? 1.0f : 0.0f;
-    };
-
-    // ATen bilinear（align_corners=False，float32）
-    const float rh = static_cast<float>(newH) / static_cast<float>(srcH);
-    const float rw = static_cast<float>(newW) / static_cast<float>(srcW);
-
-    cv::Mat out(srcH, srcW, CV_8UC1);
-    for (int y = 0; y < srcH; ++y)
+    // ---- 水平：每条 crop 行只算一次（中间量与单遍写法的 t0/t1 逐位相同） ----
+    for (int r = 0; r < newH; ++r)
     {
-        std::uint8_t* oRow = out.ptr<std::uint8_t>(y);
-        float sy = rh * (static_cast<float>(y) + 0.5f) - 0.5f;
-        if (sy < 0.0f) { sy = 0.0f; }
-        const int i0y = static_cast<int>(sy);
-        const int i1y = std::min(i0y + 1, newH - 1);
-        const float wy1 = sy - static_cast<float>(i0y);
-        const float wy0 = 1.0f - wy1;
+        const std::uint8_t* src =
+            base + static_cast<std::size_t>(padT + r) * stride + static_cast<std::size_t>(padL);
+        float* dst = hbuf.data() + static_cast<std::size_t>(r) * static_cast<std::size_t>(srcW);
         for (int x = 0; x < srcW; ++x)
         {
-            float sx = rw * (static_cast<float>(x) + 0.5f) - 0.5f;
-            if (sx < 0.0f) { sx = 0.0f; }
-            const int i0x = static_cast<int>(sx);
-            const int i1x = std::min(i0x + 1, newW - 1);
-            const float wx1 = sx - static_cast<float>(i0x);
-            const float wx0 = 1.0f - wx1;
+            const float v0 = src[tx.i0[static_cast<std::size_t>(x)]] != 0 ? 1.0f : 0.0f;
+            const float v1 = src[tx.i1[static_cast<std::size_t>(x)]] != 0 ? 1.0f : 0.0f;
+            dst[x] = tx.w0[static_cast<std::size_t>(x)] * v0 +
+                     tx.w1[static_cast<std::size_t>(x)] * v1;
+        }
+    }
 
-            const float v00 = at(padT + i0y, padL + i0x);
-            const float v01 = at(padT + i0y, padL + i1x);
-            const float v10 = at(padT + i1y, padL + i0x);
-            const float v11 = at(padT + i1y, padL + i1x);
-            const float t0 = wx0 * v00 + wx1 * v01;
-            const float t1 = wx0 * v10 + wx1 * v11;
-            const float val = wy0 * t0 + wy1 * t1;
-            oRow[x] = val > 0.5f ? 255 : 0;
+    // ---- 垂直：合并两行 + 二值化，顺手记下前景范围 ----
+    out.img.create(srcH, srcW, CV_8UC1);
+    out.rows.reserve(128);
+    out.xlo.assign(static_cast<std::size_t>(srcH), 0);
+    out.xhi.assign(static_cast<std::size_t>(srcH), 0);
+
+    for (int y = 0; y < srcH; ++y)
+    {
+        const std::size_t uy = static_cast<std::size_t>(y);
+        const float* r0 = hbuf.data() + ty.i0[uy] * static_cast<std::size_t>(srcW);
+        const float* r1 = hbuf.data() + ty.i1[uy] * static_cast<std::size_t>(srcW);
+        const float  wy0 = ty.w0[uy];
+        const float  wy1 = ty.w1[uy];
+
+        std::uint8_t* o  = out.img.ptr<std::uint8_t>(y);
+        int           lo = -1;
+        int           hi = -1;
+        for (int x = 0; x < srcW; ++x)
+        {
+            if (wy0 * r0[x] + wy1 * r1[x] > 0.5f)
+            {
+                o[x] = 255;
+                if (lo < 0) { lo = x; }
+                hi = x;
+            }
+            else
+            {
+                o[x] = 0;
+            }
+        }
+        if (lo >= 0)
+        {
+            out.rows.push_back(y);
+            out.xlo[uy] = lo;
+            out.xhi[uy] = hi;
         }
     }
     return out;
@@ -257,53 +334,150 @@ void drawSegmentations(cv::Mat& image, const std::vector<seg::Segmentation>& seg
         return;
     }
 
-    struct Layer
+    const int srcW = image.cols;
+    const int srcH = image.rows;
+
+    // ---- 几何：一帧里所有实例共用同一套 letterbox 逆变换，只算一次 ----
+    int netW = 0, netH = 0;
+    int newW = 0, newH = 0, padL = 0, padT = 0;
+    AxisTaps           tx, ty;
+    std::vector<float> hbuf;
+
+    const auto refreshGeometry = [&](int mw, int mh)
     {
-        cv::Mat   m;   //!< 源图尺寸的二值掩码（0/255）
-        cv::Vec3f c;   //!< color / 255 * alpha
+        netW = mw;
+        netH = mh;
+        // 裁剪窗（round = half-to-even，与 computeLetterBox 一致）
+        const double gain = std::min(static_cast<double>(netH) / srcH,
+                                     static_cast<double>(netW) / srcW);
+        newW = static_cast<int>(std::nearbyint(srcW * gain));
+        newH = static_cast<int>(std::nearbyint(srcH * gain));
+        const double dw = static_cast<double>(netW) - newW;
+        const double dh = static_cast<double>(netH) - newH;
+        padL = static_cast<int>(std::nearbyint(dw / 2.0 - 0.1));
+        padT = static_cast<int>(std::nearbyint(dh / 2.0 - 0.1));
+        tx = buildTaps(srcW, newW);
+        ty = buildTaps(srcH, newH);
+        hbuf.assign(static_cast<std::size_t>(newH) * static_cast<std::size_t>(srcW),
+                    0.0f);
     };
-    std::vector<Layer> layers;
-    layers.reserve(segs.size());
+
+    std::vector<ScaledMask> scaled;
+    std::vector<cv::Vec3f>  colors;
+    scaled.reserve(segs.size());
+    colors.reserve(segs.size());
+
     for (const auto& s : segs)
     {
-        cv::Mat m = scaleMaskToSource(s, image.cols, image.rows);
-        if (m.empty())
+        if (s.mask.width <= 0 || s.mask.height <= 0 || s.mask.channels != 1)
+        {
+            continue;   // 无掩码的实例：原实现同样跳过
+        }
+        if (s.mask.width != netW || s.mask.height != netH)
+        {
+            refreshGeometry(s.mask.width, s.mask.height);
+        }
+        ScaledMask m = scaleMaskToSource(s, srcW, srcH, tx, ty, hbuf,
+                                         newW, newH, padL, padT);
+        if (m.img.empty())
         {
             continue;
         }
         const cv::Scalar bgr = ultraBgr(s.box.label);
-        layers.push_back(Layer{
-            std::move(m),
-            cv::Vec3f(static_cast<float>(bgr[0]) / 255.0f * alpha,
-                      static_cast<float>(bgr[1]) / 255.0f * alpha,
-                      static_cast<float>(bgr[2]) / 255.0f * alpha),
-        });
+        scaled.push_back(std::move(m));
+        colors.push_back(cv::Vec3f(static_cast<float>(bgr[0]) / 255.0f * alpha,
+                                   static_cast<float>(bgr[1]) / 255.0f * alpha,
+                                   static_cast<float>(bgr[2]) / 255.0f * alpha));
     }
 
-    if (!layers.empty())
+    if (!scaled.empty())
     {
-        for (int y = 0; y < image.rows; ++y)
+        // 每行被哪些 layer 覆盖。合成只在"本行确实有前景"的区间里做；其它地方
+        // m 恒为 0，而 m == 0 时 max(mcs, 0) 与 *= (1 - 0*alpha) 都是恒等，
+        // 最后那次 (x/255)*255 往返对 0..255 也逐位是恒等（实测 256 个值全中），
+        // 所以跳过与不跳过结果完全相同。
+        std::vector<std::vector<int>> rowLayers(static_cast<std::size_t>(srcH));
+        for (std::size_t li = 0; li < scaled.size(); ++li)
         {
-            cv::Vec3b* px = image.ptr<cv::Vec3b>(y);
-            for (int x = 0; x < image.cols; ++x)
+            for (int y : scaled[li].rows)
             {
-                cv::Vec3f mcs(0.0f, 0.0f, 0.0f);
-                float inv = 1.0f;
-                for (const auto& l : layers)
+                rowLayers[static_cast<std::size_t>(y)].push_back(
+                    static_cast<int>(li));
+            }
+        }
+
+        std::vector<float> mcs0(static_cast<std::size_t>(srcW));
+        std::vector<float> mcs1(static_cast<std::size_t>(srcW));
+        std::vector<float> mcs2(static_cast<std::size_t>(srcW));
+        std::vector<float> opa(static_cast<std::size_t>(srcW));
+
+        // m == 1 时 (1.0f - m * alpha) 的精确值（1.0f * alpha 就是 alpha）
+        const float keepOne = 1.0f - alpha;
+
+        for (int y = 0; y < srcH; ++y)
+        {
+            const std::vector<int>& active = rowLayers[static_cast<std::size_t>(y)];
+            if (active.empty())
+            {
+                continue;
+            }
+
+            const std::size_t uy = static_cast<std::size_t>(y);
+            int xa = srcW;
+            int xb = -1;
+            for (int li : active)
+            {
+                const ScaledMask& m = scaled[static_cast<std::size_t>(li)];
+                xa = std::min(xa, m.xlo[uy]);
+                xb = std::max(xb, m.xhi[uy]);
+            }
+            if (xb < xa)
+            {
+                continue;
+            }
+
+            for (int x = xa; x <= xb; ++x)
+            {
+                const std::size_t ux = static_cast<std::size_t>(x);
+                mcs0[ux] = 0.0f;
+                mcs1[ux] = 0.0f;
+                mcs2[ux] = 0.0f;
+                opa[ux]  = 1.0f;
+            }
+
+            for (int li : active)
+            {
+                const ScaledMask& m = scaled[static_cast<std::size_t>(li)];
+                const cv::Vec3f&  c = colors[static_cast<std::size_t>(li)];
+                const std::uint8_t* mp = m.img.ptr<std::uint8_t>(y);
+                const int lo = m.xlo[uy];
+                const int hi = m.xhi[uy];
+                for (int x = lo; x <= hi; ++x)
                 {
-                    const float m = l.m.ptr<std::uint8_t>(y)[x] != 0 ? 1.0f : 0.0f;
-                    mcs[0] = std::max(mcs[0], m * l.c[0]);
-                    mcs[1] = std::max(mcs[1], m * l.c[1]);
-                    mcs[2] = std::max(mcs[2], m * l.c[2]);
-                    inv *= (1.0f - m * alpha);
+                    if (mp[x] == 0)
+                    {
+                        continue;   // m == 0：三项都是恒等，跳过
+                    }
+                    const std::size_t ux = static_cast<std::size_t>(x);
+                    mcs0[ux] = std::max(mcs0[ux], c[0]);
+                    mcs1[ux] = std::max(mcs1[ux], c[1]);
+                    mcs2[ux] = std::max(mcs2[ux], c[2]);
+                    opa[ux] *= keepOne;
                 }
-                cv::Vec3b& dst = px[x];
-                for (int ch = 0; ch < 3; ++ch)
-                {
-                    const float imv = static_cast<float>(dst[ch]) / 255.0f;
-                    const float v = (imv * inv + mcs[ch]) * 255.0f;
-                    dst[ch] = static_cast<std::uint8_t>(v);
-                }
+            }
+
+            cv::Vec3b* px = image.ptr<cv::Vec3b>(y);
+            for (int x = xa; x <= xb; ++x)
+            {
+                const std::size_t ux  = static_cast<std::size_t>(x);
+                const float       inv = opa[ux];
+                cv::Vec3b&        dst = px[x];
+                const float im0 = static_cast<float>(dst[0]) / 255.0f;
+                const float im1 = static_cast<float>(dst[1]) / 255.0f;
+                const float im2 = static_cast<float>(dst[2]) / 255.0f;
+                dst[0] = static_cast<std::uint8_t>((im0 * inv + mcs0[ux]) * 255.0f);
+                dst[1] = static_cast<std::uint8_t>((im1 * inv + mcs1[ux]) * 255.0f);
+                dst[2] = static_cast<std::uint8_t>((im2 * inv + mcs2[ux]) * 255.0f);
             }
         }
     }

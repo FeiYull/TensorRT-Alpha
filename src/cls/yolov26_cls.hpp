@@ -35,7 +35,7 @@
 namespace trt_alpha::cls {
 
 //! YOLOV26 图像分类。
-class YoloV26Cls final : public IClassifier
+class YoloV26Cls : public IClassifier
 {
 public:
     YoloV26Cls() = default;
@@ -59,6 +59,10 @@ public:
         static const std::vector<core::TensorDesc> kEmpty;
         return m_engine ? m_engine->ioTensors() : kEmpty;
     }
+
+protected:
+    //! 运行时标签：日志 / 异常 / name() 都用它；YOLO11 子类只改这个值。
+    std::string m_tag = "yolov26_cls";
 
 private:
     // 基类 IClassifier 已提供，切勿重复声明：

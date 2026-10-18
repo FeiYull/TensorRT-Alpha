@@ -20,6 +20,7 @@
 //  ops.scale_coords 只对 x/y 做 (v - pad) / gain 再 clip，conf 通道不动。
 // =============================================================================
 #include "yolov26_pose.hpp"
+#include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"   // TRT_ALPHA_REGISTER_MODEL
 
@@ -37,17 +38,19 @@ constexpr float kMaxWh = 7680.0f;
 
 const std::string& YoloV26Pose::name() const noexcept
 {
-    static const std::string kName = "yolov26_pose";
-    return kName;
+    return m_tag;
 }
 
 void YoloV26Pose::loadConfig(const core::ModelConfig& cfg)
 {
     loadCommonConfig(cfg);
 
+    // The fused preprocess applies 'scale' only; mean/std must not pass silently.
+    core::requireScaleOnlyNorm(cfg, m_tag);
+
     if (m_numClass <= 0)
     {
-        throw std::runtime_error("yolov26_pose: num_class must be > 0 (got " +
+        throw std::runtime_error(m_tag + ": num_class must be > 0 (got " +
                                  std::to_string(m_numClass) + ")");
     }
 
@@ -59,7 +62,7 @@ void YoloV26Pose::loadConfig(const core::ModelConfig& cfg)
     m_kptDim = cfg.getInt("kpt_dim", m_kptDim);
     if (m_numKpt <= 0)
     {
-        throw std::runtime_error("yolov26_pose: num_kpts must be > 0 (got " +
+        throw std::runtime_error(m_tag + ": num_kpts must be > 0 (got " +
                                  std::to_string(m_numKpt) + ")");
     }
     // The fused plan copies `extra` channels verbatim into the candidate row, and
@@ -67,17 +70,17 @@ void YoloV26Pose::loadConfig(const core::ModelConfig& cfg)
     // silently mis-index every keypoint, so fail loudly.
     if (m_kptDim != 3)
     {
-        throw std::runtime_error("yolov26_pose: kpt_dim must be 3 (x, y, conf), got " +
+        throw std::runtime_error(m_tag + ": kpt_dim must be 3 (x, y, conf), got " +
                                  std::to_string(m_kptDim));
     }
 
     if (m_topK <= 0)
     {
-        throw std::runtime_error("yolov26_pose: top_k must be > 0 (got " +
+        throw std::runtime_error(m_tag + ": top_k must be > 0 (got " +
                                  std::to_string(m_topK) + ")");
     }
 
-    TRT_LOG_INFO("YoloV26Pose: config num_class=" << m_numClass
+    TRT_LOG_INFO(m_tag << ": config num_class=" << m_numClass
                  << " num_kpts=" << m_numKpt
                  << " extra=" << extraChannels()
                  << " conf=" << m_confThreshold
@@ -96,7 +99,7 @@ void YoloV26Pose::discoverEngineIo()
     }
     if (input == nullptr || output == nullptr)
     {
-        throw std::runtime_error("yolov26_pose: engine must have >=1 input and >=1 output");
+        throw std::runtime_error(m_tag + ": engine must have >=1 input and >=1 output");
     }
     m_inputName  = input->name;
     m_outputName = output->name;
@@ -106,12 +109,12 @@ void YoloV26Pose::discoverEngineIo()
     const nvinfer1::Dims outDims = m_engine->contextShape(m_outputName);
     if (outDims.nbDims != 3)
     {
-        throw std::runtime_error("yolov26_pose: expect output0 as [batch, 4+nc+extra, anchors]");
+        throw std::runtime_error(m_tag + ": expect output0 as [batch, 4+nc+extra, anchors]");
     }
     if (outDims.d[0] > 0 && outDims.d[0] != m_cfg.batchSize)
     {
         throw std::runtime_error(
-            "yolov26_pose: output0 batch = " + std::to_string(outDims.d[0]) +
+            m_tag + ": output0 batch = " + std::to_string(outDims.d[0]) +
             " but input batch = " + std::to_string(m_cfg.batchSize) +
             " (engine profile is the single source of truth; check 'batch_size')");
     }
@@ -123,13 +126,13 @@ void YoloV26Pose::discoverEngineIo()
     if (m_outC != expectC)
     {
         throw std::runtime_error(
-            "yolov26_pose: output0 channel = " + std::to_string(m_outC) +
+            m_tag + ": output0 channel = " + std::to_string(m_outC) +
             " but 4+num_class+num_kpts*3 = " + std::to_string(expectC) +
             " (check 'num_class' / 'num_kpts' in INI)");
     }
     if (m_anchors <= 0)
     {
-        throw std::runtime_error("yolov26_pose: output0 anchors must be > 0 (got " +
+        throw std::runtime_error(m_tag + ": output0 anchors must be > 0 (got " +
                                  std::to_string(m_anchors) + ")");
     }
 }
@@ -149,7 +152,7 @@ void YoloV26Pose::buildPlans()
     m_pp = std::make_unique<kernels::ops::CvProprocessFusedVecYoloV26Plan>(pcfg);
     if (!m_pp->ok())
     {
-        throw std::runtime_error("yolov26_pose: fused postprocess plan construction failed");
+        throw std::runtime_error(m_tag + ": fused postprocess plan construction failed");
     }
 }
 
@@ -159,11 +162,11 @@ void YoloV26Pose::allocateBuffers()
     const int H = m_cfg.dstH;
     const int W = m_cfg.dstW;
 
-    auto logBox = [&](const char* nm, int batch, int ch, int h, int w,
+    auto logBox = [&](const std::string& nm, int batch, int ch, int h, int w,
                       core::DataType dt, std::size_t bytes, core::MemorySpace sp)
     {
         core::detail::AllocInfo info;
-        info.name     = nm;
+        info.name     = nm.c_str();   // the caller keeps the string alive for this call
         info.batch    = batch;
         info.channels = ch;
         info.height   = h;
@@ -175,15 +178,15 @@ void YoloV26Pose::allocateBuffers()
     };
 
     m_inputSrc.allocate(static_cast<std::size_t>(B) * 3 * W * H);
-    logBox("yolov26_pose.input_src", B, 3, H, W, core::DataType::UInt8,
+    logBox(m_tag + ".input_src", B, 3, H, W, core::DataType::UInt8,
            m_inputSrc.bytes(), core::MemorySpace::Device);
 
     m_inputNchw.allocate(static_cast<std::size_t>(B) * 3 * W * H * sizeof(float));
-    logBox("yolov26_pose.input_nchw", B, 3, H, W, core::DataType::Float32,
+    logBox(m_tag + ".input_nchw", B, 3, H, W, core::DataType::Float32,
            m_inputNchw.bytes(), core::MemorySpace::Device);
 
     m_outputSrc.allocate(static_cast<std::size_t>(B) * m_outC * m_anchors * sizeof(float));
-    logBox("yolov26_pose.output_src", B, m_outC, 1, m_anchors, core::DataType::Float32,
+    logBox(m_tag + ".output_src", B, m_outC, 1, m_anchors, core::DataType::Float32,
            m_outputSrc.bytes(), core::MemorySpace::Device);
 
     const int detStride = m_pp->detStride();
@@ -192,32 +195,32 @@ void YoloV26Pose::allocateBuffers()
     const std::size_t cntBytes = static_cast<std::size_t>(B) * sizeof(int);
 
     m_dets.allocate(detBytes);
-    logBox("yolov26_pose.dets", B, m_topK, 1, detStride, core::DataType::Float32,
+    logBox(m_tag + ".dets", B, m_topK, 1, detStride, core::DataType::Float32,
            m_dets.bytes(), core::MemorySpace::Device);
 
     m_counts.allocate(cntBytes);
-    logBox("yolov26_pose.counts", B, 1, 1, 1, core::DataType::Int32,
+    logBox(m_tag + ".counts", B, 1, 1, 1, core::DataType::Int32,
            m_counts.bytes(), core::MemorySpace::Device);
 
     m_detsHost.allocate(detBytes);
-    logBox("yolov26_pose.dets_host", B, m_topK, 1, detStride, core::DataType::Float32,
+    logBox(m_tag + ".dets_host", B, m_topK, 1, detStride, core::DataType::Float32,
            m_detsHost.bytes(), core::MemorySpace::Host);
 
     m_countsHost.allocate(cntBytes);
-    logBox("yolov26_pose.counts_host", B, 1, 1, 1, core::DataType::Int32,
+    logBox(m_tag + ".counts_host", B, 1, 1, 1, core::DataType::Int32,
            m_countsHost.bytes(), core::MemorySpace::Host);
 
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
         !ctx->setTensorAddress(m_outputName.c_str(), m_outputSrc.data()))
     {
-        throw std::runtime_error("yolov26_pose: setTensorAddress failed");
+        throw std::runtime_error(m_tag + ": setTensorAddress failed");
     }
 }
 
 void YoloV26Pose::init(const core::ModelConfig& cfg)
 {
-    TRT_LOG_DEBUG("YoloV26Pose::init: entering");
+    TRT_LOG_DEBUG(m_tag << "::init: entering");
     loadConfig(cfg);
     m_engine = cfg.sharedEngine
         ? std::make_unique<core::TrtEngine>(cfg.sharedEngine)
@@ -227,7 +230,7 @@ void YoloV26Pose::init(const core::ModelConfig& cfg)
     allocateBuffers();
     m_keypoints.assign(static_cast<std::size_t>(m_cfg.batchSize), {});
 
-    TRT_LOG_INFO("YoloV26Pose: initialized (batch=" << m_cfg.batchSize
+    TRT_LOG_INFO(m_tag << ": initialized (batch=" << m_cfg.batchSize
                  << ", outC=" << m_outC
                  << ", anchors=" << m_anchors
                  << ", dst=" << m_cfg.dstW << "x" << m_cfg.dstH << ")");
@@ -247,11 +250,11 @@ void YoloV26Pose::ensurePreprocessPlan()
             static_cast<double>(m_padValue), m_normScale));
     if (!m_pre->ok())
     {
-        throw std::runtime_error("yolov26_pose: preprocess plan construction failed");
+        throw std::runtime_error(m_tag + ": preprocess plan construction failed");
     }
     m_lb = m_pre->info();
 
-    TRT_LOG_DEBUG("YoloV26Pose: letterbox rebuilt  " << m_srcW << "x" << m_srcH
+    TRT_LOG_DEBUG(m_tag << ": letterbox rebuilt  " << m_srcW << "x" << m_srcH
                  << " -> new " << m_lb.newW << "x" << m_lb.newH
                  << " pad(l/t)=" << m_lb.padLeft << "/" << m_lb.padTop
                  << " ratio=" << m_lb.ratio);
@@ -261,15 +264,15 @@ void YoloV26Pose::setBatch(const core::Batch& batch)
 {
     if (batch.views.empty())
     {
-        throw std::runtime_error("yolov26_pose: empty batch");
+        throw std::runtime_error(m_tag + ": empty batch");
     }
 
-    m_batch = requireBatchCapacity(*this, batch, "yolov26_pose");
+    m_batch = requireBatchCapacity(*this, batch, m_tag.c_str());
     m_srcH  = batch.views[0].height;
     m_srcW  = batch.views[0].width;
     if (m_srcW <= 0 || m_srcH <= 0)
     {
-        throw std::runtime_error("yolov26_pose: invalid source size " +
+        throw std::runtime_error(m_tag + ": invalid source size " +
                                  std::to_string(m_srcW) + "x" + std::to_string(m_srcH));
     }
 
@@ -277,7 +280,7 @@ void YoloV26Pose::setBatch(const core::Batch& batch)
 
     if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
     {
-        throw std::runtime_error("yolov26_pose: batch.buffer is null");
+        throw std::runtime_error(m_tag + ": batch.buffer is null");
     }
 
     const std::size_t oneImage = 3 * static_cast<std::size_t>(m_srcH) * m_srcW;
@@ -297,14 +300,14 @@ void YoloV26Pose::preprocess()
 {
     if (!m_pre)
     {
-        throw std::runtime_error("yolov26_pose: preprocess called before setBatch");
+        throw std::runtime_error(m_tag + ": preprocess called before setBatch");
     }
     m_pre->launch(m_stream.get(), m_batch,
                   static_cast<const unsigned char*>(m_inputSrc.data()),
                   m_inputNchw.asFloat());
     if (!m_pre->ok())
     {
-        throw std::runtime_error("yolov26_pose: preprocess kernel launch failed");
+        throw std::runtime_error(m_tag + ": preprocess kernel launch failed");
     }
 }
 
@@ -312,7 +315,7 @@ void YoloV26Pose::infer()
 {
     if (!m_engine->context()->enqueueV3(m_stream.get()))
     {
-        throw std::runtime_error("yolov26_pose: enqueueV3 failed");
+        throw std::runtime_error(m_tag + ": enqueueV3 failed");
     }
 }
 
@@ -324,7 +327,7 @@ void YoloV26Pose::postprocess()
                  static_cast<int*>(m_counts.data()), m_dets.asFloat());
     if (!m_pp->ok())
     {
-        throw std::runtime_error("yolov26_pose: fused postprocess kernel launch failed");
+        throw std::runtime_error(m_tag + ": fused postprocess kernel launch failed");
     }
 
     const int         stride   = m_pp->detStride();
@@ -385,7 +388,7 @@ void YoloV26Pose::postprocess()
         }
     }
 
-    TRT_LOG_DEBUG("YoloV26Pose::postprocess: batch=" << m_batch
+    TRT_LOG_DEBUG(m_tag << "::postprocess: batch=" << m_batch
                  << " poses[0]=" << (m_keypoints.empty() ? 0 : m_keypoints[0].size()));
 }
 

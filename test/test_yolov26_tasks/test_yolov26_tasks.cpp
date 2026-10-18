@@ -52,9 +52,13 @@
 //  用法：
 //      test_yolov26_tasks
 //      test_yolov26_tasks <cls.trt> <image> [image...]          # 旧式位置参数
-//      test_yolov26_tasks [--cls <e.trt>] [--depth <e.trt>] [--sem <e.trt>]
+//      test_yolov26_tasks [--net <prefix>]
+//                         [--cls <e.trt>] [--depth <e.trt>] [--sem <e.trt>]
 //                         [--pose <e.trt>] [--seg <e.trt>] [--obb <e.trt>]
 //                         [--refdir <dir>[,<dir>...]] <image> [image...]
+//
+//      --net 模型名前缀，默认 yolov26；给 yolo11 就跑 YOLO11 那五个任务
+//            （YOLO11 没有 depth / sem）。两边共用同一套实现与同一套断言。
 //
 //      --refdir 指向 D:\Data\trt_exp\dump_*_ref.py 的输出目录；
 //      没有它时 [9]/[10]/[11]/[12]/[13] 只打印统计量、记 SKIP，不做断言。
@@ -123,6 +127,17 @@ using trt_alpha::sem::SemanticMask;
 namespace {
 
 int g_failures = 0;
+
+//! Model-name prefix: "yolov26" (default) or "yolo11" (--net yolo11).
+//! Both families share one implementation (YOLO11 derives from YOLOV26), so the
+//! same assertions apply; only the registered names and the engines differ.
+std::string g_netPrefix = "yolov26";
+
+//! "<prefix>_<task>", e.g. "yolov26_seg" / "yolo11_seg".
+std::string netName(const char* task)
+{
+    return g_netPrefix + "_" + task;
+}
 
 void check(bool cond, const char* what)
 {
@@ -430,7 +445,7 @@ int runClsEndToEnd(const std::string& enginePath, int batch,
     std::cout << "\n---- [8] end-to-end classification (" << images.size()
               << " image(s), batch=" << batch << ") ----\n";
 
-    std::unique_ptr<IModel> base = ModelRegistry::instance().create("yolov26_cls");
+    std::unique_ptr<IModel> base = ModelRegistry::instance().create(netName("cls"));
     auto* model = dynamic_cast<IClassifier*>(base.get());
     if (model == nullptr)
     {
@@ -589,7 +604,7 @@ int runDepthEndToEnd(const std::string& enginePath, int batch,
     std::cout << "\n---- [9] end-to-end depth (" << images.size()
               << " image(s), batch=" << batch << ") ----\n";
 
-    std::unique_ptr<IModel> base = ModelRegistry::instance().create("yolov26_depth");
+    std::unique_ptr<IModel> base = ModelRegistry::instance().create(netName("depth"));
     auto* model = dynamic_cast<IDepthEstimator*>(base.get());
     if (model == nullptr)
     {
@@ -707,7 +722,7 @@ int runSemEndToEnd(const std::string& enginePath, int batch,
     std::cout << "\n---- [10] end-to-end semantic (" << images.size()
               << " image(s), batch=" << batch << ") ----\n";
 
-    std::unique_ptr<IModel> base = ModelRegistry::instance().create("yolov26_sem");
+    std::unique_ptr<IModel> base = ModelRegistry::instance().create(netName("sem"));
     auto* model = dynamic_cast<ISemanticSegmentor*>(base.get());
     if (model == nullptr)
     {
@@ -846,7 +861,7 @@ int runPoseEndToEnd(const std::string& enginePath, int batch,
     constexpr float kKptTol  = 0.05f;   // pixels
     constexpr float kMatchIou = 0.99f;  // boxes must be the same object
 
-    std::unique_ptr<IModel> base = ModelRegistry::instance().create("yolov26_pose");
+    std::unique_ptr<IModel> base = ModelRegistry::instance().create(netName("pose"));
     auto* model = dynamic_cast<IKeypointer*>(base.get());
     if (model == nullptr)
     {
@@ -1111,7 +1126,7 @@ int runSegEndToEnd(const std::string& enginePath, int batch,
     // budget is tiny but not zero; the real number is printed either way.
     constexpr double kSegMaxMismatchRatio = 0.001;   // 0.1 % of all mask pixels
 
-    std::unique_ptr<IModel> base = ModelRegistry::instance().create("yolov26_seg");
+    std::unique_ptr<IModel> base = ModelRegistry::instance().create(netName("seg"));
     auto* model = dynamic_cast<ISegmentor*>(base.get());
     if (model == nullptr)
     {
@@ -1366,10 +1381,14 @@ int runObbEndToEnd(const std::string& enginePath, int batch,
 
     constexpr float kPosTol   = 0.05f;    // cx / cy, pixels
     constexpr float kSizeTol  = 0.05f;    // w / h, pixels
-    constexpr float kAngleTol = 1e-5f;    // radians
+    // angle 是网络原始输出通道（弧度），TRT 与 CPU onnxruntime 的 kernel 选择
+    // 不同，会让它漂 ~1e-5：实测 yolo26n-obb <= 7.7e-7，yolo11n-obb 在
+    // 181 框的密集 DOTA 图上 <= 1.2e-5（框数仍完全一致）。5e-5 rad ≈ 0.003°，
+    // 比任何真实的几何错误小三个数量级，用来兜住这类漂移。
+    constexpr float kAngleTol = 5e-5f;    // radians
     constexpr float kConfTol  = 1e-4f;    // probability
 
-    std::unique_ptr<IModel> base = ModelRegistry::instance().create("yolov26_obb");
+    std::unique_ptr<IModel> base = ModelRegistry::instance().create(netName("obb"));
     auto* model = dynamic_cast<IObbDetector*>(base.get());
     if (model == nullptr)
     {
@@ -1542,6 +1561,10 @@ int runObbEndToEnd(const std::string& enginePath, int batch,
 //                                 [--seg <e.trt>] [--obb <e.trt>]
 //                                 [--refdir <dir>[,<dir>...]] <image> [image...]
 //
+//  --net <prefix> selects the model family: "yolov26" (default) or "yolo11".
+//  Both share one implementation (YOLO11 derives from YOLOV26), so the same
+//  assertions cover both; only the registered names and the engines differ.
+//
 //  --refdir is repeatable / comma-separated; each optional section picks the
 //  first directory that actually holds its file.
 //
@@ -1578,6 +1601,16 @@ int main(int argc, char** argv)
             if (a == "--pose")  { poseEngine  = argv[++i]; }
             if (a == "--seg")   { segEngine   = argv[++i]; }
             if (a == "--obb")   { obbEngine   = argv[++i]; }
+        }
+        else if (a == "--net")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "[FAIL] --net needs a model-name prefix (yolov26 / yolo11)\n";
+                ++g_failures;
+                break;
+            }
+            g_netPrefix = argv[++i];
         }
         else if (a == "--refdir")
         {
@@ -1626,15 +1659,21 @@ int main(int argc, char** argv)
     }
 
     // ---- [1] 注册中心 ----
-    std::cout << "\n---- [1] registry ----\n";
-    const char* names[] = {"yolov26_depth", "yolov26_sem", "yolov26_cls",
-                           "yolov26_pose", "yolov26_seg", "yolov26_obb"};
+    std::cout << "\n---- [1] registry (prefix '" << g_netPrefix << "') ----\n";
+    // depth / sem 只有 YOLO26 有；YOLO11 只有 det / cls / pose / seg / obb。
+    std::vector<std::string> names = {netName("cls"), netName("pose"),
+                                      netName("seg"), netName("obb")};
+    if (g_netPrefix == "yolov26")
+    {
+        names.push_back(netName("depth"));
+        names.push_back(netName("sem"));
+    }
     {
         const std::vector<std::string> all = ModelRegistry::instance().names();
-        for (const char* n : names)
+        for (const std::string& n : names)
         {
             const bool ok =
-                std::find(all.begin(), all.end(), std::string(n)) != all.end();
+                std::find(all.begin(), all.end(), n) != all.end();
             std::cout << (ok ? "[PASS] " : "[FAIL] ") << "registered: " << n << "\n";
             if (!ok) { ++g_failures; }
         }
@@ -1642,7 +1681,7 @@ int main(int argc, char** argv)
 
     // ---- [2] 引擎缺失必须显式抛 ----
     std::cout << "\n---- [2] init must fail loudly when the engine is missing ----\n";
-    for (const char* n : names)
+    for (const std::string& n : names)
     {
         std::unique_ptr<IModel> m = ModelRegistry::instance().create(n);
         if (!m)

@@ -33,7 +33,7 @@
 namespace trt_alpha::det {
 
 //! YOLOV26 检测模型（one2many / end2end = false）。
-class YoloV26 final : public IDetector
+class YoloV26 : public IDetector
 {
 public:
     YoloV26() = default;
@@ -57,6 +57,10 @@ public:
         static const std::vector<core::TensorDesc> kEmpty;
         return m_engine ? m_engine->ioTensors() : kEmpty;
     }
+
+protected:
+    //! 运行时标签：日志 / 异常 / name() 都用它；YOLO11 子类只改这个值。
+    std::string m_tag = "yolov26";
 
 private:
     // ---- 配置（从 ModelConfig 解出）----

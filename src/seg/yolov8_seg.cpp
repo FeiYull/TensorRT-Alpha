@@ -5,6 +5,7 @@
 #include "trt_alpha/core/buffer.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/kernels/candidates.hpp"
 
 #include <opencv2/imgproc.hpp>
 
@@ -294,9 +295,11 @@ void YoloV8Seg::postprocess()
         const float* protoB = protoHost + std::size_t(b) * m_numMaskCoeffs
                               * m_maskProtoH * m_maskProtoW;
 
-        for (int i = 0; i < count; ++i)
+        // decode 用 atomicAdd 发槽位 ⇒ 数组顺序每次运行都不同。先取确定性全序
+        // （置信度降序），输出才可复现，也与 ultralytics 的绘制顺序一致。
+        for (int i : kernels::orderedCandidates(objRow, count, m_objectsRow))
         {
-            const float* o = objRow + 1 + i * m_objectsRow;
+            const float* o = objRow + 1 + std::size_t(i) * m_objectsRow;
             if (o[6] < 0.5f) { continue; }
 
             // 框（网络输入像素坐标）-> 原图像素坐标

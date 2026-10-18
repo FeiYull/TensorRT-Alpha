@@ -38,13 +38,14 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 - **TODO**：支持 GStreamer —— 可拆卸 OpenCV，替换为 GStreamer 数据源
 - **TODO**：`trt_alpha build` —— ONNX → engine 一键序列化
 - **TODO**：展示更细粒度的性能测试 —— 用 **Nsight Systems** 剖析整条流水线的时间线（H2D / 推理 / D2H / 后处理 / 渲染的排布与空泡），用 **Nsight Compute** 逐个 CUDA kernel 剖析（占用率、访存、瓶颈定位）
-- **TODO**：YOLO11 等更多模型系列
+- **TODO**：更多模型系列
 
 </details>
 
 <details>
 <summary><b>更新日志</b></summary>
 
+- 2026.10.18 🚀 YOLO11 接入：det / cls / obb / pose / seg 五个任务，与 YOLO26 共用同一套前后处理（实测 mask 逐像素 0 差异、框 ≤3.4e-4 px），新增 5 个注册名与配置
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux 支持：GCC 13 移植、行尾 / 编辑器策略归一、引擎序列化脚本；Windows 运行时 DLL 自动部署；参数解析与源探测硬化 + `run` 全参数矩阵测试脚本
 - 2026.10.14 🧠 YOLO26 全任务族补齐：cls / depth / obb / pose / seg / sem；首页架构图
@@ -256,11 +257,11 @@ int main(){
 | yolo26-pose | ✅ | ✅ | ✅ | ✅ |
 | yolo26-tracking | 🚧 | 🚧 | 🚧 | 🚧 |
 | **YOLO11** | | | | |
-| yolo11-det | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-seg | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-obb | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-cls | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-pose | 🚧 | 🚧 | 🚧 | 🚧 |
+| yolo11-det | ✅ | ✅ | ✅ | ✅ |
+| yolo11-seg | ✅ | ✅ | ✅ | ✅ |
+| yolo11-obb | ✅ | ✅ | ✅ | ✅ |
+| yolo11-cls | ✅ | ✅ | ✅ | ✅ |
+| yolo11-pose | ✅ | ✅ | ✅ | ✅ |
 
 </div>
 

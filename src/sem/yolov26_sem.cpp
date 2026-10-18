@@ -16,6 +16,7 @@
 //      这里显式选 Nearest，与 ultralytics scale_masks(mode="nearest") 同口径。
 // =============================================================================
 #include "yolov26_sem.hpp"
+#include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
 
@@ -35,6 +36,9 @@ const std::string& YoloV26Sem::name() const noexcept
 void YoloV26Sem::loadConfig(const core::ModelConfig& cfg)
 {
     loadCommonConfig(cfg);
+
+    // The fused preprocess applies 'scale' only; mean/std must not pass silently.
+    core::requireScaleOnlyNorm(cfg, "yolov26_sem");
     TRT_LOG_INFO("YoloV26Sem: config scale=" << m_normScale
                  << " pad_value=" << m_padValue);
 }

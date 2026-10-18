@@ -38,13 +38,14 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 - **TODO**: GStreamer support — make OpenCV detachable and replace it with a GStreamer data source
 - **TODO**: `trt_alpha build` — one-command ONNX → engine serialization
 - **TODO**: finer-grained performance profiling — **Nsight Systems** to trace the whole pipeline timeline (how H2D / inference / D2H / postprocess / render are laid out, and where the bubbles are), and **Nsight Compute** to profile the CUDA kernels one by one (occupancy, memory access, bottleneck hunting)
-- **TODO**: more model families such as YOLO11
+- **TODO**: more model families
 
 </details>
 
 <details>
 <summary><b>Changelog</b></summary>
 
+- 2026.10.18 🚀 YOLO11 support: det / cls / obb / pose / seg, sharing the YOLO26 pre/post-processing (measured: zero mismatched mask pixels, boxes within 3.4e-4 px); five new registered names and configs
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux support: GCC 13 port, unified line-ending / editor policy, engine serialization script; automatic Windows runtime DLL deployment; hardened argument parsing and source detection + a full-parameter-matrix `run` test script
 - 2026.10.14 🧠 Complete YOLO26 task family: cls / depth / obb / pose / seg / sem; the pipeline diagram on the landing page
@@ -256,11 +257,11 @@ More: [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infe
 | yolo26-pose | ✅ | ✅ | ✅ | ✅ |
 | yolo26-tracking | 🚧 | 🚧 | 🚧 | 🚧 |
 | **YOLO11** | | | | |
-| yolo11-det | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-seg | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-obb | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-cls | 🚧 | 🚧 | 🚧 | 🚧 |
-| yolo11-pose | 🚧 | 🚧 | 🚧 | 🚧 |
+| yolo11-det | ✅ | ✅ | ✅ | ✅ |
+| yolo11-seg | ✅ | ✅ | ✅ | ✅ |
+| yolo11-obb | ✅ | ✅ | ✅ | ✅ |
+| yolo11-cls | ✅ | ✅ | ✅ | ✅ |
+| yolo11-pose | ✅ | ✅ | ✅ | ✅ |
 
 </div>
 

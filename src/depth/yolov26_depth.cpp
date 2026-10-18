@@ -17,6 +17,7 @@
 //      （D:\Data\trt_exp\probe_onnx_io.py）确认过形状和值域。
 // =============================================================================
 #include "yolov26_depth.hpp"
+#include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"   // TRT_ALPHA_REGISTER_MODEL
 
@@ -35,6 +36,9 @@ const std::string& YoloV26Depth::name() const noexcept
 void YoloV26Depth::loadConfig(const core::ModelConfig& cfg)
 {
     loadCommonConfig(cfg);
+
+    // The fused preprocess applies 'scale' only; mean/std must not pass silently.
+    core::requireScaleOnlyNorm(cfg, "yolov26_depth");
 
     TRT_LOG_INFO("YoloV26Depth: config scale=" << m_normScale
                  << " pad_value=" << m_padValue);

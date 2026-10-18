@@ -63,7 +63,7 @@
 
 namespace trt_alpha::seg {
 
-class YoloV26Seg final : public ISegmentor
+class YoloV26Seg : public ISegmentor
 {
 public:
     YoloV26Seg() = default;
@@ -86,6 +86,10 @@ public:
         static const std::vector<core::TensorDesc> kEmpty;
         return m_engine ? m_engine->ioTensors() : kEmpty;
     }
+
+protected:
+    //! 运行时标签：日志 / 异常 / name() 都用它；YOLO11 子类只改这个值。
+    std::string m_tag = "yolov26_seg";
 
 private:
     void loadConfig(const core::ModelConfig& cfg);
@@ -119,11 +123,22 @@ private:
     core::PinnedBuffer m_detsHost;
     core::PinnedBuffer m_countsHost;
 
-    //! Mask scratch, one detection at a time (see the header note on why not all
-    //! of them at once). logits @160x160, upsampled mask @dstW x dstH.
-    core::DeviceBuffer m_logits;
-    core::DeviceBuffer m_maskUp;
-    core::PinnedBuffer m_maskUpHost;
+    //! Mask scratch. The dot / upsample pair still runs one detection at a time
+    //! (stage 2 needs a full 640x640 workspace per instance), but the device and
+    //! host copies are staged kMaskChunk instances deep, so a whole chunk costs
+    //! ONE cudaMemcpyAsync batch + ONE synchronize() instead of one each per
+    //! instance. 8 keeps the scratch under 14 MB while cutting 39 sync points
+    //! per batch down to 5.
+    static constexpr int kMaskChunk = 8;
+    core::DeviceBuffer m_logits;      // [kMaskChunk] x protoH*protoW
+    core::DeviceBuffer m_maskUp;      // [kMaskChunk] x dstW*dstH
+    core::PinnedBuffer m_maskUpHost;  // [kMaskChunk] x dstW*dstH
+
+    //! Emit Segmentation::maskOrig (a full dstW->srcW bilinear resize per
+    //! instance, ~616 us of the 1135 us per-instance budget at 1912x1080).
+    //! Off by default: the built-in renderer rescales Segmentation::mask itself
+    //! and never reads maskOrig. INI: [model] mask_orig.
+    bool m_emitMaskOrig = false;
 
     //! Preprocess plan + its letterbox geometry -- the inverse transform for the
     //! boxes comes from the *same* object as the forward one, so they cannot drift.
