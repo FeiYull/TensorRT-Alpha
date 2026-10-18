@@ -263,10 +263,10 @@ int main(){
 | yolov11_cls | ✅ | ✅ | ✅ | ✅ |
 | yolov11_pose | ✅ | ✅ | ✅ | ✅ |
 | **YOLOV9** | | | | |
-| yolov9_det | ✅ | — | — | ✅ |
-| yolov9_seg | ✅ | — | — | ✅ |
+| yolov9_det | ✅ | ✅ | ✅ | ✅ |
+| yolov9_seg | ✅ | ✅ | ✅ | ✅ |
 | **YOLOV10** | | | | |
-| yolov10_det | ✅ | — | — | ✅ |
+| yolov10_det | ✅ | ✅ | ✅ | ✅ |
 
 </div>
 
