@@ -1,6 +1,6 @@
-add_executable(test_yolov8_pose test_yolov8_pose.cpp)
+add_executable(test_yolov8_seg_old test_yolov8_seg_old.cpp)
 
-target_link_libraries(test_yolov8_pose
+target_link_libraries(test_yolov8_seg_old
     PRIVATE
         trt::trt
         ocv::ocv

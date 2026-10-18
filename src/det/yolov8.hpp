@@ -1,96 +1,29 @@
 // =============================================================================
 //  trt_alpha :: det :: YoloV8（私有头文件）
 // -----------------------------------------------------------------------------
-//  仅供 src/det/yolov8.cpp 和同目录模型使用。
+//  YOLOV8-det 的 ONNX 契约与 YOLOV26-det 逐项相同：
+//      input   [batch, 3, 640, 640]（NCHW，正方形 letterbox，/255）
+//      output0 [batch, 4 + nc, anchors] = [batch, 84, 8400]
+//  dist2bbox / *stride / sigmoid 已烘焙进图 => box 是 xywh 像素，cls 是概率。
+//
+//  实测（onnxruntime，同一张 bus.jpg，正方形 letterbox）：
+//      top-anchor box = [320.0, 291.4, 469.3, 309.6]（xywh），
+//      官方 nms.non_max_suppression 直接可解码，与 yolov26 同一后处理入口。
+//
+//  所以这里不复制管线，只继承并把标签换成 yolov8 —— 复制一份处理逻辑就等于
+//  多一份会漂移的实现。
 // =============================================================================
 #pragma once
 
-#include "trt_alpha/core/batch.hpp"
-#include "trt_alpha/core/batch_result.hpp"
-#include "trt_alpha/core/cuda_stream.hpp"
-#include "trt_alpha/core/device_buffer.hpp"
-#include "trt_alpha/core/engine.hpp"
-#include "trt_alpha/core/model_config.hpp"
-#include "trt_alpha/core/pinned_buffer.hpp"
-#include "trt_alpha/det/detector.hpp"
-#include "trt_alpha/kernels/legacy/postprocess.hpp"
-#include "trt_alpha/kernels/legacy/preprocess.hpp"
-
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
+#include "yolov26.hpp"
 
 namespace trt_alpha::det {
 
-//! YOLOv8 检测模型。
-class YoloV8 final : public IDetector
+//! YOLOV8 检测模型：与 YoloV26 共用同一套前后处理，只有标签不同。
+class YoloV8 final : public YoloV26
 {
 public:
-    YoloV8() = default;
-    ~YoloV8() override = default;
-
-    YoloV8(const YoloV8&) = delete;
-    YoloV8& operator=(const YoloV8&) = delete;
-
-    // ---- IModel 接口 ----
-    [[nodiscard]] const std::string& name() const noexcept override;
-
-    void init(const core::ModelConfig& cfg) override;
-    void setBatch(const core::Batch& batch) override;
-    void preprocess() override;
-    void infer() override;
-    void postprocess() override;
-    void reset() override;
-
-    [[nodiscard]] const std::vector<core::TensorDesc>& describe() const noexcept override
-    {
-        static const std::vector<core::TensorDesc> kEmpty;
-        return m_engine ? m_engine->ioTensors() : kEmpty;
-    }
-
-private:
-    // ---- 配置（从 ModelConfig 解出）----
-    // core::ModelConfig m_cfg;
-    // int m_numClass = 80;
-    // float m_confThreshold = 0.25f;
-    // float m_iouThreshold = 0.45f;
-    // int m_topK = 300;
-    // float m_normScale = 255.f;
-    // float m_normMean[3] = {0.f, 0.f, 0.f};
-    // float m_normStd[3]  = {1.f, 1.f, 1.f};
-    // float m_padValue = 114.f;
-
-    // ---- 运行时状态 ----
-    std::unique_ptr<core::TrtEngine> m_engine;
-    std::string m_inputName;    // "images"
-    std::string m_outputName;   // "output0"
-
-    int m_batch = 0;
-    int m_srcW = 0;
-    int m_srcH = 0;
-
-    int m_srcRow = 0;      // 输出通道 = 4 + nc
-    int m_anchors = 0;     // 输出 anchor 数（YOLOv8 通常是 8400）
-
-    // ---- Device / Host 缓冲 ----
-    core::CudaStream m_stream;
-    core::DeviceBuffer m_inputSrc;        // 原图上传（uint8 BGR HWC）
-    core::DeviceBuffer m_resizeOut;       // letterbox 输出（float BGR HWC）
-    core::DeviceBuffer m_inputNchw;       // NCHW 归一化后（网络输入）
-    core::DeviceBuffer m_outputSrc;       // 引擎原始输出（[B, 4+nc, anchors]）
-    core::DeviceBuffer m_outputTransposed;// 转置后（[B, anchors, 4+nc]）
-    core::DeviceBuffer m_objects;         // decode + NMS 结果（Device）
-    core::PinnedBuffer m_objectsHost;     // decode + NMS 结果（Host）
-
-    int m_objectsPerImage = 0;   // 1 + kObjectWidth * topK
-
-    trt_alpha::kernels::AffineMat m_dst2src{};
-
-    // ---- 辅助 ----
-    void loadConfig(const core::ModelConfig& cfg);
-    void discoverEngineIo();
-    void allocateBuffers();
+    YoloV8() { m_tag = "yolov8"; }
 };
 
 }  // namespace trt_alpha::det

@@ -208,14 +208,29 @@ serialize yolov5s.onnx  yolov5s.trt \
 serialize yolov7-tiny.onnx  yolov7_tiny.trt \
     --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
 
-serialize yolov8n.onnx  yolov8n.trt \
-    --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+# yolov8 (new deployment): STATIC batch = 2, no dynamic shapes.
+# The legacy dynamic engines are kept as *_old.trt for the yolov8_old registration.
+# --noTF32 keeps the engine on true fp32: with TF32 on (the Ampere+ default the
+# reference numbers were taken with) the boxes drift enough to reshuffle NMS.
+serialize yolov8n.onnx  yolov8n.trt  --noTF32
 
-serialize yolov8n-pose.onnx  yolov8n_pose.trt \
-    --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+serialize yolov8n-pose.onnx  yolov8n_pose.trt  --noTF32
 
-serialize yolov8n-seg.onnx  yolov8n_seg.trt \
-    --minShapes=images:1x3x640x640 --optShapes=images:2x3x640x640 --maxShapes=images:4x3x640x640
+serialize yolov8n-seg.onnx  yolov8n_seg.trt  --noTF32
+
+serialize yolov8n-cls.onnx  yolov8n_cls.trt  --noTF32
+
+serialize yolov8n-obb.onnx  yolov8n_obb.trt  --noTF32
+
+# yolov9: same static batch = 2.  Only yolov9c-seg / yolov9e-seg exist for seg,
+# so the seg engine is named after the `c` checkpoint.
+serialize yolov9t.onnx      yolov9t.trt      --noTF32
+
+serialize yolov9c-seg.onnx  yolov9c_seg.trt  --noTF32
+
+# yolov10: one2many only ([B, 84, 8400]).  The official release ONNX is end2end
+# ([B, 300, 6]) and is rejected at startup, so export with `yolo export`.
+serialize yolov10n.onnx     yolov10n.trt     --noTF32
 
 # yolov6n: images[batch,3,640,640]  (H/W fixed at 640)
 serialize yolov6n.onnx  yolov6n.trt \

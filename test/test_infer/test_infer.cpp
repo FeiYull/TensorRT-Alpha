@@ -27,8 +27,8 @@ void check(bool cond, const char* what)
 int main(int argc, char** argv)
 {
     trt_alpha::InferParams p;
-    p.model_type  = trt_alpha::ModelType::yolov8;
-    p.config_path = "configs/yolov8.ini";
+    p.model_type  = trt_alpha::ModelType::yolov8_old;
+    p.config_path = "configs/yolov8_old.ini";
     p.show        = true;
 
     std::string display_source;

@@ -69,6 +69,7 @@
 #include "trt_alpha/core/buffer.hpp"
 #include "trt_alpha/core/data_type.hpp"
 #include "trt_alpha/core/model_registry.hpp"
+#include "trt_alpha/det/detector.hpp"
 #include "trt_alpha/depth/depth_estimator.hpp"
 #include "trt_alpha/kernels/ops/preprocess_fused_vec_yolov26_cls.hpp"
 #include "trt_alpha/kernels/ops/preprocess_fused_vec_yolov26_det.hpp"
@@ -109,6 +110,8 @@ using trt_alpha::core::MemorySpace;
 using trt_alpha::core::ModelConfig;
 using trt_alpha::depth::DepthMap;
 using trt_alpha::depth::IDepthEstimator;
+using trt_alpha::det::Detection;
+using trt_alpha::det::IDetector;
 using trt_alpha::kernels::ops::computeLetterBox;
 using trt_alpha::kernels::ops::CvPreprocessVecClsPlan;
 using trt_alpha::kernels::ops::CvScaleMaskPlan;
@@ -128,9 +131,15 @@ namespace {
 
 int g_failures = 0;
 
-//! Model-name prefix: "yolov26" (default) or "yolov11" (--net yolov11).
-//! Both families share one implementation (YOLOV11 derives from YOLOV26), so the
-//! same assertions apply; only the registered names and the engines differ.
+// Defined further down, next to the depth/sem reference loaders; the [8]
+// classification section needs them earlier.
+std::string stripExtension(const std::string& p);
+std::string locateRef(const std::vector<std::string>& dirs, const std::string& file);
+
+//! Model-name prefix: "yolov26" (default), "yolov11", "yolov8", "yolov9",
+//! "yolov10".  All families share one implementation (they all derive from
+//! YOLOV26), so the same assertions apply; only the registered names and the
+//! engines differ.
 std::string g_netPrefix = "yolov26";
 
 //! "<prefix>_<task>", e.g. "yolov26_seg" / "yolov11_seg".
@@ -439,7 +448,8 @@ Batch batchFromMat(const cv::Mat& img, int batchSize)
 }
 
 int runClsEndToEnd(const std::string& enginePath, int batch,
-                   const std::vector<std::string>& images)
+                   const std::vector<std::string>& images,
+                   const std::vector<std::string>& refDirs)
 {
     int failures = 0;
     std::cout << "\n---- [8] end-to-end classification (" << images.size()
@@ -508,6 +518,96 @@ int runClsEndToEnd(const std::string& enginePath, int batch,
             std::cout << " " << cs.label << ":" << cs.score;
         }
         std::cout << "\n";
+
+        // Per-model reference (D:\Data\trt_exp\ref_dump.py --task cls):
+        //     <stem>.cls.f32.bin
+        //         int32  n            (n = top_k, best first)
+        //         int32  labels[n]
+        //         float  scores[n]    softmax probabilities, descending
+        // The kClsExpect table below only holds values for one particular
+        // model, so it is the fallback when no bin is present.
+        const std::string clsRef =
+            locateRef(refDirs, stripExtension(nm) + ".cls.f32.bin");
+        if (!clsRef.empty())
+        {
+            std::ifstream rin(clsRef, std::ios::binary | std::ios::ate);
+            const std::streamsize rtotal = rin.tellg();
+            rin.seekg(0);
+            std::vector<char> rraw(static_cast<std::size_t>(rtotal));
+            rin.read(rraw.data(), rtotal);
+
+            int refN = 0;
+            const std::size_t head = sizeof(std::int32_t);
+            if (rtotal >= static_cast<std::streamsize>(head))
+            {
+                std::memcpy(&refN, rraw.data(), head);
+            }
+            const std::size_t rwant =
+                head + static_cast<std::size_t>(refN) *
+                           (sizeof(std::int32_t) + sizeof(float));
+            if (refN <= 0 || static_cast<std::size_t>(rtotal) != rwant)
+            {
+                std::cout << "[FAIL] " << nm << ": reference " << clsRef
+                          << " has " << rtotal << " bytes, expected " << rwant
+                          << " (n=" << refN << ")\n";
+                ++failures;
+                model->reset();
+                continue;
+            }
+
+            const auto* rlab = reinterpret_cast<const std::int32_t*>(
+                rraw.data() + head);
+            const auto* rsc = reinterpret_cast<const float*>(
+                rraw.data() + head +
+                static_cast<std::size_t>(refN) * sizeof(std::int32_t));
+
+            // Softmax over the same logits: TRT fp32 vs torch CPU fp32 differ by
+            // rounding only. The real number is printed below either way.
+            constexpr float kScoreTol = 5e-4f;
+
+            float maxScoreD = 0.f;
+            int   bad = 0;
+            const int cmp = std::min(static_cast<int>(top.size()), refN);
+            for (int k = 0; k < cmp; ++k)
+            {
+                const float d = std::fabs(
+                    top[static_cast<std::size_t>(k)].score - rsc[k]);
+                maxScoreD = std::max(maxScoreD, d);
+                if (top[static_cast<std::size_t>(k)].label != rlab[k] ||
+                    d > kScoreTol)
+                {
+                    if (bad < 4)
+                    {
+                        std::cout << "[FAIL] " << nm << ": top-" << (k + 1)
+                                  << " got " << top[static_cast<std::size_t>(k)].label
+                                  << ":" << top[static_cast<std::size_t>(k)].score
+                                  << " want " << rlab[k] << ":" << rsc[k] << "\n";
+                    }
+                    ++bad;
+                }
+            }
+            if (static_cast<int>(top.size()) != refN)
+            {
+                std::cout << "[FAIL] " << nm << ": top_k size got " << top.size()
+                          << " want " << refN << "\n";
+                ++bad;
+            }
+
+            std::cout << "       " << nm << "  n=" << refN
+                      << "  max|d| score=" << maxScoreD << "\n";
+            if (bad == 0)
+            {
+                std::cout << "[PASS] " << nm << " top-k matches the reference\n";
+            }
+            else
+            {
+                std::cout << "[FAIL] " << nm << ": " << bad
+                          << " top-k entr(ies) out of tolerance\n";
+                ++failures;
+            }
+            model->reset();
+            continue;
+        }
 
         if (exp == nullptr)
         {
@@ -1546,6 +1646,226 @@ int runObbEndToEnd(const std::string& enginePath, int batch,
     return failures;
 }
 
+// -----------------------------------------------------------------------------
+//  [14] det end to end, box by box
+// -----------------------------------------------------------------------------
+//  Reference bins (D:\Data\trt_exp\ref_dump.py --task det):
+//      <stem>.det.f32.bin
+//          int32   n
+//          float   boxes[n][6]     x1, y1, x2, y2, conf, cls  (source pixels)
+//
+//  The reference runs onnxruntime (SQUARE letterbox) + the official
+//  nms.non_max_suppression (nc = num_class, max_det = 300) + ops.scale_boxes --
+//  exactly the steps the C++ side performs, in the same order.  See the header
+//  of dump_seg_ref.py for why a `.pt` model is not a usable reference here.
+//
+//  ORDER is not part of the contract (ours comes out of our own greedy rounds,
+//  theirs out of TorchNMS), so the two sets are matched by IoU first and only
+//  then compared value by value.  The COUNT is asserted up front: a different
+//  survivor set means the NMS genuinely disagrees.
+// -----------------------------------------------------------------------------
+int runDetEndToEnd(const std::string& enginePath, int batch,
+                   const std::vector<std::string>& images,
+                   const std::vector<std::string>& refDirs)
+{
+    int failures = 0;
+    std::cout << "\n---- [14] end-to-end detection (" << images.size()
+              << " image(s), batch=" << batch << ") ----\n";
+
+    constexpr float kBoxTol   = 0.05f;   // pixels
+    constexpr float kConfTol  = 1e-4f;   // probability
+    constexpr float kMatchIou = 0.99f;   // same object, not merely overlapping
+
+    std::unique_ptr<IModel> base = ModelRegistry::instance().create(g_netPrefix);
+    auto* model = dynamic_cast<IDetector*>(base.get());
+    if (model == nullptr)
+    {
+        std::cout << "[FAIL] " << g_netPrefix << " is not an IDetector\n";
+        return 1;
+    }
+
+    ModelConfig cfg;
+    cfg.engine    = enginePath;
+    cfg.batchSize = batch;
+    cfg.dstW      = 640;          // the engine's declared shape wins anyway
+    cfg.dstH      = 640;
+    cfg.extras["num_class"]   = "80";
+    cfg.extras["conf_thresh"] = "0.25";
+    cfg.extras["iou_thresh"]  = "0.7";
+    cfg.extras["top_k"]       = "300";
+    cfg.extras["scale"]       = "255.0";
+    cfg.extras["pad_value"]   = "114.0";
+
+    model->init(cfg);
+    std::cout << "[PASS] engine loaded: " << enginePath << "\n";
+
+    for (const std::string& p : images)
+    {
+        const cv::Mat img = cv::imread(p, cv::IMREAD_COLOR);
+        if (img.empty())
+        {
+            std::cout << "[FAIL] cannot read " << p << "\n";
+            ++failures;
+            continue;
+        }
+
+        model->setBatch(batchFromMat(img, batch));
+        model->preprocess();
+        model->infer();
+        model->postprocess();
+
+        const std::string nm = baseName(p);
+
+        // `detections()` is a reference into the model and reset() clears it.
+        const std::vector<std::vector<Detection>> all = model->detections();
+        if (all.empty())
+        {
+            std::cout << "[FAIL] " << nm << ": no detection output slot\n";
+            ++failures;
+            model->reset();
+            continue;
+        }
+        const std::vector<Detection> ours = all[0];
+
+        const std::string binPath =
+            locateRef(refDirs, stripExtension(nm) + ".det.f32.bin");
+        if (binPath.empty())
+        {
+            std::cout << "[SKIP] " << nm << " (no det reference)\n";
+            model->reset();
+            continue;
+        }
+
+        std::ifstream in(binPath, std::ios::binary | std::ios::ate);
+        const std::streamsize total = in.tellg();
+        in.seekg(0);
+        std::vector<char> raw(static_cast<std::size_t>(total));
+        in.read(raw.data(), total);
+
+        if (total < 4)
+        {
+            std::cout << "[FAIL] " << nm << ": reference " << binPath
+                      << " is truncated\n";
+            ++failures;
+            model->reset();
+            continue;
+        }
+        int refN = 0;
+        std::memcpy(&refN, raw.data(), sizeof(refN));
+        const std::size_t want = 4 + static_cast<std::size_t>(refN) * 6 * sizeof(float);
+        if (refN < 0 || static_cast<std::size_t>(total) != want)
+        {
+            std::cout << "[FAIL] " << nm << ": reference " << binPath << " has "
+                      << total << " bytes, expected " << want
+                      << " (n=" << refN << ")\n";
+            ++failures;
+            model->reset();
+            continue;
+        }
+
+        std::vector<float> refBox(static_cast<std::size_t>(refN) * 6);
+        std::memcpy(refBox.data(), raw.data() + 4, refBox.size() * sizeof(float));
+
+        std::cout << "       " << nm << "  " << img.cols << "x" << img.rows
+                  << "  ours=" << ours.size() << "  ref=" << refN << "\n";
+
+        if (static_cast<int>(ours.size()) != refN)
+        {
+            std::cout << "[FAIL] " << nm << ": detection count got " << ours.size()
+                      << " want " << refN
+                      << " (NMS survivor set differs)\n";
+            ++failures;
+            model->reset();
+            continue;
+        }
+
+        const auto iouXyxy = [](const float* a, const Detection& b)
+        {
+            const float x1 = std::max(a[0], b.left);
+            const float y1 = std::max(a[1], b.top);
+            const float x2 = std::min(a[2], b.right);
+            const float y2 = std::min(a[3], b.bottom);
+            const float iw = std::max(0.f, x2 - x1);
+            const float ih = std::max(0.f, y2 - y1);
+            const float inter = iw * ih;
+            const float areaA = (a[2] - a[0]) * (a[3] - a[1]);
+            const float areaB = (b.right - b.left) * (b.bottom - b.top);
+            const float uni = areaA + areaB - inter + 1e-9f;
+            return inter / uni;
+        };
+
+        std::vector<char> used(ours.size(), 0);
+        float maxBoxD = 0.f, maxConfD = 0.f;
+        int   unmatched = 0;
+
+        for (int r = 0; r < refN; ++r)
+        {
+            const float* rb = refBox.data() + static_cast<std::size_t>(r) * 6;
+
+            int   best = -1;
+            float bestIou = 0.f;
+            for (std::size_t i = 0; i < ours.size(); ++i)
+            {
+                if (used[i] != 0) { continue; }
+                const float v = iouXyxy(rb, ours[i]);
+                if (v > bestIou) { bestIou = v; best = static_cast<int>(i); }
+            }
+            if (best < 0 || bestIou < kMatchIou)
+            {
+                if (unmatched < 4)
+                {
+                    std::cout << "[FAIL] " << nm << ": no match for ref box #" << r
+                              << " (best IoU " << bestIou << ")\n";
+                }
+                ++unmatched;
+                continue;
+            }
+            used[static_cast<std::size_t>(best)] = 1;
+
+            const Detection& o = ours[static_cast<std::size_t>(best)];
+            const float dBox = std::max(
+                std::max(std::fabs(o.left - rb[0]), std::fabs(o.top - rb[1])),
+                std::max(std::fabs(o.right - rb[2]), std::fabs(o.bottom - rb[3])));
+            const float dConf = std::fabs(o.confidence - rb[4]);
+            maxBoxD  = std::max(maxBoxD, dBox);
+            maxConfD = std::max(maxConfD, dConf);
+
+            if (dBox > kBoxTol || dConf > kConfTol ||
+                o.label != static_cast<int>(rb[5]))
+            {
+                if (unmatched < 4)
+                {
+                    std::cout << "[FAIL] " << nm << ": box #" << r
+                              << " ours=[" << o.left << " " << o.top << " "
+                              << o.right << " " << o.bottom << " "
+                              << o.confidence << " " << o.label << "]"
+                              << " ref=[" << rb[0] << " " << rb[1] << " "
+                              << rb[2] << " " << rb[3] << " " << rb[4] << " "
+                              << static_cast<int>(rb[5]) << "]\n";
+                }
+                ++unmatched;
+            }
+        }
+
+        std::cout << "       " << nm << "  n=" << refN
+                  << "  max|d| box=" << maxBoxD << " conf=" << maxConfD << "\n";
+
+        if (unmatched == 0)
+        {
+            std::cout << "[PASS] " << nm << " detections match the reference\n";
+        }
+        else
+        {
+            std::cout << "[FAIL] " << nm << ": " << unmatched
+                      << " box(es) unmatched or out of tolerance\n";
+            ++failures;
+        }
+        model->reset();
+    }
+
+    return failures;
+}
+
 }  // namespace
 
 // =============================================================================
@@ -1556,14 +1876,16 @@ int runObbEndToEnd(const std::string& enginePath, int batch,
 //    (legacy)  test_yolov26_tasks <cls.trt> <image> [image...]
 //              -> equivalent to --cls <cls.trt> plus the trailing images
 //
-//    (flags)   test_yolov26_tasks [--cls <e.trt>] [--depth <e.trt>]
-//                                 [--sem <e.trt>] [--pose <e.trt>]
-//                                 [--seg <e.trt>] [--obb <e.trt>]
+//    (flags)   test_yolov26_tasks [--det <e.trt>] [--cls <e.trt>]
+//                                 [--depth <e.trt>] [--sem <e.trt>]
+//                                 [--pose <e.trt>] [--seg <e.trt>]
+//                                 [--obb <e.trt>]
 //                                 [--refdir <dir>[,<dir>...]] <image> [image...]
 //
-//  --net <prefix> selects the model family: "yolov26" (default) or "yolov11".
-//  Both share one implementation (YOLOV11 derives from YOLOV26), so the same
-//  assertions cover both; only the registered names and the engines differ.
+//  --net <prefix> selects the model family: "yolov26" (default), "yolov11",
+//  "yolov8", "yolov9" or "yolov10".  All of them share one implementation
+//  (every family derives from YOLOV26), so the same assertions cover all; only
+//  the registered names, the task set and the engines differ.
 //
 //  --refdir is repeatable / comma-separated; each optional section picks the
 //  first directory that actually holds its file.
@@ -1580,13 +1902,14 @@ int main(int argc, char** argv)
     std::cout << "============ test_yolov26_tasks ============\n";
 
     std::string clsEngine, depthEngine, semEngine, poseEngine, segEngine, obbEngine;
+    std::string detEngine;
     std::vector<std::string> refDirs;
     std::vector<std::string> images;
 
     for (int i = 1; i < argc; ++i)
     {
         const std::string a = argv[i];
-        if (a == "--cls" || a == "--depth" || a == "--sem" ||
+        if (a == "--det" || a == "--cls" || a == "--depth" || a == "--sem" ||
             a == "--pose" || a == "--seg" || a == "--obb")
         {
             if (i + 1 >= argc)
@@ -1595,7 +1918,7 @@ int main(int argc, char** argv)
                 ++g_failures;
                 break;
             }
-            if (a == "--cls")   { clsEngine   = argv[++i]; }
+            if (a == "--det")   { detEngine   = argv[++i]; }
             if (a == "--depth") { depthEngine = argv[++i]; }
             if (a == "--sem")   { semEngine   = argv[++i]; }
             if (a == "--pose")  { poseEngine  = argv[++i]; }
@@ -1606,7 +1929,8 @@ int main(int argc, char** argv)
         {
             if (i + 1 >= argc)
             {
-                std::cout << "[FAIL] --net needs a model-name prefix (yolov26 / yolov11)\n";
+                std::cout << "[FAIL] --net needs a model-name prefix "
+                             "(yolov26 / yolov11 / yolov8 / yolov9 / yolov10)\n";
                 ++g_failures;
                 break;
             }
@@ -1660,13 +1984,33 @@ int main(int argc, char** argv)
 
     // ---- [1] 注册中心 ----
     std::cout << "\n---- [1] registry (prefix '" << g_netPrefix << "') ----\n";
-    // depth / sem 只有 YOLO26 有；YOLOV11 只有 det / cls / pose / seg / obb。
-    std::vector<std::string> names = {netName("cls"), netName("pose"),
-                                      netName("seg"), netName("obb")};
+    // Each family registers only the tasks it actually implements.  det carries
+    // no task suffix, so the prefix itself is a registered name:
+    //   yolov26  det + cls / depth / obb / pose / seg / sem
+    //   yolov11  det + cls / obb / pose / seg        (no depth / sem)
+    //   yolov8   det + cls / obb / pose / seg
+    //   yolov9   det + seg                           (no cls / obb / pose)
+    //   yolov10  det only
+    std::vector<std::string> names;
+    names.push_back(g_netPrefix);
     if (g_netPrefix == "yolov26")
     {
-        names.push_back(netName("depth"));
-        names.push_back(netName("sem"));
+        for (const char* t : {"cls", "depth", "obb", "pose", "seg", "sem"})
+        { names.push_back(netName(t)); }
+    }
+    else if (g_netPrefix == "yolov11" || g_netPrefix == "yolov8")
+    {
+        for (const char* t : {"cls", "obb", "pose", "seg"})
+        { names.push_back(netName(t)); }
+    }
+    else if (g_netPrefix == "yolov9")
+    {
+        names.push_back(netName("seg"));
+    }
+    else if (g_netPrefix != "yolov10")
+    {
+        std::cout << "[FAIL] unknown --net prefix '" << g_netPrefix << "'\n";
+        ++g_failures;
     }
     {
         const std::vector<std::string> all = ModelRegistry::instance().names();
@@ -1715,7 +2059,7 @@ int main(int argc, char** argv)
     // ---- [8] 可选：端到端分类 ----
     if (!clsEngine.empty() && !images.empty())
     {
-        g_failures += runClsEndToEnd(clsEngine, 2, images);
+        g_failures += runClsEndToEnd(clsEngine, 2, images, refDirs);
     }
     else
     {
@@ -1776,6 +2120,17 @@ int main(int argc, char** argv)
     {
         std::cout << "\n---- [13] end-to-end skipped"
                      " (needs --obb <obb.trt> <image...>)\n";
+    }
+
+    // ---- [14] 可选：端到端目标检测 ----
+    if (!detEngine.empty() && !images.empty())
+    {
+        g_failures += runDetEndToEnd(detEngine, 2, images, refDirs);
+    }
+    else
+    {
+        std::cout << "\n---- [14] end-to-end detection skipped"
+                     " (needs --det <det.trt> <image...>)\n";
     }
 
     std::cout << "\n============ summary ============\n";

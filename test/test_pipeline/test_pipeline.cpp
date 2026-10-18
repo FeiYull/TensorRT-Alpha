@@ -124,7 +124,7 @@ int main(int argc, char** argv)
         InferencePool pool(
             modelCfg,
             []() -> std::unique_ptr<trt_alpha::IModel> {
-                return ModelRegistry::instance().create("yolov8");
+                return ModelRegistry::instance().create("yolov8_old");
             },
             /*workers=*/1,
             /*maxQueueSize=*/16);

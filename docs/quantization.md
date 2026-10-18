@@ -77,7 +77,7 @@ a directory with `train/<class>/` and `val/<class>/` instead of a yaml.
 ```bash
 trtexec --onnx=yolo11n_fp16.onnx --saveEngine=engines/yolov11n_fp16.trt --fp16
 trtexec --onnx=yolo11n_int8.onnx --saveEngine=engines/yolov11n_int8.trt --int8
-# ... same for yolov11n_{seg,pose,cls,obb}, see serialize_engines.md
+# ... same for yolov11n_{seg,pose,cls,obb}, see export_and_serialize.md
 ```
 
 Engine sizes, Windows + TensorRT 10.16, `batch = 2`:

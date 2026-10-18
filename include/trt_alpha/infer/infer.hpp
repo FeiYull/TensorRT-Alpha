@@ -5,8 +5,8 @@
 //
 //  Usage (synchronous):
 //      trt_alpha::InferParams p;
-//      p.model_type  = trt_alpha::ModelType::yolov8;
-//      p.config_path = "configs/yolov8.ini";
+//      p.model_type  = trt_alpha::ModelType::yolov8_old;
+//      p.config_path = "configs/yolov8_old.ini";
 //      p.source      = "data/bus.jpg";
 //      p.conf_thresh = 0.5f;
 //
@@ -67,9 +67,9 @@ enum class ModelType
     yolov5,
     yolov6,
     yolov7,
-    yolov8,
-    yolov8_pose,
-    yolov8_seg,
+    yolov8_old,
+    yolov8_pose_old,
+    yolov8_seg_old,
     yolox,
     yolor,
     yolo_nas,
@@ -86,6 +86,20 @@ enum class ModelType
     yolov26_pose,
     yolov26_seg,
     yolov26_sem,
+    // YOLOV8 on the fused pipeline (the *_old entries above are the legacy
+    // implementations kept for A/B comparison). Append-only, same lock-step
+    // rule as above.
+    yolov8,
+    yolov8_pose,
+    yolov8_seg,
+    yolov8_cls,
+    yolov8_obb,
+    // YOLOV9 / YOLOV10 on the same fused pipeline. YOLOV10 is exported in its
+    // default one2many form (no TopK / NMS in the graph), so the tensor
+    // contract is identical to YOLOV26. Append-only, same lock-step rule.
+    yolov9,
+    yolov9_seg,
+    yolov10,
 };
 
 // -----------------------------------------------------------------------------
@@ -124,7 +138,7 @@ struct SaveOption
 //
 //  Required:
 //    * model_type  -- the model type
-//    * config_path -- the ini path (e.g. "configs/yolov8.ini")
+//    * config_path -- the ini path (e.g. "configs/yolov8_old.ini")
 //    * a source: source (image / video / URL) or camera_id (camera), one of them
 //
 //  Optional (empty / -1 / Unset = no override, use the ini):

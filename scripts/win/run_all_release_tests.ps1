@@ -55,7 +55,10 @@ $unitTests = @(
     "test_ini_parser",
     "test_engine",
     "test_task_types",
-    "test_model_registry"
+    "test_model_registry",
+    "test_yolov11",
+    "test_yolov9",
+    "test_yolov10"
 )
 
 foreach ($t in $unitTests) {
@@ -63,7 +66,7 @@ foreach ($t in $unitTests) {
 }
 
 # ---- 2. 真推理 ----
-Run-One -Title "infer: test_yolov8"   -Exe "$bin\test_yolov8.exe"   -ExtraArgs @($engine, $image)
+Run-One -Title "infer: test_yolov8_old"   -Exe "$bin\test_yolov8_old.exe"   -ExtraArgs @($engine, $image)
 Run-One -Title "infer: test_pipeline" -Exe "$bin\test_pipeline.exe" -ExtraArgs @($engine, $image)
 
 # ---- 3. sample_yolov8 ----

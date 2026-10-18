@@ -30,14 +30,18 @@ namespace trt_alpha {
 namespace {
 
 const char* kModelNames[] = {
-    "yolov3", "yolov4", "yolov5", "yolov6", "yolov7", "yolov8",
-    "yolov8_pose", "yolov8_seg",
+    "yolov3", "yolov4", "yolov5", "yolov6", "yolov7", "yolov8_old",
+    "yolov8_pose_old", "yolov8_seg_old",
     "yolox", "yolor", "yolo_nas",
     "efficientdet", "yunet", "u2net",
     "yolov26",
     // YOLOV26 task variants -- order must match ModelType (append-only).
     "yolov26_cls", "yolov26_depth", "yolov26_obb",
     "yolov26_pose", "yolov26_seg", "yolov26_sem",
+    // YOLOV8 on the fused pipeline -- order must match ModelType.
+    "yolov8", "yolov8_pose", "yolov8_seg", "yolov8_cls", "yolov8_obb",
+    // YOLOV9 / YOLOV10 on the fused pipeline -- order must match ModelType.
+    "yolov9", "yolov9_seg", "yolov10",
 };
 
 const char* registry_name(ModelType t)

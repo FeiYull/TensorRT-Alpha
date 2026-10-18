@@ -226,7 +226,7 @@ void requireScaleOnlyNorm(const ModelConfig& cfg, const std::string& who)
                   "(its fused preprocess applies 'scale' only), got mean='" + meanStr +
                   "', std='" + stdStr + "'; remove them, or use a model whose "
                   "preprocess honours mean/std (yolov3-8 / yolox / yolor / yolo_nas / "
-                  "yolov8_pose / yolov8_seg / u2net)");
+                  "yolov8_pose_old / yolov8_seg_old / u2net)");
     }
 }
 

@@ -1,7 +1,7 @@
 // =============================================================================
-//  test/test_yolov8/test_yolov8.cpp
+//  test/test_yolov8_old/test_yolov8_old.cpp
 // -----------------------------------------------------------------------------
-//  YoloV8 测试：
+//  YoloV8Old 测试：
 //    [1] 注册中心能创建
 //    [2] init 失败（engine 不存在）抛异常
 //    [3] 真推理（需要 engine + 图片）：
@@ -9,8 +9,8 @@
 //          检查框数 -> 用 OpenCV 画框 -> 存盘
 //
 //  用法：
-//    test_yolov8                                 # 只跑 [1][2]
-//    test_yolov8 <engine.trt> <image>            # 跑 [1][2][3]
+//    test_yolov8_old                                 # 只跑 [1][2]
+//    test_yolov8_old <engine.trt> <image>            # 跑 [1][2][3]
 // =============================================================================
 #include "trt_alpha/core/buffer.hpp"
 #include "trt_alpha/core/data_type.hpp"
@@ -172,21 +172,21 @@ void drawDetections(cv::Mat& image, const std::vector<Detection>& detections,
 
 int main(int argc, char** argv)
 {
-    std::cout << "=== YoloV8 tests ===\n";
+    std::cout << "=== YoloV8Old tests ===\n";
 
     // [1] 注册中心能创建
     {
         bool ok = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8");
-            ok = (m != nullptr) && (m->name() == "yolov8");
+            auto m = ModelRegistry::instance().create("yolov8_old");
+            ok = (m != nullptr) && (m->name() == "yolov8_old");
         }
         catch (const std::exception& e)
         {
             std::cout << "[FAIL] create threw: " << e.what() << "\n";
         }
-        check(ok, "[1] 'yolov8' registered and created");
+        check(ok, "[1] 'yolov8_old' registered and created");
     }
 
     // [2] init 失败（engine 不存在）
@@ -200,7 +200,7 @@ int main(int argc, char** argv)
         bool threw = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8");
+            auto m = ModelRegistry::instance().create("yolov8_old");
             m->init(cfg);
         }
         catch (const std::runtime_error& e)
@@ -238,7 +238,7 @@ int main(int argc, char** argv)
                 cfg.extras["num_class"] = "80";
                 cfg.extras["conf_thresh"] = "0.25";
 
-                auto m = ModelRegistry::instance().create("yolov8");
+                auto m = ModelRegistry::instance().create("yolov8_old");
                 m->init(cfg);
 
                 auto* detector = dynamic_cast<IDetector*>(m.get());
@@ -300,7 +300,7 @@ int main(int argc, char** argv)
     else
     {
         std::cout << "\n(no engine+image args; real inference test skipped)\n";
-        std::cout << "  usage: test_yolov8 <engine.trt> <image>\n";
+        std::cout << "  usage: test_yolov8_old <engine.trt> <image>\n";
     }
 
     std::cout << "====================\n";

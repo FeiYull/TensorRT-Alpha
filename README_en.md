@@ -45,7 +45,7 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 <details>
 <summary><b>Changelog</b></summary>
 
-- 2026.10.18 🚀 YOLOV11 support: det / cls / obb / pose / seg, sharing the YOLO26 pre/post-processing (measured: zero mismatched mask pixels, boxes within 3.4e-4 px); five new registered names and configs
+- 2026.10.18 🚀 YOLOV11 / YOLOV8 / YOLOV9 / YOLOV10 support, all on the YOLO26 fused pre/post-processing: yolov11 (5 tasks); yolov8 rewritten for all 5 tasks (the old dynamic engines stay as `yolov8*_old` for A/B); yolov9 det + seg; yolov10 det (one2many only). Measured against Python per box: boxes within 3.4e-4 px, conf within 2e-6, zero mismatched mask pixels
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux support: GCC 13 port, unified line-ending / editor policy, engine serialization script; automatic Windows runtime DLL deployment; hardened argument parsing and source detection + a full-parameter-matrix `run` test script
 - 2026.10.14 🧠 Complete YOLO26 task family: cls / depth / obb / pose / seg / sem; the pipeline diagram on the landing page
@@ -196,7 +196,7 @@ yolo export model=yolo26n.pt format=onnx imgsz=640 batch=2 opset=17 simplify=Tru
 trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 ```
 
-More: [Exporting and serializing](docs/export_and_serialize.md)　or　[Serialization parameters per model](docs/serialize_engines.md)
+More: [Exporting and serializing](docs/export_and_serialize.md)
 
 </details>
 
@@ -262,8 +262,19 @@ More: [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infe
 | yolov11_obb | ✅ | ✅ | ✅ | ✅ |
 | yolov11_cls | ✅ | ✅ | ✅ | ✅ |
 | yolov11_pose | ✅ | ✅ | ✅ | ✅ |
+| **YOLOV9** | | | | |
+| yolov9_det | ✅ | — | — | ✅ |
+| yolov9_seg | ✅ | — | — | ✅ |
+| **YOLOV10** | | | | |
+| yolov10_det | ✅ | — | — | ✅ |
 
 </div>
+
+> `—` means **that tier is not part of this repository's validation matrix** — not that
+> it cannot be built: FP16 is a single `trtexec --fp16` flag on any ONNX, and INT8 needs a
+> Q/DQ graph exported from the PyTorch-side PTQ. Quantization depends heavily on the
+> calibration set and per-node scales, so the only accuracy contract here is **FP32
+> (`--noTF32`) matching Python box for box**.
 
 **Others (reusing the legacy assets)**
 
@@ -276,9 +287,11 @@ More: [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infe
 | yolov5 | ✅ | — | — | ✅ |
 | yolov6 | ✅ | — | — | ✅ |
 | yolov7 | ✅ | — | — | ✅ |
-| yolov8 | ✅ | — | — | ✅ |
-| yolov8-pose | ✅ | — | — | ✅ |
-| yolov8-seg | ✅ | — | — | ✅ |
+| yolov8_det | ✅ | ✅ | ✅ | ✅ |
+| yolov8_seg | ✅ | ✅ | ✅ | ✅ |
+| yolov8_cls | ✅ | ✅ | ✅ | ✅ |
+| yolov8_pose | ✅ | ✅ | ✅ | ✅ |
+| yolov8_obb | ✅ | ✅ | ✅ | ✅ |
 | yolox | ✅ | — | — | ✅ |
 | yolor | ✅ | — | — | ✅ |
 | yolo_nas | ✅ | — | — | ✅ |

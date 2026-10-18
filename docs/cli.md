@@ -19,7 +19,7 @@ Prints every registered model. The name it prints is exactly what `--net` accept
 trt_alpha list
 ```
 
-Current build registers 26 models: `efficientdet`, `u2net`, `yolo_nas`, `yolor`, `yolov11` and its task family (`yolov11_cls`, `_obb`, `_pose`, `_seg`), `yolov3`-`yolov8`, `yolov8_pose`, `yolov8_seg`, `yolov26` and its task family (`yolov26_cls`, `_depth`, `_obb`, `_pose`, `_seg`, `_sem`), `yolox`, `yunet`.
+Current build registers 34 models: `efficientdet`, `u2net`, `yolo_nas`, `yolor`, `yolov11` and its task family (`yolov11_cls`, `_obb`, `_pose`, `_seg`), `yolov3`-`yolov7`, `yolov8` and its task family (`yolov8_seg`, `_cls`, `_pose`, `_obb`), the legacy `yolov8_old` / `yolov8_pose_old` / `yolov8_seg_old` kept for A/B comparison, `yolov9` and `yolov9_seg`, `yolov10`, `yolov26` and its task family (`yolov26_cls`, `_depth`, `_obb`, `_pose`, `_seg`, `_sem`), `yolox`, `yunet`.
 
 ## `run`
 

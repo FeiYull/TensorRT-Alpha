@@ -45,7 +45,7 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 <details>
 <summary><b>更新日志</b></summary>
 
-- 2026.10.18 🚀 YOLOV11 接入：det / cls / obb / pose / seg 五个任务，与 YOLO26 共用同一套前后处理（实测 mask 逐像素 0 差异、框 ≤3.4e-4 px），新增 5 个注册名与配置
+- 2026.10.18 🚀 YOLOV11 / YOLOV8 / YOLOV9 / YOLOV10 接入，全部走 YOLO26 的 fused 前后处理：yolov11 五任务；yolov8 重写五任务（旧的动态引擎保留为 `yolov8*_old` 供 A/B 对拍）；yolov9 det + seg；yolov10 det（仅 one2many）。与 python 逐框对拍实测：框 ≤3.4e-4 px、conf ≤2e-6、mask 逐像素 0 差异
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux 支持：GCC 13 移植、行尾 / 编辑器策略归一、引擎序列化脚本；Windows 运行时 DLL 自动部署；参数解析与源探测硬化 + `run` 全参数矩阵测试脚本
 - 2026.10.14 🧠 YOLO26 全任务族补齐：cls / depth / obb / pose / seg / sem；首页架构图
@@ -196,7 +196,7 @@ yolo export model=yolo26n.pt format=onnx imgsz=640 batch=2 opset=17 simplify=Tru
 trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 ```
 
-更多参考：[导出与序列化](docs/export_and_serialize.md)　or　[各模型序列化参数](docs/serialize_engines.md)
+更多参考：[导出与序列化](docs/export_and_serialize.md)
 
 </details>
 
@@ -262,8 +262,15 @@ int main(){
 | yolov11_obb | ✅ | ✅ | ✅ | ✅ |
 | yolov11_cls | ✅ | ✅ | ✅ | ✅ |
 | yolov11_pose | ✅ | ✅ | ✅ | ✅ |
+| **YOLOV9** | | | | |
+| yolov9_det | ✅ | — | — | ✅ |
+| yolov9_seg | ✅ | — | — | ✅ |
+| **YOLOV10** | | | | |
+| yolov10_det | ✅ | — | — | ✅ |
 
 </div>
+
+> `—` 的含义是**这一档没有纳入本仓库的验证矩阵**，不是跑不了：FP16 只是 `trtexec --fp16` 一个 flag，任何 ONNX 都能出；INT8 需要 PyTorch 侧 PTQ 导出的 Q/DQ 图。量化受校准集、每层 scale 影响太大，不确定性不可控，而本仓库的精度契约只有一条：**FP32（`--noTF32`）与 Python 逐框一致**。
 
 **其他（沿用 legacy 资产）**
 
@@ -276,9 +283,11 @@ int main(){
 | yolov5 | ✅ | — | — | ✅ |
 | yolov6 | ✅ | — | — | ✅ |
 | yolov7 | ✅ | — | — | ✅ |
-| yolov8 | ✅ | — | — | ✅ |
-| yolov8-pose | ✅ | — | — | ✅ |
-| yolov8-seg | ✅ | — | — | ✅ |
+| yolov8_det | ✅ | ✅ | ✅ | ✅ |
+| yolov8_seg | ✅ | ✅ | ✅ | ✅ |
+| yolov8_cls | ✅ | ✅ | ✅ | ✅ |
+| yolov8_pose | ✅ | ✅ | ✅ | ✅ |
+| yolov8_obb | ✅ | ✅ | ✅ | ✅ |
 | yolox | ✅ | — | — | ✅ |
 | yolor | ✅ | — | — | ✅ |
 | yolo_nas | ✅ | — | — | ✅ |

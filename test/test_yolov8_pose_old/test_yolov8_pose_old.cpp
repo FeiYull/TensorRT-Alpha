@@ -1,9 +1,9 @@
 // =============================================================================
-//  test/test_yolov8_seg/test_yolov8_seg.cpp
+//  test/test_yolov8_pose_old/test_yolov8_pose_old.cpp
 // -----------------------------------------------------------------------------
-//  YoloV8Seg 测试：
-//    [1] 注册中心能创建
-//    [2] init 失败（engine 不存在）抛异常
+//  YoloV8PoseOld tests:
+//    [1] registry can create
+//    [2] init fails (engine not exist) throws
 // =============================================================================
 #include "trt_alpha/core/model_registry.hpp"
 
@@ -29,27 +29,27 @@ void check(bool cond, const char* what)
 
 int main(int argc, char** argv)
 {
-    std::cout << "=== yolov8_seg tests ===\n";
+    std::cout << "=== yolov8_pose_old tests ===\n";
 
     // [1]
     {
         bool ok = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8_seg");
-            ok = (m != nullptr) && (m->name() == "yolov8_seg");
+            auto m = ModelRegistry::instance().create("yolov8_pose_old");
+            ok = (m != nullptr) && (m->name() == "yolov8_pose_old");
         }
         catch (const std::exception& e)
         {
             std::cout << "[FAIL] create threw: " << e.what() << "\n";
         }
-        check(ok, "[1] 'yolov8_seg' registered and created");
+        check(ok, "[1] 'yolov8_pose_old' registered and created");
     }
 
     // [2]
     {
         ModelConfig cfg;
-        cfg.engine = "/definitely/not/exist/yolov8n-seg_12345.trt";
+        cfg.engine = "/definitely/not/exist/yolov8n-pose_12345.trt";
         cfg.batchSize = 1;
         cfg.dstH = 640;
         cfg.dstW = 640;
@@ -57,7 +57,7 @@ int main(int argc, char** argv)
         bool threw = false;
         try
         {
-            auto m = ModelRegistry::instance().create("yolov8_seg");
+            auto m = ModelRegistry::instance().create("yolov8_pose_old");
             m->init(cfg);
         }
         catch (const std::runtime_error& e)
