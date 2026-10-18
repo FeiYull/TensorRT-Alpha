@@ -270,12 +270,6 @@ More: [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infe
 
 </div>
 
-> `—` means **that tier is not part of this repository's validation matrix** — not that
-> it cannot be built: FP16 is a single `trtexec --fp16` flag on any ONNX, and INT8 needs a
-> Q/DQ graph exported from the PyTorch-side PTQ. Quantization depends heavily on the
-> calibration set and per-node scales, so the only accuracy contract here is **FP32
-> (`--noTF32`) matching Python box for box**.
-
 **Others (reusing the legacy assets)**
 
 <div align="center">

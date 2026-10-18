@@ -270,7 +270,7 @@ int main(){
 
 </div>
 
-> `—` 的含义是**这一档没有纳入本仓库的验证矩阵**，不是跑不了：FP16 只是 `trtexec --fp16` 一个 flag，任何 ONNX 都能出；INT8 需要 PyTorch 侧 PTQ 导出的 Q/DQ 图。量化受校准集、每层 scale 影响太大，不确定性不可控，而本仓库的精度契约只有一条：**FP32（`--noTF32`）与 Python 逐框一致**。
+
 
 **其他（沿用 legacy 资产）**
 
