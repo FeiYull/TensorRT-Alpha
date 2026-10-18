@@ -222,6 +222,7 @@ int main(){
     trt_alpha::InferParams p;     
     p.model_type  = trt_alpha::ModelType::yolov26; // det, pose, cls, obb, depth
     p.source = "xxx.jpg";                          // xx.jpg, xx.mp4, camera_id, url, images' path
+    // p.engine = "engines/yolov26.trt" p.config_path = "configs/yolov26.ini"
     trt_alpha::Infer  model(p);   trt_alpha::Stream stream = model.async();    trt_alpha::Result r;
     while (stream.get(r)){
         // here:get the results of inference
