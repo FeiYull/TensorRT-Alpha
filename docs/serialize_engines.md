@@ -56,64 +56,64 @@ trtexec --onnx=yolo26n-sem.onnx \
         --noTF32
 ```
 
-## yolo11
+## yolov11
 
 ```bash
 trtexec --onnx=yolo11n.onnx \
-        --saveEngine=engines/yolo11n.trt \
+        --saveEngine=engines/yolov11n.trt \
         --noTF32
 
 # quantized (ONNX from the PTQ export, see quantization.md)
-trtexec --onnx=yolo11n_fp16.onnx --saveEngine=engines/yolo11n_fp16.trt --fp16
-trtexec --onnx=yolo11n_int8.onnx --saveEngine=engines/yolo11n_int8.trt --int8
+trtexec --onnx=yolo11n_fp16.onnx --saveEngine=engines/yolov11n_fp16.trt --fp16
+trtexec --onnx=yolo11n_int8.onnx --saveEngine=engines/yolov11n_int8.trt --int8
 ```
 
-## yolo11_cls
+## yolov11_cls
 
 ```bash
 trtexec --onnx=yolo11n-cls.onnx \
-        --saveEngine=engines/yolo11n_cls.trt \
+        --saveEngine=engines/yolov11n_cls.trt \
         --noTF32
 
 # quantized
-trtexec --onnx=yolo11n-cls_fp16.onnx --saveEngine=engines/yolo11n_cls_fp16.trt --fp16
-trtexec --onnx=yolo11n-cls_int8.onnx --saveEngine=engines/yolo11n_cls_int8.trt --int8
+trtexec --onnx=yolo11n-cls_fp16.onnx --saveEngine=engines/yolov11n_cls_fp16.trt --fp16
+trtexec --onnx=yolo11n-cls_int8.onnx --saveEngine=engines/yolov11n_cls_int8.trt --int8
 ```
 
-## yolo11_obb
+## yolov11_obb
 
 ```bash
 trtexec --onnx=yolo11n-obb.onnx \
-        --saveEngine=engines/yolo11n_obb.trt \
+        --saveEngine=engines/yolov11n_obb.trt \
         --noTF32
 
 # quantized
-trtexec --onnx=yolo11n-obb_fp16.onnx --saveEngine=engines/yolo11n_obb_fp16.trt --fp16
-trtexec --onnx=yolo11n-obb_int8.onnx --saveEngine=engines/yolo11n_obb_int8.trt --int8
+trtexec --onnx=yolo11n-obb_fp16.onnx --saveEngine=engines/yolov11n_obb_fp16.trt --fp16
+trtexec --onnx=yolo11n-obb_int8.onnx --saveEngine=engines/yolov11n_obb_int8.trt --int8
 ```
 
-## yolo11_pose
+## yolov11_pose
 
 ```bash
 trtexec --onnx=yolo11n-pose.onnx \
-        --saveEngine=engines/yolo11n_pose.trt \
+        --saveEngine=engines/yolov11n_pose.trt \
         --noTF32
 
 # quantized
-trtexec --onnx=yolo11n-pose_fp16.onnx --saveEngine=engines/yolo11n_pose_fp16.trt --fp16
-trtexec --onnx=yolo11n-pose_int8.onnx --saveEngine=engines/yolo11n_pose_int8.trt --int8
+trtexec --onnx=yolo11n-pose_fp16.onnx --saveEngine=engines/yolov11n_pose_fp16.trt --fp16
+trtexec --onnx=yolo11n-pose_int8.onnx --saveEngine=engines/yolov11n_pose_int8.trt --int8
 ```
 
-## yolo11_seg
+## yolov11_seg
 
 ```bash
 trtexec --onnx=yolo11n-seg.onnx \
-        --saveEngine=engines/yolo11n_seg.trt \
+        --saveEngine=engines/yolov11n_seg.trt \
         --noTF32
 
 # quantized
-trtexec --onnx=yolo11n-seg_fp16.onnx --saveEngine=engines/yolo11n_seg_fp16.trt --fp16
-trtexec --onnx=yolo11n-seg_int8.onnx --saveEngine=engines/yolo11n_seg_int8.trt --int8
+trtexec --onnx=yolo11n-seg_fp16.onnx --saveEngine=engines/yolov11n_seg_fp16.trt --fp16
+trtexec --onnx=yolo11n-seg_int8.onnx --saveEngine=engines/yolov11n_seg_int8.trt --int8
 ```
 
 ## efficientdet

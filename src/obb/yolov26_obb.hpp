@@ -69,7 +69,7 @@ public:
     }
 
 protected:
-    //! 运行时标签：日志 / 异常 / name() 都用它；YOLO11 子类只改这个值。
+    //! 运行时标签：日志 / 异常 / name() 都用它；YOLOV11 子类只改这个值。
     std::string m_tag = "yolov26_obb";
 
 private:

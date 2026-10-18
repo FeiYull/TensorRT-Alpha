@@ -45,7 +45,7 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 <details>
 <summary><b>Changelog</b></summary>
 
-- 2026.10.18 🚀 YOLO11 support: det / cls / obb / pose / seg, sharing the YOLO26 pre/post-processing (measured: zero mismatched mask pixels, boxes within 3.4e-4 px); five new registered names and configs
+- 2026.10.18 🚀 YOLOV11 support: det / cls / obb / pose / seg, sharing the YOLO26 pre/post-processing (measured: zero mismatched mask pixels, boxes within 3.4e-4 px); five new registered names and configs
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux support: GCC 13 port, unified line-ending / editor policy, engine serialization script; automatic Windows runtime DLL deployment; hardened argument parsing and source detection + a full-parameter-matrix `run` test script
 - 2026.10.14 🧠 Complete YOLO26 task family: cls / depth / obb / pose / seg / sem; the pipeline diagram on the landing page
@@ -256,12 +256,12 @@ More: [`samples/sample_infer/sample_infer.cpp`](samples/sample_infer/sample_infe
 | yolo26-sem | ✅ | ✅ | ✅ | ✅ |
 | yolo26-pose | ✅ | ✅ | ✅ | ✅ |
 | yolo26-tracking | 🚧 | 🚧 | 🚧 | 🚧 |
-| **YOLO11** | | | | |
-| yolo11-det | ✅ | ✅ | ✅ | ✅ |
-| yolo11-seg | ✅ | ✅ | ✅ | ✅ |
-| yolo11-obb | ✅ | ✅ | ✅ | ✅ |
-| yolo11-cls | ✅ | ✅ | ✅ | ✅ |
-| yolo11-pose | ✅ | ✅ | ✅ | ✅ |
+| **YOLOV11** | | | | |
+| yolov11_det | ✅ | ✅ | ✅ | ✅ |
+| yolov11_seg | ✅ | ✅ | ✅ | ✅ |
+| yolov11_obb | ✅ | ✅ | ✅ | ✅ |
+| yolov11_cls | ✅ | ✅ | ✅ | ✅ |
+| yolov11_pose | ✅ | ✅ | ✅ | ✅ |
 
 </div>
 

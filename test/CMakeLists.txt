@@ -22,7 +22,7 @@ add_subdirectory(test_yolov6)
 add_subdirectory(test_yolov7)
 add_subdirectory(test_yolov8)
 add_subdirectory(test_yolov26)
-add_subdirectory(test_yolo11)
+add_subdirectory(test_yolov11)
 add_subdirectory(test_yolox)
 add_subdirectory(test_yolor)
 add_subdirectory(test_yolonas)
@@ -48,7 +48,7 @@ set(TRT_ALPHA_TEST_TARGETS
     test_yolov3 test_yolov4 test_yolov5 test_yolov6 test_yolov7
     test_yolov8 test_yolov26 test_yolox test_yolor test_yolonas test_efficientdet
     test_yunet test_yolov8_seg test_u2net test_yolov8_pose test_infer
-    test_yolov26_tasks test_yolo11
+    test_yolov26_tasks test_yolov11
 )
 foreach(_t IN LISTS TRT_ALPHA_TEST_TARGETS)
     if(TARGET ${_t})

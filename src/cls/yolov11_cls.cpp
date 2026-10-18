@@ -1,9 +1,9 @@
 // =============================================================================
-//  trt_alpha :: det :: YoloV11（注册）
+//  trt_alpha :: cls :: YoloV11Cls（注册）
 // -----------------------------------------------------------------------------
-//  只做注册：实现全部继承自 YoloV26（见 yolo11.hpp 的说明）。
+//  只做注册：实现全部继承自 YoloV26Cls（见 yolov11_cls.hpp）。
 // =============================================================================
-#include "yolo11.hpp"
+#include "yolov11_cls.hpp"
 #include "trt_alpha/core/model_registry.hpp"
 
-TRT_ALPHA_REGISTER_MODEL("yolo11", trt_alpha::det::YoloV11);
+TRT_ALPHA_REGISTER_MODEL("yolov11_cls", trt_alpha::cls::YoloV11Cls);

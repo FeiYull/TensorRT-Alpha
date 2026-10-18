@@ -1,19 +1,19 @@
 // =============================================================================
-//  test/test_yolo11/test_yolo11.cpp
+//  test/test_yolov11/test_yolov11.cpp
 // -----------------------------------------------------------------------------
-//  YOLO11 的接入检查（不需要引擎，CTest 里恒能跑）。
+//  YOLOV11 的接入检查（不需要引擎，CTest 里恒能跑）。
 //
-//  YOLO11 五个任务和 YOLO26 共用同一套实现（子类只改 m_tag），所以这里不重复
-//  那套 1747 行的逐框对拍 —— 数值等价由 test_yolov26_tasks --net yolo11 承担：
+//  YOLOV11 五个任务和 YOLO26 共用同一套实现（子类只改 m_tag），所以这里不重复
+//  那套 1747 行的逐框对拍 —— 数值等价由 test_yolov26_tasks --net yolov11 承担：
 //
-//      test_yolov26_tasks --net yolo11 --seg <e.trt> --pose <e.trt> --obb <e.trt> \
+//      test_yolov26_tasks --net yolov11 --seg <e.trt> --pose <e.trt> --obb <e.trt> \
 //                         --refdir D:/Data/trt_exp/yolo11_ref <image...>
 //
 //  这个测试盯的是"接线"层面的四件事，每一件都曾经在别的模型上静默出过错：
 //
 //    [1] 注册中心确实有这 5 个名字（link 时 WHOLE_ARCHIVE 生效）
 //    [2] name() 返回注册名 —— 证明子类的 m_tag 真的被用上，而不是还叫 yolov26
-//    [3] configs/yolo11*.ini 能被 loadModelConfig 解出预期值
+//    [3] configs/yolov11*.ini 能被 loadModelConfig 解出预期值
 //        （engine / batch / num_class / extra；键名写错段会在这里暴露）
 //    [4] init 在引擎缺失时显式抛异常，且异常前缀带自己的标签
 //        （证明标签进了异常消息，而不是硬编码的 yolov26）
@@ -49,18 +49,18 @@ struct Case
 };
 
 const Case kCases[] = {
-    {"yolo11",      "engines/yolo11n.trt",      80,   -1},   // det: extra 缺省 0
-    {"yolo11_cls",  "engines/yolo11n_cls.trt",  1000, -1},
-    {"yolo11_obb",  "engines/yolo11n_obb.trt",  15,   1},
-    {"yolo11_pose", "engines/yolo11n_pose.trt", 1,    -1},   // 由 num_kpts*3 推导
-    {"yolo11_seg",  "engines/yolo11n_seg.trt",  80,   32},
+    {"yolov11",      "engines/yolov11n.trt",      80,   -1},   // det: extra 缺省 0
+    {"yolov11_cls",  "engines/yolov11n_cls.trt",  1000, -1},
+    {"yolov11_obb",  "engines/yolov11n_obb.trt",  15,   1},
+    {"yolov11_pose", "engines/yolov11n_pose.trt", 1,    -1},   // 由 num_kpts*3 推导
+    {"yolov11_seg",  "engines/yolov11n_seg.trt",  80,   32},
 };
 
 }  // namespace
 
 int main()
 {
-    std::cout << "============ test_yolo11 ============\n";
+    std::cout << "============ test_yolov11 ============\n";
 
     // ---- [1] registry ----
     std::cout << "\n---- [1] registry ----\n";
@@ -71,9 +71,9 @@ int main()
             const bool ok = std::find(all.begin(), all.end(), std::string(c.net)) != all.end();
             check(ok, std::string("registered: ") + c.net);
         }
-        // YOLO11 没有 depth / sem —— 不该出现同名模型，否则 --net 会选中一个
+        // YOLOV11 没有 depth / sem —— 不该出现同名模型，否则 --net 会选中一个
         // 语义完全不同的模型。
-        for (const char* absent : {"yolo11_depth", "yolo11_sem"})
+        for (const char* absent : {"yolov11_depth", "yolov11_sem"})
         {
             const bool ok = std::find(all.begin(), all.end(), std::string(absent)) == all.end();
             check(ok, std::string("not registered (no such task): ") + absent);
@@ -145,7 +145,7 @@ int main()
         catch (...) { continue; }
 
         trt_alpha::core::ModelConfig missingEngine = cfg;
-        missingEngine.engine = "D:/definitely/not/exist/yolo11_probe.trt";
+        missingEngine.engine = "D:/definitely/not/exist/yolov11_probe.trt";
         std::string msg;
         try { m->init(missingEngine); }
         catch (const std::exception& e) { msg = e.what(); }

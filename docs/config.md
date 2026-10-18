@@ -16,7 +16,7 @@ API call / command-line flags   >   configs/<model>.ini   >   configs/base.ini
 
 | Key | Default | Meaning |
 |---|---|---|
-| `layout` | per model (yolo family = `nchw`, efficientdet = `nhwc`) | Logical axis order. Only override it when the same model is swapped onto an engine with a different layout |
+| `layout` | written explicitly in every `configs/<model>.ini` (`nchw`; `efficientdet` = `nhwc`); commented out here | Logical axis order of the input. Priority: `<model>.ini` > `base.ini` > the model's built-in canonical layout. Only change it when the same model is swapped onto an engine with a different layout |
 | `batch_size` | `1` | Batch actually used for this run. A static engine requires it to **equal** the baked-in batch; a dynamic engine requires it to fall inside `[min, max]`. A mismatch is an **error and terminates** — never silently clamped |
 | `max_batch_size` | not checked | Contract for the engine's batch upper bound; a mismatch fails at startup |
 | `dst_h` / `dst_w` | — | **Normally leave these out**: the spatial dims come from the engine's declared shape. Nothing is printed when they are absent; a value that disagrees with a static engine dim only raises a warning and the engine shape wins (it never errors). They act as the intended value only when that engine dim is dynamic (`-1`) |
@@ -26,7 +26,7 @@ API call / command-line flags   >   configs/<model>.ini   >   configs/base.ini
 | Key | Default | Meaning |
 |---|---|---|
 | `scale` | `255.0` | Normalization divisor. Honoured by every model |
-| `mean` | `0.0,0.0,0.0` | Per-channel mean, comma separated. **Only the legacy preprocess honours it** (`yolov3`-`yolov8`, `yolox`, `yolor`, `yolo_nas`, `yolov8_pose`, `yolov8_seg`, `u2net`). The fused preprocess (`yolov26` and `yolo11`, all tasks, plus `depth` / `sem`) has no slot for it: a non-identity value fails at startup instead of being silently dropped |
+| `mean` | `0.0,0.0,0.0` | Per-channel mean, comma separated. **Only the legacy preprocess honours it** (`yolov3`-`yolov8`, `yolox`, `yolor`, `yolo_nas`, `yolov8_pose`, `yolov8_seg`, `u2net`). The fused preprocess (`yolov26` and `yolov11`, all tasks, plus `depth` / `sem`) has no slot for it: a non-identity value fails at startup instead of being silently dropped |
 | `std` | `1.0,1.0,1.0` | Per-channel std, same rule as `mean` |
 | `pad_value` | `114.0` | Letterbox fill value (matches ultralytics' 114) |
 

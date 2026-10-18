@@ -1,7 +1,7 @@
 // =============================================================================
 //  trt_alpha :: seg :: YoloV11Seg（私有头文件）
 // -----------------------------------------------------------------------------
-//  YOLO11-seg 的 ONNX 契约与 YOLO26-seg 逐项相同：
+//  YOLOV11-seg 的 ONNX 契约与 YOLO26-seg 逐项相同：
 //      output0 [batch, 4 + nc + 32, anchors]，output1 [batch, 32, 160, 160]。
 //  实测（onnxruntime 官方 process_mask 对拍，8 张混尺寸图）：
 //      mask 0 / 2048000 像素不一致，box <= 2.4e-4 px，conf <= 1.2e-6。
@@ -15,11 +15,11 @@
 
 namespace trt_alpha::seg {
 
-//! YOLO11 实例分割模型：与 YoloV26Seg 共用同一套前后处理。
+//! YOLOV11 实例分割模型：与 YoloV26Seg 共用同一套前后处理。
 class YoloV11Seg final : public YoloV26Seg
 {
 public:
-    YoloV11Seg() { m_tag = "yolo11_seg"; }
+    YoloV11Seg() { m_tag = "yolov11_seg"; }
 };
 
 }  // namespace trt_alpha::seg

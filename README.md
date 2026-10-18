@@ -45,7 +45,7 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 <details>
 <summary><b>更新日志</b></summary>
 
-- 2026.10.18 🚀 YOLO11 接入：det / cls / obb / pose / seg 五个任务，与 YOLO26 共用同一套前后处理（实测 mask 逐像素 0 差异、框 ≤3.4e-4 px），新增 5 个注册名与配置
+- 2026.10.18 🚀 YOLOV11 接入：det / cls / obb / pose / seg 五个任务，与 YOLO26 共用同一套前后处理（实测 mask 逐像素 0 差异、框 ≤3.4e-4 px），新增 5 个注册名与配置
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux 支持：GCC 13 移植、行尾 / 编辑器策略归一、引擎序列化脚本；Windows 运行时 DLL 自动部署；参数解析与源探测硬化 + `run` 全参数矩阵测试脚本
 - 2026.10.14 🧠 YOLO26 全任务族补齐：cls / depth / obb / pose / seg / sem；首页架构图
@@ -256,12 +256,12 @@ int main(){
 | yolo26-sem | ✅ | ✅ | ✅ | ✅ |
 | yolo26-pose | ✅ | ✅ | ✅ | ✅ |
 | yolo26-tracking | 🚧 | 🚧 | 🚧 | 🚧 |
-| **YOLO11** | | | | |
-| yolo11-det | ✅ | ✅ | ✅ | ✅ |
-| yolo11-seg | ✅ | ✅ | ✅ | ✅ |
-| yolo11-obb | ✅ | ✅ | ✅ | ✅ |
-| yolo11-cls | ✅ | ✅ | ✅ | ✅ |
-| yolo11-pose | ✅ | ✅ | ✅ | ✅ |
+| **YOLOV11** | | | | |
+| yolov11_det | ✅ | ✅ | ✅ | ✅ |
+| yolov11_seg | ✅ | ✅ | ✅ | ✅ |
+| yolov11_obb | ✅ | ✅ | ✅ | ✅ |
+| yolov11_cls | ✅ | ✅ | ✅ | ✅ |
+| yolov11_pose | ✅ | ✅ | ✅ | ✅ |
 
 </div>
 

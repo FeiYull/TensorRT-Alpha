@@ -57,8 +57,8 @@
 //                         [--pose <e.trt>] [--seg <e.trt>] [--obb <e.trt>]
 //                         [--refdir <dir>[,<dir>...]] <image> [image...]
 //
-//      --net 模型名前缀，默认 yolov26；给 yolo11 就跑 YOLO11 那五个任务
-//            （YOLO11 没有 depth / sem）。两边共用同一套实现与同一套断言。
+//      --net 模型名前缀，默认 yolov26；给 yolov11 就跑 YOLOV11 那五个任务
+//            （YOLOV11 没有 depth / sem）。两边共用同一套实现与同一套断言。
 //
 //      --refdir 指向 D:\Data\trt_exp\dump_*_ref.py 的输出目录；
 //      没有它时 [9]/[10]/[11]/[12]/[13] 只打印统计量、记 SKIP，不做断言。
@@ -128,12 +128,12 @@ namespace {
 
 int g_failures = 0;
 
-//! Model-name prefix: "yolov26" (default) or "yolo11" (--net yolo11).
-//! Both families share one implementation (YOLO11 derives from YOLOV26), so the
+//! Model-name prefix: "yolov26" (default) or "yolov11" (--net yolov11).
+//! Both families share one implementation (YOLOV11 derives from YOLOV26), so the
 //! same assertions apply; only the registered names and the engines differ.
 std::string g_netPrefix = "yolov26";
 
-//! "<prefix>_<task>", e.g. "yolov26_seg" / "yolo11_seg".
+//! "<prefix>_<task>", e.g. "yolov26_seg" / "yolov11_seg".
 std::string netName(const char* task)
 {
     return g_netPrefix + "_" + task;
@@ -1382,7 +1382,7 @@ int runObbEndToEnd(const std::string& enginePath, int batch,
     constexpr float kPosTol   = 0.05f;    // cx / cy, pixels
     constexpr float kSizeTol  = 0.05f;    // w / h, pixels
     // angle 是网络原始输出通道（弧度），TRT 与 CPU onnxruntime 的 kernel 选择
-    // 不同，会让它漂 ~1e-5：实测 yolo26n-obb <= 7.7e-7，yolo11n-obb 在
+    // 不同，会让它漂 ~1e-5：实测 yolo26n-obb <= 7.7e-7，yolov11n-obb 在
     // 181 框的密集 DOTA 图上 <= 1.2e-5（框数仍完全一致）。5e-5 rad ≈ 0.003°，
     // 比任何真实的几何错误小三个数量级，用来兜住这类漂移。
     constexpr float kAngleTol = 5e-5f;    // radians
@@ -1561,8 +1561,8 @@ int runObbEndToEnd(const std::string& enginePath, int batch,
 //                                 [--seg <e.trt>] [--obb <e.trt>]
 //                                 [--refdir <dir>[,<dir>...]] <image> [image...]
 //
-//  --net <prefix> selects the model family: "yolov26" (default) or "yolo11".
-//  Both share one implementation (YOLO11 derives from YOLOV26), so the same
+//  --net <prefix> selects the model family: "yolov26" (default) or "yolov11".
+//  Both share one implementation (YOLOV11 derives from YOLOV26), so the same
 //  assertions cover both; only the registered names and the engines differ.
 //
 //  --refdir is repeatable / comma-separated; each optional section picks the
@@ -1606,7 +1606,7 @@ int main(int argc, char** argv)
         {
             if (i + 1 >= argc)
             {
-                std::cout << "[FAIL] --net needs a model-name prefix (yolov26 / yolo11)\n";
+                std::cout << "[FAIL] --net needs a model-name prefix (yolov26 / yolov11)\n";
                 ++g_failures;
                 break;
             }
@@ -1660,7 +1660,7 @@ int main(int argc, char** argv)
 
     // ---- [1] 注册中心 ----
     std::cout << "\n---- [1] registry (prefix '" << g_netPrefix << "') ----\n";
-    // depth / sem 只有 YOLO26 有；YOLO11 只有 det / cls / pose / seg / obb。
+    // depth / sem 只有 YOLO26 有；YOLOV11 只有 det / cls / pose / seg / obb。
     std::vector<std::string> names = {netName("cls"), netName("pose"),
                                       netName("seg"), netName("obb")};
     if (g_netPrefix == "yolov26")
