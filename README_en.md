@@ -327,7 +327,7 @@ scripts/             platform scripts (linux/ = engine serialization, parameter-
 
 ### [1. Configuration](docs/config.md)
 ### [2. Quantization](docs/quantization.md)
-
+### [3.Train and deploy custom model](docs/train_and_deploy_custom.md)
 ## Citation
 ```bibtex
 @misc{FeiYull_TensorRT-Alpha,

@@ -5,7 +5,7 @@
 //
 //  Design:
 //    * Common fields (shared by every model): engine / batchSize / dstH / dstW /
-//      inputOutputNames / classNamesFile / classNames
+//      classNamesFile / classNames
 //    * Model-specific fields: all live in extras (unordered_map<string, string>)
 //      and are read by the model itself via getInt / getFloat / getString /
 //      getBool
@@ -56,7 +56,6 @@ struct ModelConfig
     //! does this value take effect, as the intent for "how large to run".
     int dstH = 0;
     int dstW = 0;
-    std::vector<std::string> inputOutputNames;
 
     // ---- Model-specific fields (all gathered here) ----
     // key = the original INI key (including the section prefix, e.g.

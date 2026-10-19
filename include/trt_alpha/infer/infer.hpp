@@ -100,6 +100,13 @@ enum class ModelType
     yolov9,
     yolov9_seg,
     yolov10,
+    // YOLOV11 on the same fused pipeline: identical head contract and kernels,
+    // only the tag differs. Append-only, same lock-step rule as above.
+    yolov11,
+    yolov11_cls,
+    yolov11_obb,
+    yolov11_pose,
+    yolov11_seg,
 };
 
 // -----------------------------------------------------------------------------

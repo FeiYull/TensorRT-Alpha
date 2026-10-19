@@ -92,24 +92,6 @@ ModelConfig loadModelConfig(const std::string& iniPath)
     cfg.engine = requireString(merged, "model.engine", iniPath);
     cfg.classNamesFile = requireString(merged, "model.class_names_file", iniPath);
 
-    // input_output_names（逗号分隔）
-    {
-        const auto it = merged.find("model.input_output_names");
-        if (it == merged.end() || it->second.empty()) {
-            TRT_LOG_ERROR("Config: model.input_output_names is empty in " << iniPath);
-            throw std::runtime_error("INI missing required key: model.input_output_names");
-        }
-        std::istringstream iss(it->second);
-        std::string token;
-        while (std::getline(iss, token, ',')) {
-            token = trim(token);
-            if (!token.empty()) cfg.inputOutputNames.push_back(token);
-        }
-        if (cfg.inputOutputNames.empty()) {
-            throw std::runtime_error("INI: input_output_names is empty: " + iniPath);
-        }
-    }
-
     // 可选（从合并结果读）
     cfg.batchSize = getIntOr(merged, "input.batch_size", cfg.batchSize);
     cfg.maxBatchSize = getIntOr(merged, "input.max_batch_size", cfg.maxBatchSize);
@@ -177,7 +159,7 @@ ModelConfig loadModelConfig(const std::string& iniPath)
     //    其余的键（num_class、conf_thresh、scale、mean…）由模型 init 时
     //    调 getXxx 自动登记 —— 两处合起来 = "本次真正被读到"的全集。
     static const char* const kDirectKeys[] = {
-        "model.engine", "model.class_names_file", "model.input_output_names",
+        "model.engine", "model.class_names_file",
         "input.batch_size", "input.max_batch_size", "input.layout",
         "input.dst_h", "input.dst_w",
     };

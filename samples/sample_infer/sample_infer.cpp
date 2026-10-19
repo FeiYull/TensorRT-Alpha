@@ -68,7 +68,9 @@ void sample_yolov26_det(const std::string& source)
     trt_alpha::InferParams p;
     p.model_type  = trt_alpha::ModelType::yolov26;
     p.config_path = "configs/yolov26.ini";
-    p.source      = source;
+    //p.source      = source;
+    p.source = "F:/VideoAlpha/huaxue1.mp4";
+    p.engine = "D:/VS2022_Project/TensorRT-Alpha/engines/yolov26n.trt";
     p.draw        = true;                      // 产出渲染图（默认即 true）
     
     trt_alpha::Infer  model(p);

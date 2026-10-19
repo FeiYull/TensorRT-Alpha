@@ -19,8 +19,10 @@ namespace trt_alpha::core {
 struct TensorDesc;
 
 //! INI -> ModelConfig.
-//! engine / classNamesFile / inputOutputNames / numClass are mandatory;
-//! a missing one throws std::runtime_error (the message carries context).
+//! engine / classNamesFile are mandatory; a missing one throws
+//! std::runtime_error (the message carries context).
+//! Tensor names are NOT configured: every model resolves them from the engine
+//! (ADR-1, the engine's declared I/O is the single source of truth).
 //! Relative paths are kept as-is (the caller decides what they are relative to).
 //! Also fills cfg.origins: whether each key came from base.ini or from this
 //! model's ini (order preserved).

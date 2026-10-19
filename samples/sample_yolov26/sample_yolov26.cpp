@@ -1,5 +1,5 @@
 // =============================================================================
-//  sample_yolov26 —— trt_alpha 使用示例
+//  sample_yolov26 —— trt_alpha 使用示例（YOLOV26）
 // -----------------------------------------------------------------------------
 //  演示如何用 trt_alpha 框架跑 YOLOV26 推理：
 //    1. 手工构造 ModelConfig（不读 INI）
@@ -12,8 +12,8 @@
 //    sample_yolov26 <engine.trt> <input>          # input = 图片 / 视频
 //    sample_yolov26 <engine.trt> <input> --save   # 存盘
 //
-//  注意：batchSize 必须与引擎一致。YOLOV26 的测试引擎是静态 batch（导出 ONNX
-//  时写死的），所以这里给的是 2；换成静态 batch = 1 的引擎就改成 1。
+//  注意：batchSize 必须与引擎一致。本系列的引擎是静态 batch（导出 ONNX 时
+//  写死的），所以这里给的是 2；换成静态 batch = 1 的引擎就改成 1。
 // =============================================================================
 #include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/inference_pool.hpp"
@@ -55,17 +55,16 @@ int main(int argc, char** argv)
         // ---- 1. ModelConfig ----
         trt_alpha::core::ModelConfig cfg;
         cfg.engine = enginePath;
-        cfg.batchSize = 2;          // 必须与引擎的静态 batch 一致
+        cfg.batchSize = 2;
         cfg.dstH = 640;
         cfg.dstW = 640;
         cfg.classNamesFile = "data/classes/coco80.txt";
 
-        // 模型特有字段（YoloV26 自己读）
-        cfg.extras["num_class"]   = "80";
-        cfg.extras["extra"]       = "0";
+        // 模型特有字段（YOLOV26 自己读）
+        cfg.extras["num_class"] = "80";
         cfg.extras["conf_thresh"] = "0.25";
-        cfg.extras["iou_thresh"]  = "0.70";
-        cfg.extras["top_k"]       = "300";
+        cfg.extras["iou_thresh"] = "0.7";
+        cfg.extras["top_k"] = "300";
 
         // 类别信息（渲染用）
         cfg.classNames = trt_alpha::core::loadClassNamesFile(cfg.classNamesFile);
@@ -113,6 +112,7 @@ int main(int argc, char** argv)
         pcfg.classNames = cfg.classNames;
         pcfg.saveEnabled = saveEnabled;
         pcfg.saveDir = trt_alpha::core::Paths::resolveSaveDir("", "yolov26");
+
         pcfg.showEnabled = false;
 
         trt_alpha::pipeline::Pipeline pipeline(std::move(pcfg));

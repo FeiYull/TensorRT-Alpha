@@ -1,0 +1,4 @@
+buffalo 255 0 255
+elephant 255 0 0
+rhino 0 255 255
+zebra 0 255 0

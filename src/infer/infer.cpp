@@ -42,6 +42,8 @@ const char* kModelNames[] = {
     "yolov8", "yolov8_pose", "yolov8_seg", "yolov8_cls", "yolov8_obb",
     // YOLOV9 / YOLOV10 on the fused pipeline -- order must match ModelType.
     "yolov9", "yolov9_seg", "yolov10",
+    // YOLOV11 on the fused pipeline -- order must match ModelType.
+    "yolov11", "yolov11_cls", "yolov11_obb", "yolov11_pose", "yolov11_seg",
 };
 
 const char* registry_name(ModelType t)

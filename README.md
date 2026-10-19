@@ -330,6 +330,8 @@ scripts/             平台脚本（linux/ = 引擎序列化、参数矩阵测�
 #### [1.配置文件](docs/config.md)
 #### [2.量化](docs/quantization.md)
 
+#### [3.部署自己训练的模型](docs/train_and_deploy_custom.md)
+
 ## Citation
 ```bibtex
 @misc{FeiYull_TensorRT-Alpha,

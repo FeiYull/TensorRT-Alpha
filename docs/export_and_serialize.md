@@ -23,8 +23,11 @@ pip install ultralytics
 - **Keep NMS out of the graph.** This repository runs decode + NMS in its own
   fused CUDA kernels. From the Python API pass `nms=None`; the CLI default
   already leaves it out.
-- **Keep the tensor names.** Input is `images`, outputs are `output0` /
-  `output1`. If you rename them, update `input_output_names` in the INI too.
+- **Keep the tensor names for consistency.** Input is `images`, outputs are
+  `output0` / `output1`. Nothing on the C++ side reads a name from the INI: each
+  model takes the first input and the first N outputs of the engine as declared
+  (the engine is the single source of truth), so a rename will not break it --
+  but keeping the upstream names makes cross-checking against Python simpler.
 - **`--noTF32` on every FP32 build.** TF32 is on by default from Ampere on, and
   it drifts enough to reshuffle NMS; the accuracy baseline in this repo is
   TF32-off.

@@ -68,7 +68,6 @@ int main()
             "engine = data/yolov8/yolov8n.trt\n"
             "num_class = 80\n"
             "class_names_file = data/classes/coco80.txt\n"
-            "input_output_names = images,output0\n"
             "\n"
             "[input]\n"
             "layout = nhwc\n"
@@ -98,9 +97,6 @@ int main()
             check(cfg.maxBatchSize == 4,                    "[1] max_batch_size");
             check(cfg.dstH == 640 && cfg.dstW == 640,      "[1] dst_h/w");
             check(cfg.layout == trt_alpha::core::Layout::NHWC, "[1] input.layout");
-            check(cfg.inputOutputNames.size() == 2,         "[1] io size");
-            check(cfg.inputOutputNames[0] == "images",      "[1] io[0]");
-            check(cfg.inputOutputNames[1] == "output0",     "[1] io[1]");
 
             // ---- 模型特有字段：从 extras 读（两种 key 都能命中）----
             check(cfg.getInt("num_class", 0) == 80,         "[1] extras num_class (short)");
@@ -128,8 +124,7 @@ int main()
             const std::string ini =
                 "[model]\n"
                 "num_class = 80\n"
-                "class_names_file = x.txt\n"
-                "input_output_names = a,b\n";
+                "class_names_file = x.txt\n";
             const fs::path p = writeTempFile("test_2a.ini", ini);
             bool threw = false;
             try { (void)loadModelConfig(p.string()); }
@@ -142,8 +137,7 @@ int main()
             const std::string ini =
                 "[model]\n"
                 "engine = x.trt\n"
-                "class_names_file = x.txt\n"
-                "input_output_names = a,b\n";
+                "class_names_file = x.txt\n";
             const fs::path p = writeTempFile("test_2b.ini", ini);
             bool ok = false;
             try
@@ -161,8 +155,7 @@ int main()
             const std::string ini =
                 "[model]\n"
                 "engine = x.trt\n"
-                "num_class = 80\n"
-                "input_output_names = a,b\n";
+                "num_class = 80\n";
             const fs::path p = writeTempFile("test_2c.ini", ini);
             bool threw = false;
             try { (void)loadModelConfig(p.string()); }
@@ -170,28 +163,13 @@ int main()
             check(threw, "[2c] missing class_names_file throws");
             removeTempFile(p);
         }
-        // 2d：缺 input_output_names
-        {
-            const std::string ini =
-                "[model]\n"
-                "engine = x.trt\n"
-                "num_class = 80\n"
-                "class_names_file = x.txt\n";
-            const fs::path p = writeTempFile("test_2d.ini", ini);
-            bool threw = false;
-            try { (void)loadModelConfig(p.string()); }
-            catch (const std::runtime_error&) { threw = true; }
-            check(threw, "[2d] missing input_output_names throws");
-            removeTempFile(p);
-        }
-                // 2e：num_class = 0 —— 现在不抛；模型 init() 里自己校验
+        // 2e：num_class = 0 —— 现在不抛；模型 init() 里自己校验
         {
             const std::string ini =
                 "[model]\n"
                 "engine = x.trt\n"
                 "num_class = 0\n"
-                "class_names_file = x.txt\n"
-                "input_output_names = a,b\n";
+                "class_names_file = x.txt\n";
             const fs::path p = writeTempFile("test_2e.ini", ini);
             bool ok = false;
             try
@@ -299,7 +277,6 @@ int main()
             "[model]\n"
             "engine = a.trt\n"
             "class_names_file = data/classes/coco80.txt\n"
-            "input_output_names = images,output0\n"
             "\n"
             "[input]\n";
 
@@ -357,7 +334,6 @@ int main()
             "[model]\n"
             "engine = a.trt\n"
             "class_names_file = data/classes/coco80.txt\n"
-            "input_output_names = images,output0\n"
             "\n"
             "[normalize]\n"
             "scale = 2.0\n";          // 覆盖 base.ini 的同名键
@@ -409,7 +385,6 @@ int main()
             "[model]\n"
             "engine = a.trt\n"
             "class_names_file = data/classes/coco80.txt\n"
-            "input_output_names = images,output0\n"
             "num_class = 80\n"
             "batch_size = 8\n"          // 放错节：框架读的是 input.batch_size → 本键是死键
             "\n"
@@ -461,7 +436,6 @@ int main()
             "[model]\n"
             "engine = a.trt\n"
             "class_names_file = data/classes/coco80.txt\n"
-            "input_output_names = images,output0\n"
             "\n"
             "[normalize]\n";
 

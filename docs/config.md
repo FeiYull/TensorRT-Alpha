@@ -65,7 +65,6 @@ API call / command-line flags   >   configs/<model>.ini   >   configs/base.ini
 [model]
 engine = engines/yolov26n.trt
 class_names_file = data/classes/coco80.txt
-input_output_names = images,output0
 num_class = 80
 # extra: per-anchor extra channels (seg = 32 / pose = 51). 0 for det.
 # extra = 0

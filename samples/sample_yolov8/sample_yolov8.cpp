@@ -1,7 +1,7 @@
 // =============================================================================
-//  sample_yolov8 —— trt_alpha 使用示例
+//  sample_yolov8 —— trt_alpha 使用示例（YOLOV8）
 // -----------------------------------------------------------------------------
-//  演示如何用 trt_alpha 框架跑 YOLOv8 推理：
+//  演示如何用 trt_alpha 框架跑 YOLOV8 推理：
 //    1. 手工构造 ModelConfig（不读 INI）
 //    2. 构造 InferencePool（1 worker）
 //    3. 构造 OpenCVSource（图片 / 视频）
@@ -11,6 +11,9 @@
 //  用法：
 //    sample_yolov8 <engine.trt> <input>          # input = 图片 / 视频
 //    sample_yolov8 <engine.trt> <input> --save   # 存盘
+//
+//  注意：batchSize 必须与引擎一致。本系列的引擎是静态 batch（导出 ONNX 时
+//  写死的），所以这里给的是 2；换成静态 batch = 1 的引擎就改成 1。
 // =============================================================================
 #include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/inference_pool.hpp"
@@ -52,15 +55,15 @@ int main(int argc, char** argv)
         // ---- 1. ModelConfig ----
         trt_alpha::core::ModelConfig cfg;
         cfg.engine = enginePath;
-        cfg.batchSize = 1;
+        cfg.batchSize = 2;
         cfg.dstH = 640;
         cfg.dstW = 640;
         cfg.classNamesFile = "data/classes/coco80.txt";
 
-        // 模型特有字段（YoloV8 自己读）
+        // 模型特有字段（YOLOV8 自己读）
         cfg.extras["num_class"] = "80";
         cfg.extras["conf_thresh"] = "0.25";
-        cfg.extras["iou_thresh"] = "0.45";
+        cfg.extras["iou_thresh"] = "0.7";
         cfg.extras["top_k"] = "300";
 
         // 类别信息（渲染用）
@@ -76,7 +79,7 @@ int main(int argc, char** argv)
 
         // ---- 3. 数据源 ----
         trt_alpha::datasource::SourceConfig srcCfg;
-        srcCfg.batchSize = cfg.batchSize;
+        srcCfg.batchSize = pool.resolvedBatch();
         srcCfg.sourceId = 0;
 
         const bool isVideo =
@@ -109,6 +112,7 @@ int main(int argc, char** argv)
         pcfg.classNames = cfg.classNames;
         pcfg.saveEnabled = saveEnabled;
         pcfg.saveDir = trt_alpha::core::Paths::resolveSaveDir("", "yolov8");
+
         pcfg.showEnabled = false;
 
         trt_alpha::pipeline::Pipeline pipeline(std::move(pcfg));
