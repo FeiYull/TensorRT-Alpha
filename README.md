@@ -242,32 +242,32 @@ int main(){
 <details open>
 <summary><b>模型矩阵</b></summary>
 
-`✅` 已跑通并实测 · `🚧` 规划中 · `—` 未提供
+`✅` 已跑通并实测 · `🚧` 规划中 · `—` 未提供 · `📥` 点击下载 onnx
 
 <div align="center">
 
-| model | fp32 | fp16 | int8 | onnx |
+| model | fp32 | fp16 | int8 | 下载onnx |
 |---|:---:|:---:|:---:|:---:|
 | **YOLO26** | | | | |
-| yolo26-det | ✅ | ✅ | ✅ | ✅ |
-| yolo26-seg | ✅ | ✅ | ✅ | ✅ |
-| yolo26-obb | ✅ | ✅ | ✅ | ✅ |
-| yolo26-cls | ✅ | ✅ | ✅ | ✅ |
-| yolo26-depth | ✅ | ✅ | ✅ | ✅ |
-| yolo26-sem | ✅ | ✅ | ✅ | ✅ |
-| yolo26-pose | ✅ | ✅ | ✅ | ✅ |
-| yolo26-tracking | 🚧 | 🚧 | 🚧 | 🚧 |
+| yolo26-det | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo26n.onnx) |
+| yolo26-seg | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo26n-seg.onnx) |
+| yolo26-obb | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo26n-obb.onnx) |
+| yolo26-cls | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo26n-cls.onnx) |
+| yolo26-depth | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo26n-depth.onnx) |
+| yolo26-sem | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo26n-sem.onnx) |
+| yolo26-pose | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo26n-pose.onnx) |
+| yolo26-tracking | 🚧 | 🚧 | 🚧 | —  
 | **YOLOV11** | | | | |
-| yolov11_det | ✅ | ✅ | ✅ | ✅ |
-| yolov11_seg | ✅ | ✅ | ✅ | ✅ |
-| yolov11_obb | ✅ | ✅ | ✅ | ✅ |
-| yolov11_cls | ✅ | ✅ | ✅ | ✅ |
-| yolov11_pose | ✅ | ✅ | ✅ | ✅ |
+| yolov11_det | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolo11n.onnx) |
+| yolov11_seg | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov11n_seg.onnx) |
+| yolov11_obb | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov11n_obb.onnx) |
+| yolov11_cls | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov11n_cls.onnx) |
+| yolov11_pose | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov11n_pose.onnx) |
 | **YOLOV9** | | | | |
-| yolov9_det | ✅ | ✅ | ✅ | ✅ |
-| yolov9_seg | ✅ | ✅ | ✅ | ✅ |
+| yolov9_det | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov9t.onnx) |
+| yolov9_seg | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov9c_seg.onnx) |
 | **YOLOV10** | | | | |
-| yolov10_det | ✅ | ✅ | ✅ | ✅ |
+| yolov10_det | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov10n.onnx) |
 
 </div>
 
@@ -277,24 +277,24 @@ int main(){
 
 <div align="center">
 
-| model | fp32 | fp16 | int8 | onnx |
+| model | fp32 | fp16 | int8 | 下载onnx |
 |---|:---:|:---:|:---:|:---:|
-| yolov3 | ✅ | — | — | ✅ |
-| yolov4 | ✅ | — | — | ✅ |
-| yolov5 | ✅ | — | — | ✅ |
-| yolov6 | ✅ | — | — | ✅ |
-| yolov7 | ✅ | — | — | ✅ |
-| yolov8_det | ✅ | ✅ | ✅ | ✅ |
-| yolov8_seg | ✅ | ✅ | ✅ | ✅ |
-| yolov8_cls | ✅ | ✅ | ✅ | ✅ |
-| yolov8_pose | ✅ | ✅ | ✅ | ✅ |
-| yolov8_obb | ✅ | ✅ | ✅ | ✅ |
-| yolox | ✅ | — | — | ✅ |
-| yolor | ✅ | — | — | ✅ |
-| yolo_nas | ✅ | — | — | ✅ |
-| efficientdet | ✅ | — | — | ✅ |
-| yunet | ✅ | — | — | ✅ |
-| u2net | ✅ | — | — | ✅ |
+| yolov3 | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/alpha_yolov3-spp.onnx) |
+| yolov4 | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/alpha_yolov4_-1_3_608_608_dynamic.onnx) |
+| yolov5 | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov5n.onnx) |
+| yolov6 | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov6n.onnx) |
+| yolov7 | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov7-tiny.onnx) |
+| yolov8_det | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov8n.onnx) |
+| yolov8_seg | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov8n_seg.onnx) |
+| yolov8_cls | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov8n_cls.onnx) |
+| yolov8_pose | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov8n_pose.onnx) |
+| yolov8_obb | ✅ | ✅ | ✅ | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolov8n_obb.onnx) |
+| yolox | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolox_tiny.onnx) |
+| yolor | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolor_csp.onnx) |
+| yolo_nas | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/yolonas_s.onnx) |
+| efficientdet | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/efficientdet0.onnx) |
+| yunet | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/alpha_yunet_yunet_final_dynamic_simplify.onnx) |
+| u2net | ✅ | — | — | [📥](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/u2netp.onnx) |
 
 </div>
 

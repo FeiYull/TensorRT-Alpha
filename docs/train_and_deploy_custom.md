@@ -50,9 +50,8 @@ model.export(
 
 This writes:
 
-```
-my_det_task_cls_num_4.onnx
-```
+[my_det_task_cls_num_4.onnx](https://github.com/FeiYull/TensorRT-Alpha/releases/download/v1.0.0/my_det_task_cls_num_4.onnx)
+
 
 ## 3. Serialize with `trtexec`
 
@@ -60,12 +59,7 @@ my_det_task_cls_num_4.onnx
 .\trtexec.exe --onnx=my_det_task_cls_num_4.onnx --saveEngine=my_det_task_cls_num_4.trt --noTF32
 ```
 
-This writes:
-
-```
-my_det_task_cls_num_4.trt
-```
-
+This writes: my_det_task_cls_num_4.trt
 ## 4. Create the INI configuration
 
 All paths below are relative to the repository root (`TensorRT-Alpha/`).

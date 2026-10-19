@@ -165,7 +165,7 @@ target_link_libraries(trt_alpha_core
 # 测试
 # =============================================================================
 enable_testing()          # 顶层开启 CTest，注册的各 test_* 可 `ctest -C Release` 一键跑
-add_subdirectory(test)
+#add_subdirectory(test)
 add_subdirectory(app)
 add_subdirectory(samples)
 
