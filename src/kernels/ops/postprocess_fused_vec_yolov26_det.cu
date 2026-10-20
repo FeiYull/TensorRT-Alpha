@@ -32,6 +32,32 @@ using detail::rankSortByConf;
 constexpr int kVec = 4;   //!< 4 consecutive anchors per thread (one float4)
 
 // =============================================================================
+//  loadQuad -- 4 consecutive anchors of one channel row
+// -----------------------------------------------------------------------------
+//  Row c of a channel plane starts at cls0 + c * anchors floats, so a 16B float4
+//  load is aligned only when anchors % kVec == 0 (8400 yes, 9261 no). The stride
+//  is known at plan time, so both forms are compiled and the launch picks one --
+//  the unaligned case never performs a float4 access.
+// =============================================================================
+template <bool kRowAligned>
+__device__ __forceinline__ float4 loadQuad(const float* __restrict__ p)
+{
+    if constexpr (kRowAligned)
+    {
+        return *reinterpret_cast<const float4*>(p);
+    }
+    else
+    {
+        float4 v;
+        v.x = p[0];
+        v.y = p[1];
+        v.z = p[2];
+        v.w = p[3];
+        return v;
+    }
+}
+
+// =============================================================================
 //  commitOne -- one decoded candidate -> compacted candidate buffer
 // -----------------------------------------------------------------------------
 //  Same arithmetic as the scalar kernel: xywh -> xyxy first, then the atomic
@@ -71,6 +97,7 @@ __device__ __forceinline__ void commitOne(
 // =============================================================================
 //  Vectorized fused kernel -- one block per image
 // =============================================================================
+template <bool kRowAligned>
 __global__ void proprocessFusedVecYoloV26Kernel(
     const float* __restrict__ y, int nc, int extra, int anchors,
     float confThresh, float iouThresh, float maxWh, int maxDet,
@@ -109,12 +136,12 @@ __global__ void proprocessFusedVecYoloV26Kernel(
         float best0, best1, best2, best3;
         int   bestI0 = 0, bestI1 = 0, bestI2 = 0, bestI3 = 0;
         {
-            const float4 v = *reinterpret_cast<const float4*>(cls0 + a0);
+            const float4 v = loadQuad<kRowAligned>(cls0 + a0);
             best0 = v.x; best1 = v.y; best2 = v.z; best3 = v.w;
         }
         for (int c = 1; c < nc; ++c)
         {
-            const float4 v = *reinterpret_cast<const float4*>(
+            const float4 v = loadQuad<kRowAligned>(
                 cls0 + (std::size_t)c * (std::size_t)anchors + a0);
             if (v.x > best0) { best0 = v.x; bestI0 = c; }
             if (v.y > best1) { best1 = v.y; bestI1 = c; }
@@ -122,10 +149,10 @@ __global__ void proprocessFusedVecYoloV26Kernel(
             if (v.w > best3) { best3 = v.w; bestI3 = c; }
         }
 
-        const float4 c4 = *reinterpret_cast<const float4*>(yb + a0);
-        const float4 y4 = *reinterpret_cast<const float4*>(yb + (std::size_t)anchors + a0);
-        const float4 w4 = *reinterpret_cast<const float4*>(yb + (std::size_t)2 * (std::size_t)anchors + a0);
-        const float4 h4 = *reinterpret_cast<const float4*>(yb + (std::size_t)3 * (std::size_t)anchors + a0);
+        const float4 c4 = loadQuad<kRowAligned>(yb + a0);
+        const float4 y4 = loadQuad<kRowAligned>(yb + (std::size_t)anchors + a0);
+        const float4 w4 = loadQuad<kRowAligned>(yb + (std::size_t)2 * (std::size_t)anchors + a0);
+        const float4 h4 = loadQuad<kRowAligned>(yb + (std::size_t)3 * (std::size_t)anchors + a0);
 
         if (best0 > confThresh)
         {
@@ -192,6 +219,7 @@ __global__ void proprocessFusedVecYoloV26Kernel(
 // =============================================================================
 //  Launch helper
 // =============================================================================
+template <bool kRowAligned>
 void launchFusedVec(cudaStream_t stream, int batch, const float* y,
                     int* count, float* dets,
                     const ProprocessFusedVecYoloV26Config& cfg,
@@ -199,7 +227,7 @@ void launchFusedVec(cudaStream_t stream, int batch, const float* y,
 {
     const dim3 blk((unsigned)kBlock1D);
     const dim3 grd((unsigned)batch);
-    proprocessFusedVecYoloV26Kernel<<<grd, blk, 0, stream>>>(
+    proprocessFusedVecYoloV26Kernel<kRowAligned><<<grd, blk, 0, stream>>>(
         y, cfg.nc, cfg.extra, cfg.anchors,
         cfg.confThresh, cfg.iouThresh, cfg.maxWh, cfg.maxDet,
         count, dets, buf, order, alive, cnt);
@@ -284,7 +312,19 @@ void CvProprocessFusedVecYoloV26Plan::launch(cudaStream_t stream, int batch,
         return;
     }
 
-    launchFusedVec(stream, batch, y, count, dets, cfg_, d_buf_, d_order_, d_alive_, d_cnt_);
+    // Row alignment is a plan property: anchors % 4 == 0 -> 16B float4 rows,
+    // otherwise four scalar loads per row. Both instantiations already exist, so
+    // this is a launch-time pick, never a silent shape change.
+    if ((cfg_.anchors % kVec) == 0)
+    {
+        launchFusedVec<true>(stream, batch, y, count, dets,
+                             cfg_, d_buf_, d_order_, d_alive_, d_cnt_);
+    }
+    else
+    {
+        launchFusedVec<false>(stream, batch, y, count, dets,
+                              cfg_, d_buf_, d_order_, d_alive_, d_cnt_);
+    }
     err_ = cudaGetLastError();
 }
 

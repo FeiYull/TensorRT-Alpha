@@ -14,10 +14,11 @@
 //                                             in parallel (independent lanes)
 //
 //  Why it is safe:
-//      * y is channel-major: for a fixed channel the anchors are contiguous, so
-//        4 consecutive anchors are 16B aligned whenever A is a multiple of 4
-//        (8400 is). If A is not, the tail is handled by a scalar loop -- no
-//        out-of-bounds access, no misalignment.
+//      * y is channel-major: for a fixed channel the anchors are contiguous. Row c
+//        of a channel plane starts at cls0 + c * A floats, so a 16B float4 load is
+//        aligned only when A % 4 == 0 (8400 is, 9261 is not). Any A is legal: the
+//        launch picks the <false> instantiation, which reads each row with four
+//        scalar loads -- no misaligned access, no out-of-bounds read.
 //      * Each lane still performs its own compare-and-select, so the chosen
 //        class index and the resulting box are the same values as the scalar
 //        version -- no "shared approximation" was introduced.
