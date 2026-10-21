@@ -31,23 +31,12 @@ int computeStride(int width, int channels, DataType dtype) noexcept
     return width * channels * static_cast<int>(sizeOf(dtype));
 }
 
-void checkCudaMalloc(cudaError_t err, std::size_t bytes)
-{
-    if (err != cudaSuccess)
-    {
-        TRT_LOG_ERROR("Buffer: cudaMalloc failed for " << bytes
-                      << " bytes: " << cudaGetErrorString(err));
-        throw std::runtime_error(
-            "Buffer: cudaMalloc failed for " + std::to_string(bytes) +
-            " bytes: " + cudaGetErrorString(err));
-    }
-}
-
 }  // namespace
 
 Buffer::Buffer(std::uint8_t* data, int width, int height, int channels,
                int stride, DataType dtype, MemorySpace space,
-               std::weak_ptr<MemoryPool> pool, std::size_t capacity) noexcept
+               MemoryPool::Kind poolKind, std::weak_ptr<MemoryPool> pool,
+               std::size_t capacity) noexcept
     : m_data(data)
     , m_width(width)
     , m_height(height)
@@ -55,6 +44,7 @@ Buffer::Buffer(std::uint8_t* data, int width, int height, int channels,
     , m_stride(stride)
     , m_dtype(dtype)
     , m_space(space)
+    , m_poolKind(poolKind)
     , m_pool(std::move(pool))
     , m_capacity(capacity)
 {
@@ -71,15 +61,19 @@ void Buffer::release() noexcept
     {
         return;
     }
-    if (m_space == MemorySpace::Device)
-    {
-        cudaFree(m_data);
-    }
-    else if (std::shared_ptr<MemoryPool> pool = m_pool.lock())
+    if (std::shared_ptr<MemoryPool> pool = m_pool.lock())
     {
         // 必须把 allocate() 返回的 Block 原样交回（release 靠 capacity 记账，
-        // 并靠 outstanding 注册表查重复归还）。
-        pool->release(MemoryPool::Kind::Host, MemoryPool::Block{m_data, m_capacity});
+        // 并靠 outstanding 注册表查重复归还）。Kind 必须与 allocate 时一致：
+        // 池按 Kind 分维护各自的空闲表，交错了会被当成外来指针拒绝。
+        // 显存也必须回池：cudaMalloc / cudaFree 会隐式同步设备，每帧一进一出
+        // 等于在流水线中间插一次硬停顿（实测 cudaFree 12MB 约 20~40 us）。
+        pool->release(m_poolKind, MemoryPool::Block{m_data, m_capacity});
+    }
+    else if (m_space == MemorySpace::Device)
+    {
+        // 池已销毁（进程退出路径）：直接释放，保证无泄漏
+        cudaFree(m_data);
     }
     else
     {
@@ -109,7 +103,34 @@ std::shared_ptr<Buffer> Buffer::createHost(int width, int height, int channels,
 
     return std::shared_ptr<Buffer>(
         new Buffer(static_cast<std::uint8_t*>(block.ptr), width, height, channels,
-                   stride, dtype, MemorySpace::Host, pool, block.capacity));
+                   stride, dtype, MemorySpace::Host, MemoryPool::Kind::Host,
+                   pool, block.capacity));
+}
+
+std::shared_ptr<Buffer> Buffer::createPinned(int width, int height, int channels,
+                                             DataType dtype)
+{
+    validateSize(width, height, channels);
+    const int stride = computeStride(width, channels, dtype);
+    const std::size_t bytes = static_cast<std::size_t>(stride) *
+                              static_cast<std::size_t>(height);
+
+    // Page-locked, so cudaMemcpyAsync really is asynchronous against it. It is
+    // also a scarce resource (it cannot be paged out), which is why the pool owns
+    // it and hands the same blocks back instead of calling cudaHostAlloc per batch.
+    const std::shared_ptr<MemoryPool>& pool = MemoryPool::instance();
+    const MemoryPool::Block block = pool->allocate(MemoryPool::Kind::PinnedHost, bytes);
+
+    TRT_LOG_DEBUG("Buffer: createPinned " << width << "x" << height
+                  << "x" << channels << " " << nameOf(dtype)
+                  << " (" << bytes << " bytes, cap=" << block.capacity << ")");
+
+    // MemorySpace::Host on purpose: from CUDA's point of view this is host memory.
+    // Only the pool kind records that it is page-locked.
+    return std::shared_ptr<Buffer>(
+        new Buffer(static_cast<std::uint8_t*>(block.ptr), width, height, channels,
+                   stride, dtype, MemorySpace::Host, MemoryPool::Kind::PinnedHost,
+                   pool, block.capacity));
 }
 
 std::shared_ptr<Buffer> Buffer::createDevice(int width, int height, int channels,
@@ -120,16 +141,20 @@ std::shared_ptr<Buffer> Buffer::createDevice(int width, int height, int channels
     const std::size_t bytes = static_cast<std::size_t>(stride) *
                               static_cast<std::size_t>(height);
 
-    void* ptr = nullptr;
-    checkCudaMalloc(cudaMalloc(&ptr, bytes), bytes);
+    // 走池，与 Host 同一套记账：cudaMalloc / cudaFree 会隐式同步设备，把它放进
+    // 每批一次的热路径就等于给流水线加一次硬停顿。池按 exact-size 命中，稳态下
+    // 这里零 CUDA 调用。
+    const std::shared_ptr<MemoryPool>& pool = MemoryPool::instance();
+    const MemoryPool::Block block = pool->allocate(MemoryPool::Kind::Device, bytes);
 
     TRT_LOG_DEBUG("Buffer: createDevice " << width << "x" << height
                   << "x" << channels << " " << nameOf(dtype)
-                  << " (" << bytes << " bytes)");
+                  << " (" << bytes << " bytes, cap=" << block.capacity << ")");
 
     return std::shared_ptr<Buffer>(
-        new Buffer(static_cast<std::uint8_t*>(ptr), width, height, channels, stride,
-                   dtype, MemorySpace::Device, {}, 0));
+        new Buffer(static_cast<std::uint8_t*>(block.ptr), width, height, channels,
+                   stride, dtype, MemorySpace::Device, MemoryPool::Kind::Device,
+                   pool, block.capacity));
 }
 
 std::shared_ptr<Buffer> Buffer::fromHostData(const std::uint8_t* srcData,
@@ -173,7 +198,7 @@ std::shared_ptr<Buffer> Buffer::fromHostData(const std::uint8_t* srcData,
 
     return std::shared_ptr<Buffer>(
         new Buffer(data, width, height, channels, dstStride, dtype,
-                   MemorySpace::Host, pool, block.capacity));
+                   MemorySpace::Host, MemoryPool::Kind::Host, pool, block.capacity));
 }
 
 BufferView Buffer::view() const noexcept

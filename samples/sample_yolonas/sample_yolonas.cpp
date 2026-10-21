@@ -13,6 +13,7 @@
 #include "trt_alpha/core/paths.hpp"
 #include "trt_alpha/datasource/i_data_source.hpp"
 #include "trt_alpha/datasource/opencv_source.hpp"
+#include "trt_alpha/datasource/source_factory.hpp"
 #include "trt_alpha/datasource/source_config.hpp"
 #include "trt_alpha/pipeline/pipeline.hpp"
 #include "trt_alpha/pipeline/pipeline_config.hpp"
@@ -83,8 +84,8 @@ int main(int argc, char** argv)
         srcCfg.path = inputPath;
 
         std::vector<std::unique_ptr<trt_alpha::datasource::IDataSource>> sources;
-        sources.push_back(
-            std::make_unique<trt_alpha::datasource::OpenCVSource>(srcCfg));
+        trt_alpha::datasource::applyBackendArgs(argc, argv, srcCfg);
+        sources.push_back(trt_alpha::datasource::makeSource(srcCfg));
 
         trt_alpha::renderer::OpenCVRenderer renderer;
 

@@ -142,6 +142,9 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
         const std::string& a = args[i];
 
         if      (a == "--source")   { opt.source = nextArg(args, i, a); }
+        else if (a == "--decode")   { opt.decode = nextArg(args, i, a); }
+        else if (a == "--hwaccel")  { opt.hwaccel = nextArg(args, i, a); }
+        else if (a == "--host-copy"){ opt.hostCopy = nextArg(args, i, a); }
         else if (a == "--config")   { opt.config = nextArg(args, i, a); }
         else if (a == "--engine")   { opt.engine = nextArg(args, i, a); }
         else if (a == "--net")      { opt.net = nextArg(args, i, a); }

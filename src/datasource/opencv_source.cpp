@@ -407,6 +407,7 @@ bool OpenCVSource::next(core::Batch& out)
         v.channels = 3;
         v.dtype = core::DataType::UInt8;
         v.space = core::MemorySpace::Host;
+        v.format = core::PixelFormat::BGR8;
         out.views.push_back(v);
     }
 

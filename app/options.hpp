@@ -19,6 +19,17 @@ struct RunOptions
     //! 具体类型由框架内部判别（datasource::resolveSource），命令行不再区分。
     std::string source;
 
+    //! --decode <opencv|ffmpeg|auto>：视频用哪个库解码。默认 opencv（保持现状）。
+    //! 图片 / 目录 / 摄像头始终走 OpenCV。
+    std::string decode;
+
+    //! --hwaccel <auto|none|nvdec>：FFmpeg 后端是否用 NVDEC 硬解。默认 auto。
+    std::string hwaccel;
+
+    //! --host-copy <auto|on|off>：解码后是否把像素拷回主机。
+    //! 空 = 用 INI [source] need_host_copy（默认 auto）。
+    std::string hostCopy;
+
     // ---- 模型 ----
     std::string config;         //!< --config <ini>（不传则 configs/<net>.ini）
     std::string engine;         //!< --engine <trt>（覆盖 INI）

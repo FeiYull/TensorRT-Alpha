@@ -26,14 +26,13 @@
 
 #include "trt_alpha/core/buffer_view.hpp"
 #include "trt_alpha/core/data_type.hpp"
+#include "trt_alpha/core/memory_pool.hpp"   // MemoryPool::Kind (which free list to return to)
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 
 namespace trt_alpha::core {
-
-class MemoryPool;   //!< only ever held weakly; defined in memory_pool.hpp
 
 //! Owning memory container. Not copyable, not movable (passed only via shared_ptr).
 class Buffer
@@ -54,6 +53,21 @@ public:
     //! width / height / channels must be > 0. stride = width * channels * sizeOf(dtype) (tight).
     [[nodiscard]] static std::shared_ptr<Buffer>
     createHost(int width, int height, int channels, DataType dtype);
+
+    //! Allocate page-locked (pinned) Host memory.
+    //!
+    //! Why this is a separate factory rather than a flag: page-locked memory is a
+    //! different resource with different costs, and only the caller knows whether
+    //! it is worth it. The reason to ask for it is `cudaMemcpyAsync`: with pageable
+    //! memory the driver silently turns the "async" copy into a synchronous one
+    //! through its own staging buffer (measured: 6.2 MB D2H blocked the calling
+    //! thread for 793 us instead of returning immediately). With page-locked memory
+    //! the call really does return at once.
+    //!
+    //! MemorySpace stays Host -- it is host memory either way; only its
+    //! pageability differs, which is a detail of which pool it came from.
+    [[nodiscard]] static std::shared_ptr<Buffer>
+    createPinned(int width, int height, int channels, DataType dtype);
 
     //! Allocate on the Device (cudaMalloc).
     //! Will switch to pooled allocation once MemoryPool lands.
@@ -100,7 +114,8 @@ public:
 private:
     Buffer(std::uint8_t* data, int width, int height, int channels,
            int stride, DataType dtype, MemorySpace space,
-           std::weak_ptr<MemoryPool> pool, std::size_t capacity) noexcept;
+           MemoryPool::Kind poolKind, std::weak_ptr<MemoryPool> pool,
+           std::size_t capacity) noexcept;
 
     void release() noexcept;
 
@@ -112,7 +127,13 @@ private:
     DataType m_dtype = DataType::UInt8;
     MemorySpace m_space = MemorySpace::Host;
 
-    std::weak_ptr<MemoryPool> m_pool;   //!< set when the block came from the pool (Host)
+    //! Which pool kind the block came from. MemorySpace alone is not enough:
+    //! pageable and page-locked host memory are both Host, but they must be
+    //! returned to different free lists (the pool rejects a block handed back to
+    //! the wrong kind).
+    MemoryPool::Kind m_poolKind = MemoryPool::Kind::Host;
+
+    std::weak_ptr<MemoryPool> m_pool;   //!< set when the block came from the pool
     std::size_t m_capacity = 0;         //!< bytes actually held (>= byteSize())
 };
 

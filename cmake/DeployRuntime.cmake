@@ -99,6 +99,17 @@ function(trt_alpha_deploy_runtime target)
     endif()
 
     # -------------------------------------------------------------------------
+    # 1b) FFmpeg（可选解码后端）
+    #     imported target 不参与 $<TARGET_RUNTIME_DLLS>，直接 glob shared 构建
+    #     的 bin/：avcodec-63 / avformat-63 / avutil-61 / swscale-10。
+    #     没有它 exe 会报 "avcodec-63.dll not found"，且只影响 --decode ffmpeg。
+    # -------------------------------------------------------------------------
+    if(TRT_ALPHA_FFMPEG_ENABLED AND DEFINED FFMPEG_ROOT AND EXISTS "${FFMPEG_ROOT}/bin")
+        file(GLOB _ffmpeg_dlls "${FFMPEG_ROOT}/bin/*.dll")
+        list(APPEND _dlls ${_ffmpeg_dlls})
+    endif()
+
+    # -------------------------------------------------------------------------
     # 2) TensorRT
     #    bin/ 是官方发行包的固定布局，直接 glob。
     #    默认排除 nvinfer_builder_resource_*：只有从 ONNX 现场构建 engine 时才

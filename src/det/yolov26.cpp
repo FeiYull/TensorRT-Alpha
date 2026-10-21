@@ -2,7 +2,8 @@
 //  trt_alpha :: det :: YoloV26（实现）
 // -----------------------------------------------------------------------------
 //  管线：
-//      setBatch   : 原图连续内存 H2D
+//      setBatch   : 原图连续内存 H2D —— 除非数据源已经把像素留在显存里
+//                   （NVDEC 硬解），那时直接复用，一次上传都不做
 //      preprocess : CvPreprocessVecPlan  —— letterbox 640x640 + BGR2RGB +
 //                   HWC2CHW + /255，五合一单 kernel
 //      infer      : enqueueV3
@@ -15,6 +16,7 @@
 //      ultralytics 参考逐位一致（max|d| = 0，已在 9 张 VOC val 图上验证）。
 // =============================================================================
 #include "yolov26.hpp"
+#include "trt_alpha/core/batch_stage.hpp"
 #include "trt_alpha/core/config.hpp"
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"   // TRT_ALPHA_REGISTER_MODEL
@@ -277,25 +279,21 @@ void YoloV26::setBatch(const core::Batch& batch)
     // 正/反变换同源：几何一变就重建 Plan，同时刷新 m_lb
     ensurePreprocessPlan();
 
-    if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
+    // Pixels may exist only on the device: the source skips its host copy when no
+    // renderer is attached. stageBatchPixels() below picks the right block, so
+    // the only thing worth rejecting here is a batch that has neither.
+    const bool haveHost = (batch.buffer != nullptr && batch.buffer->data() != nullptr);
+    if (!haveHost && batch.deviceBuffer == nullptr)
     {
-        throw std::runtime_error(m_tag + ": batch.buffer is null");
+        throw std::runtime_error(m_tag + ": batch has no pixels");
     }
 
-    const std::size_t oneImage = 3 * static_cast<std::size_t>(m_srcH) * m_srcW;
-    const std::size_t total    = oneImage * batch.views.size();
+    // Zero copy when the source already produced device pixels (NVDEC), otherwise
+    // grow m_inputSrc and upload. m_srcDevice is what preprocess() reads.
+    m_srcDevice = core::stageBatchPixels(batch, m_inputSrc, m_stream.get(),
+                                         m_tag.c_str());
 
-    if (total > m_inputSrc.bytes())
-    {
-        // 源图尺寸变化触发扩容（少见）
-        m_inputSrc.allocate(total);
-    }
-
-    cudaMemcpyAsync(m_inputSrc.data(), batch.buffer->data(), total,
-                    cudaMemcpyHostToDevice, m_stream.get());
-    m_stream.synchronize();
-
-    TRT_LOG_DEBUG(m_tag << "::setBatch: H2D done, " << total << " bytes (batch=" << m_batch << ")");
+    TRT_LOG_DEBUG(m_tag << "::setBatch: pixels staged (batch=" << m_batch << ")");
 }
 
 void YoloV26::preprocess()
@@ -305,7 +303,7 @@ void YoloV26::preprocess()
         throw std::runtime_error(m_tag + ": preprocess called before setBatch");
     }
     m_pre->launch(m_stream.get(), m_batch,
-                  static_cast<const unsigned char*>(m_inputSrc.data()),
+                  static_cast<const unsigned char*>(m_srcDevice),
                   m_inputNchw.asFloat());
     if (!m_pre->ok())
     {
@@ -405,6 +403,9 @@ void YoloV26::reset()
         v.clear();
     }
     m_batch = 0;
+    // The device pixels belong to the batch, not to this model: drop the pointer
+    // so a later preprocess() cannot read a block that has gone back to the pool.
+    m_srcDevice = nullptr;
 }
 
 }  // namespace trt_alpha::det

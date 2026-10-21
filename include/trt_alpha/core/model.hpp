@@ -57,6 +57,16 @@ public:
     //! Upload one batch of images to device memory. Buffers in a Batch are contiguous.
     virtual void setBatch(const core::Batch& batch) = 0;
 
+    //! Whether setBatch() can consume pixels straight from Batch::deviceBuffer.
+    //!
+    //! A source may skip its host copy when nobody renders the frames, and then
+    //! Batch::buffer is null: the pixels only exist on the device. A model that
+    //! still does its own host-to-device upload would dereference that null
+    //! buffer, so it must say "no" until it has been taught to stage through
+    //! core::stageBatchPixels(). Default false keeps every model that has not
+    //! been converted correct instead of crashing.
+    [[nodiscard]] virtual bool acceptsDevicePixels() const noexcept { return false; }
+
     //! CUDA preprocessing (letterbox / normalization / HWC->NCHW, etc.).
     //! Implemented by each model.
     virtual void preprocess() = 0;

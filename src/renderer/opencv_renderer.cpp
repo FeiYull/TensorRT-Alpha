@@ -898,6 +898,14 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
                                 const std::vector<core::ClassInfo>& classNames,
                                 const RenderOptions& options) const
 {
+    // The source fills the host copy with an asynchronous memcpy; this is the
+    // first place that actually touches those pixels. Waiting here is idempotent
+    // and, by the time a result reaches the renderer, the copy has long landed.
+    if (result.hostReady)
+    {
+        result.hostReady->wait();
+    }
+
     const std::size_t n =
         std::min<std::size_t>(result.views.size(),
                               static_cast<std::size_t>(std::max(0, result.validCount)));
@@ -943,6 +951,11 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
 void OpenCVRenderer::save(const core::BatchResult& result,
                           const std::string& outputDir) const
 {
+    if (result.hostReady)
+    {
+        result.hostReady->wait();
+    }
+
     // 输出目录准备（create_directories + weakly_canonical）每个目录只做一次。
     // save() 是 const、每帧都被调用，而且 --save 并行时会被多个渲染线程同时调用，
     // 所以缓存用 mutable + 互斥保护。失败也只尝试一次、只报一次，免得逐帧刷屏。
@@ -1101,6 +1114,10 @@ void OpenCVRenderer::show(const core::BatchResult& result,
     if (result.views.empty() || result.validCount <= 0)
     {
         return;
+    }
+    if (result.hostReady)
+    {
+        result.hostReady->wait();
     }
     const cv::Mat image = matFromView(result.views[0]);
     if (image.empty())

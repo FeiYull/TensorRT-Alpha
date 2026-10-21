@@ -106,4 +106,131 @@ ResolvedSource resolveSource(const std::string& source)
     return rs;
 }
 
+// =============================================================================
+//  Backend / hardware-acceleration names
+// -----------------------------------------------------------------------------
+//  One parser for the CLI (`--decode`, `--hwaccel`) and one for the high-level
+//  API, so the two spellings can never disagree. parse*() are the lenient
+//  variants (unknown -> Auto); require*() are what the entry points use, because
+//  a typo must not silently change which backend runs.
+// =============================================================================
+const char* toString(DecodeBackend b) noexcept
+{
+    switch (b)
+    {
+    case DecodeBackend::Auto:   return "auto";
+    case DecodeBackend::OpenCV: return "opencv";
+    case DecodeBackend::FFmpeg: return "ffmpeg";
+    }
+    return "auto";
+}
+
+const char* toString(HwAccel h) noexcept
+{
+    switch (h)
+    {
+    case HwAccel::Auto:  return "auto";
+    case HwAccel::None:  return "none";
+    case HwAccel::Nvdec: return "nvdec";
+    }
+    return "auto";
+}
+
+const char* toString(HostCopy h) noexcept
+{
+    switch (h)
+    {
+    case HostCopy::Auto: return "auto";
+    case HostCopy::On:   return "on";
+    case HostCopy::Off:  return "off";
+    }
+    return "auto";
+}
+
+namespace {
+
+//! Lower-case a copy of the string (ASCII only; the keywords are ASCII).
+std::string lower(std::string s)
+{
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+}  // namespace
+
+DecodeBackend parseDecodeBackend(const std::string& s) noexcept
+{
+    const std::string k = lower(s);
+    if (k == "opencv" || k == "cv" || k == "opencvsource") { return DecodeBackend::OpenCV; }
+    if (k == "ffmpeg" || k == "av" || k == "avcodec")      { return DecodeBackend::FFmpeg; }
+    return DecodeBackend::Auto;
+}
+
+HwAccel parseHwAccel(const std::string& s) noexcept
+{
+    const std::string k = lower(s);
+    if (k == "none" || k == "off" || k == "cpu" || k == "sw") { return HwAccel::None; }
+    if (k == "nvdec" || k == "cuda" || k == "cuvid" || k == "hw") { return HwAccel::Nvdec; }
+    return HwAccel::Auto;
+}
+
+HostCopy parseHostCopy(const std::string& s) noexcept
+{
+    const std::string k = lower(s);
+    // "off" must be tested before the bool spellings: it is also a bool-ish word
+    // a user might type expecting "no copy", and the enum has no ambiguity here.
+    if (k == "off" || k == "false" || k == "no" || k == "0" || k == "never")
+    {
+        return HostCopy::Off;
+    }
+    if (k == "on" || k == "true" || k == "yes" || k == "1" || k == "always")
+    {
+        return HostCopy::On;
+    }
+    return HostCopy::Auto;
+}
+
+DecodeBackend requireDecodeBackend(const std::string& s)
+{
+    const std::string k = lower(s);
+    if (k.empty() || k == "auto") { return DecodeBackend::Auto; }
+
+    const DecodeBackend b = parseDecodeBackend(k);
+    if (b == DecodeBackend::Auto)
+    {
+        throw std::invalid_argument("unknown decode backend '" + s +
+                                    "' (expected auto | opencv | ffmpeg)");
+    }
+    return b;
+}
+
+HwAccel requireHwAccel(const std::string& s)
+{
+    const std::string k = lower(s);
+    if (k.empty() || k == "auto") { return HwAccel::Auto; }
+
+    const HwAccel h = parseHwAccel(k);
+    if (h == HwAccel::Auto)
+    {
+        throw std::invalid_argument("unknown hardware acceleration '" + s +
+                                    "' (expected auto | none | nvdec)");
+    }
+    return h;
+}
+
+HostCopy requireHostCopy(const std::string& s)
+{
+    const std::string k = lower(s);
+    if (k.empty() || k == "auto") { return HostCopy::Auto; }
+
+    const HostCopy h = parseHostCopy(k);
+    if (h == HostCopy::Auto)
+    {
+        throw std::invalid_argument("unknown need_host_copy value '" + s +
+                                    "' (expected auto | on | off)");
+    }
+    return h;
+}
+
 }  // namespace trt_alpha::datasource

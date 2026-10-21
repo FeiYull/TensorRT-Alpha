@@ -47,6 +47,11 @@ public:
 
     void init(const core::ModelConfig& cfg) override;
     void setBatch(const core::Batch& batch) override;
+
+    //! This family stages through core::stageBatchPixels(), so it reads the
+    //! device buffer directly when the source skipped its host copy. v8 / v9 /
+    //! v10 / v11 all inherit this setBatch(), so one override covers them.
+    [[nodiscard]] bool acceptsDevicePixels() const noexcept override { return true; }
     void preprocess() override;
     void infer() override;
     void postprocess() override;
@@ -93,6 +98,12 @@ private:
     // ---- Device / Host 缓冲 ----
     core::CudaStream   m_stream;
     core::DeviceBuffer m_inputSrc;    // 原图上传（uint8 BGR HWC，batch 连续）
+
+    //! 本批像素在显存里的位置，preprocess 读它。
+    //! 可能是 m_inputSrc（自己上传），也可能是数据源直接给出的显存块
+    //! （NVDEC 解码，零拷贝 —— 此时 m_inputSrc 不参与，也不该被扩容干扰）。
+    //! 只在 setBatch 里赋值，生命周期由 batch 保证到 postprocess 结束。
+    const void*        m_srcDevice = nullptr;
     core::DeviceBuffer m_inputNchw;   // 融合预处理输出（float RGB CHW，网络输入）
     core::DeviceBuffer m_outputSrc;   // 引擎原始输出（[B, 4+nc+extra, anchors]）
     core::DeviceBuffer m_dets;        // 融合后处理输出（[B, topK, 6+extra]）

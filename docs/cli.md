@@ -47,6 +47,9 @@ Current build registers 34 models: `efficientdet`, `u2net`, `yolo_nas`, `yolor`,
 | `--workers <n>` | inference-pool workers over the INI's `[pool].workers` |
 | `--save [dir]` | save rendered frames. Without a value it goes to `save/<net>`; with a value that directory is used verbatim |
 | `--show` | open the result window (title `<net>`-scoped, `trt_alpha:<net>`) |
+| `--decode <backend>` | video decoder: `opencv` (default) or `ffmpeg`; `auto` = FFmpeg when the build has it. Images and cameras always stay on OpenCV |
+| `--hwaccel <mode>` | decode acceleration for `--decode ffmpeg`: `auto` (default, NVDEC when possible), `none` (CPU), `nvdec`. Ignored otherwise |
+| `--host-copy <mode>` | copy decoded frames back to host memory: `auto` (default, only when something reads them), `on`, `off` (device-only; saves one 6.2 MB D2H per 1080p NVDEC frame). `off` with `--save`/`--show` is an error |
 | `--root <dir>` | override the project root used to resolve relative paths |
 
 ### Examples

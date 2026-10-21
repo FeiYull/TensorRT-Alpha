@@ -16,6 +16,7 @@
 #include "trt_alpha/datasource/i_data_source.hpp"
 #include "trt_alpha/datasource/opencv_source.hpp"
 #include "trt_alpha/datasource/source_config.hpp"
+#include "trt_alpha/datasource/source_factory.hpp"
 #include "trt_alpha/pipeline/pipeline.hpp"
 #include "trt_alpha/pipeline/pipeline_config.hpp"
 #include "trt_alpha/renderer/opencv_renderer.hpp"
@@ -97,6 +98,9 @@ void printUsage()
         "  --workers <n>     inference pool workers (default: INI [pool].workers)\n"
         "  --save [dir]      save result images (default dir: save/<net>)\n"
         "  --show            show result window\n"
+        "  --decode <name>   video decode backend: opencv (default) | ffmpeg | auto\n"
+        "                    (ffmpeg needs a build with TRT_ALPHA_WITH_FFMPEG)\n"
+        "  --hwaccel <mode>  FFmpeg only: auto (default) | none | nvdec\n"
         "  --root <dir>      override project root\n"
         "\n"
         "Bench options:\n"
@@ -229,6 +233,29 @@ int runCommand(const std::vector<std::string>& args)
     // 必须在这里就读 —— 配置框在本函数稍后才打印，晚读会被误标成 [unused]。
     const int jpegQuality = modelCfg.getInt("output.jpeg_quality", 95);
 
+    // [source] 段的解码选项。优先级：CLI > ini > 代码默认。
+    // 同样必须赶在配置框之前读（pool 构造时会把 modelCfg 连同 readKeys 拷一份），
+    // 否则 ini 里写了的键会被标成 [unused]，看着像没生效。
+    const std::string decodeName = opt.decode.empty()
+                                       ? modelCfg.getString("source.decode", "opencv")
+                                       : opt.decode;
+    const std::string hwaccelName = opt.hwaccel.empty()
+                                        ? modelCfg.getString("source.hwaccel", "auto")
+                                        : opt.hwaccel;
+    const std::string hostCopyName =
+        opt.hostCopy.empty() ? modelCfg.getString("source.need_host_copy", "auto")
+                             : opt.hostCopy;
+    const int openTimeoutMs = modelCfg.getInt("source.open_timeout_ms", 5000);
+    const int readTimeoutMs = modelCfg.getInt("source.read_timeout_ms", 5000);
+
+    // 立即解析：拼写错误要在这里就炸，而不是等到打开视频才发现。
+    const trt_alpha::datasource::DecodeBackend decodeBackend =
+        trt_alpha::datasource::requireDecodeBackend(decodeName);
+    const trt_alpha::datasource::HwAccel hwAccel =
+        trt_alpha::datasource::requireHwAccel(hwaccelName);
+    const trt_alpha::datasource::HostCopy hostCopy =
+        trt_alpha::datasource::requireHostCopy(hostCopyName);
+
     // 推理池
     trt_alpha::core::InferencePool pool(
         modelCfg,
@@ -264,6 +291,13 @@ int runCommand(const std::vector<std::string>& args)
         srcCfg.path     = rs.path;
         srcCfg.cameraId = rs.cameraId;
     }
+
+    // 解码后端：取值已在函数前半段按 CLI > ini > 默认 的顺序定好并解析过
+    // （那一步必须赶在配置框之前，见 decodeBackend / hwAccel）。
+    srcCfg.decodeBackend = decodeBackend;
+    srcCfg.hwAccel = hwAccel;
+    srcCfg.openTimeoutMs = openTimeoutMs;
+    srcCfg.readTimeoutMs = readTimeoutMs;
 
     // 安全守卫：结果按"原文件名"存盘 ⇒ 输出路径可能正好是输入文件本身。
     // 旧判据只处理"输入是目录"，漏掉了最常见的一种：输入是【单张图】而
@@ -310,13 +344,62 @@ int runCommand(const std::vector<std::string>& args)
         }
     }
 
-    std::vector<std::unique_ptr<trt_alpha::datasource::IDataSource>> sources;
-    sources.push_back(
-        std::make_unique<trt_alpha::datasource::OpenCVSource>(srcCfg));
-
     // 渲染器：只在真的要存 / 要显时才挂。否则 Pipeline 会为每一帧白跑一遍
     // drawResult（画框 + 画字 + getTextSize）然后丢弃，纯浪费。
+    // 同一件事也决定数据源要不要把像素搬回主机：没有渲染器就没人读主机帧，
+    // NVDEC 路径可以整批留在显存里（1080p 每帧省 6.2 MB 的 D2H，约 0.475 ms，
+    // 折合 22% 的帧预算）。
     const bool needRender = opt.save || opt.show;
+
+    // 主机副本只在渲染器会读的时候才需要。但模型若还不认识 Batch::deviceBuffer，
+    // 它照样从主机上传像素 —— 那种情况必须保留副本，否则它读到的是空指针。
+    // 所以 auto 的条件是"要渲染 或 模型不支持设备像素"，只有两条都不成立才真的省。
+    srcCfg.needHostCopy = needRender || !pool.acceptsDevicePixels();
+    if (hostCopy == trt_alpha::datasource::HostCopy::On)
+    {
+        // 显式要求：即使没人读，也留着（源码里要拿 image() 就必须它）。
+        srcCfg.needHostCopy = true;
+    }
+    else if (hostCopy == trt_alpha::datasource::HostCopy::Off)
+    {
+        // 显式要求不拷，但这两条中任一条成立时"不拷"根本不可能满足：渲染器会
+        // 拿着显存指针当主机图像画，模型会在空缓冲上做 H2D。当场报错，绝不
+        // 悄悄改回 true —— 那正是 ini 值静默失效。
+        if (needRender)
+        {
+            throw std::runtime_error(
+                "run: source.need_host_copy = off cannot be honoured together with "
+                "--save / --show (the renderer draws into the host copy); "
+                "use auto or on");
+        }
+        if (!pool.acceptsDevicePixels())
+        {
+            throw std::runtime_error(
+                "run: source.need_host_copy = off cannot be honoured with model '" +
+                opt.net + "' (it uploads pixels from the host); use auto or on");
+        }
+        if (decodeBackend == trt_alpha::datasource::DecodeBackend::OpenCV)
+        {
+            TRT_LOG_WARN("run: source.need_host_copy = off has no effect on the "
+                         "OpenCV backend, which always decodes into host memory");
+        }
+        srcCfg.needHostCopy = false;
+    }
+
+    // 本次回拷决策的最终口径（与高层 Infer 的那条日志同名同序，便于对照）。
+    TRT_LOG_INFO("run: host pixel copy " << (srcCfg.needHostCopy ? "ON" : "OFF")
+                 << " (render=" << (needRender ? "on" : "off")
+                 << ", model "
+                 << (pool.acceptsDevicePixels() ? "supports" : "does not support")
+                 << " device pixels, decode="
+                 << trt_alpha::datasource::toString(srcCfg.decodeBackend)
+                 << ", hwaccel=" << trt_alpha::datasource::toString(srcCfg.hwAccel)
+                 << ", need_host_copy="
+                 << trt_alpha::datasource::toString(hostCopy) << ")");
+
+    std::vector<std::unique_ptr<trt_alpha::datasource::IDataSource>> sources;
+    sources.push_back(trt_alpha::datasource::makeSource(srcCfg));
+
     trt_alpha::renderer::OpenCVRenderer renderer;
 
     // 把输入源登记给渲染器：save() 会拒绝对这些路径的写入（"输出 == 输入"的

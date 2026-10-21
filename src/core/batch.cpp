@@ -15,7 +15,8 @@ bool Batch::validate(std::string* errorMsg) const
         return false;
     };
 
-    if (buffer == nullptr)               return fail("Batch::validate: buffer is nullptr");
+    if (buffer == nullptr && deviceBuffer == nullptr)
+        return fail("Batch::validate: neither a host nor a device buffer is set");
     if (views.empty())                   return fail("Batch::validate: views is empty");
     if (validCount < 0 || validCount > static_cast<int>(views.size()))
         return fail("Batch::validate: validCount out of range");

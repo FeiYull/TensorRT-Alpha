@@ -114,6 +114,14 @@ public:
     //! use it to judge correctly which keys really took effect.
     [[nodiscard]] const ModelConfig& modelConfig() const noexcept { return m_cfg; }
 
+    //! Whether every worker's model can read pixels straight out of a device
+    //! buffer (see IModel::acceptsDevicePixels).
+    //!
+    //! A data source may then skip its host copy when nobody renders the frames.
+    //! If any worker says no, the caller must keep the host pixels: those models
+    //! do their own host-to-device upload and would read a null buffer.
+    [[nodiscard]] bool acceptsDevicePixels() const noexcept;
+
 private:
     struct Worker
     {

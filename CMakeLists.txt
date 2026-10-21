@@ -156,6 +156,113 @@ set_target_properties(trt_alpha_core PROPERTIES
 target_include_directories(trt_alpha_core
   PUBLIC "${CMAKE_SOURCE_DIR}/include")
 
+# =============================================================================
+# FFmpeg（可选）—— 视频解码后端
+# -----------------------------------------------------------------------------
+#   三种取值：
+#     OFF   默认。完全不编，不产生任何 FFmpeg 依赖；--decode ffmpeg 会报一条
+#           明确的错误（不是静默回退）。想用就显式打开：
+#               cmake -S . -B build -DTRT_ALPHA_WITH_FFMPEG=ON
+#     ON    必须找到，找不到就 FATAL —— 用于 CI / 发布，避免"以为编进去了其实没有"。
+#     AUTO  找到就用（ON），找不到就静默降级为 OFF。适合"本机有就用"的脚本。
+#
+#   为什么默认 OFF 而不是 AUTO：链接的是 shared 构建，FFmpeg 一旦编进去就成了
+#   **硬运行时依赖**（avcodec-*.dll 缺失时 exe 直接起不来，哪怕你只用 opencv）。
+#   "可选"就该是显式 opt-in，而不是配好了路径就悄悄产生依赖。
+#
+#   需要的是 **shared 构建**（include/ + lib/*.lib + bin/*.dll），不是 CLI 的静态
+#   exe。下载：BtbN FFmpeg-Builds 的 *-win64-gpl-shared.zip
+#   只链 4 个库：avformat / avcodec / avutil（+ swscale 给软件解码路径做
+#   YUV->BGR）。avfilter / avdevice 不用。
+# =============================================================================
+set(TRT_ALPHA_WITH_FFMPEG "OFF" CACHE STRING
+    "FFmpeg video decode backend: OFF (default) | ON (require) | AUTO (use if found)")
+set_property(CACHE TRT_ALPHA_WITH_FFMPEG PROPERTY STRINGS OFF ON AUTO)
+
+set(FFMPEG_ROOT "D:/ThirdParty/ffmpeg-shared" CACHE PATH
+    "Root of a shared FFmpeg build (include/ lib/ bin/)")
+
+string(TOUPPER "${TRT_ALPHA_WITH_FFMPEG}" TRT_ALPHA_FF_MODE)
+
+set(TRT_ALPHA_FFMPEG_ENABLED FALSE)
+
+# The import library / shared object is named differently per platform, so probe
+# for the one this toolchain actually links against. Hard-coding avcodec.lib
+# makes the whole block dead code on Linux (AUTO then silently reports OFF).
+if(WIN32)
+    set(TRT_ALPHA_FF_LIBGLOB "${FFMPEG_ROOT}/lib/avcodec.lib")
+else()
+    file(GLOB TRT_ALPHA_FF_LIBGLOB "${FFMPEG_ROOT}/lib/libavcodec.so")
+    if(NOT TRT_ALPHA_FF_LIBGLOB)
+        file(GLOB TRT_ALPHA_FF_LIBGLOB "${FFMPEG_ROOT}/lib/libavcodec.so.*")
+    endif()
+endif()
+
+if(NOT TRT_ALPHA_FF_MODE STREQUAL "OFF")
+    if(EXISTS "${FFMPEG_ROOT}/include/libavcodec/avcodec.h"
+       AND EXISTS "${FFMPEG_ROOT}/include/libavformat/avformat.h"
+       AND TRT_ALPHA_FF_LIBGLOB)
+        set(TRT_ALPHA_FFMPEG_ENABLED TRUE)
+    endif()
+endif()
+
+if(TRT_ALPHA_FFMPEG_ENABLED)
+    foreach(_ff_lib avformat avcodec avutil swscale)
+        if(WIN32)
+            # The DLL carries the version in its name (avcodec-63.dll) and is what
+            # has to sit next to the exe at run time.
+            file(GLOB _ff_dll "${FFMPEG_ROOT}/bin/${_ff_lib}-*.dll")
+            if(NOT _ff_dll)
+                message(FATAL_ERROR
+                    "FFmpeg: ${_ff_lib} DLL not found under ${FFMPEG_ROOT}/bin")
+            endif()
+            list(GET _ff_dll 0 _ff_binary)
+            set(_ff_implib "${FFMPEG_ROOT}/lib/${_ff_lib}.lib")
+        else()
+            file(GLOB _ff_so "${FFMPEG_ROOT}/lib/lib${_ff_lib}.so")
+            if(NOT _ff_so)
+                file(GLOB _ff_so "${FFMPEG_ROOT}/lib/lib${_ff_lib}.so.*")
+            endif()
+            if(NOT _ff_so)
+                message(FATAL_ERROR
+                    "FFmpeg: lib${_ff_lib}.so not found under ${FFMPEG_ROOT}/lib")
+            endif()
+            list(GET _ff_so 0 _ff_binary)
+            set(_ff_implib "")
+        endif()
+
+        add_library(ffmpeg::${_ff_lib} SHARED IMPORTED)
+        set_target_properties(ffmpeg::${_ff_lib} PROPERTIES
+            IMPORTED_LOCATION              "${_ff_binary}"
+            INTERFACE_INCLUDE_DIRECTORIES  "${FFMPEG_ROOT}/include")
+        if(_ff_implib)
+            set_target_properties(ffmpeg::${_ff_lib} PROPERTIES
+                IMPORTED_IMPLIB "${_ff_implib}")
+        endif()
+    endforeach()
+
+    target_link_libraries(trt_alpha_core PUBLIC
+        ffmpeg::avformat ffmpeg::avcodec ffmpeg::avutil ffmpeg::swscale)
+    target_compile_definitions(trt_alpha_core PUBLIC TRT_ALPHA_WITH_FFMPEG=1)
+    message(STATUS "FFmpeg: ON  (${FFMPEG_ROOT})")
+elseif(TRT_ALPHA_FF_MODE STREQUAL "ON")
+    message(FATAL_ERROR
+        "TRT_ALPHA_WITH_FFMPEG=ON but no usable FFmpeg build was found at "
+        "'${FFMPEG_ROOT}'. Point -DFFMPEG_ROOT=<dir containing include/ lib/ bin/> "
+        "at a shared build (Windows: a BtbN *-win64-gpl-shared package; "
+        "Linux: e.g. a jellyfin-ffmpeg / self-built prefix -- the distro's "
+        "libavcodec-dev ships no cuvid, so NVDEC will not exist there).")
+else()
+    target_compile_definitions(trt_alpha_core PUBLIC TRT_ALPHA_WITH_FFMPEG=0)
+    if(TRT_ALPHA_FF_MODE STREQUAL "OFF")
+        message(STATUS "FFmpeg: OFF (disabled by default; "
+                       "-DTRT_ALPHA_WITH_FFMPEG=ON to enable)")
+    else()
+        message(STATUS "FFmpeg: OFF (no shared build at '${FFMPEG_ROOT}'); "
+                       "--decode ffmpeg will report an error at runtime")
+    endif()
+endif()
+
 target_link_libraries(trt_alpha_core
   PUBLIC  ocv::ocv
   PRIVATE trt::trt)
@@ -166,6 +273,20 @@ target_link_libraries(trt_alpha_core
 # =============================================================================
 enable_testing()          # 顶层开启 CTest，注册的各 test_* 可 `ctest -C Release` 一键跑
 #add_subdirectory(test)
+
+# 单个测试的独立入口：整个 test/ 树默认不编（上面那行是注释状态），但解码后端
+# 的 A/B 需要随时能跑，所以给一个只挂 test_ffmpeg_source 的开关：
+#     cmake -S . -B build -DTRT_ALPHA_BUILD_FFMPEG_TEST=ON
+#     cmake --build build --config Release --target test_ffmpeg_source
+#     ctest -C Release -R test_ffmpeg_source --output-on-failure
+option(TRT_ALPHA_BUILD_FFMPEG_TEST
+       "Build test/test_ffmpeg_source (opencv / ffmpeg-sw / ffmpeg-nvdec A/B)" OFF)
+if(TRT_ALPHA_BUILD_FFMPEG_TEST AND NOT TARGET test_ffmpeg_source)
+    add_subdirectory(test/test_ffmpeg_source)
+    add_test(NAME test_ffmpeg_source COMMAND test_ffmpeg_source)
+    set_tests_properties(test_ffmpeg_source PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+
 add_subdirectory(app)
 add_subdirectory(samples)
 

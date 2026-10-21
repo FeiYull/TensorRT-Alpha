@@ -72,7 +72,23 @@ void sample_yolov26_det(const std::string& source)
     p.source = "F:/VideoAlpha/huaxue1.mp4";
     p.engine = "D:/VS2022_Project/TensorRT-Alpha/engines/yolov26n.trt";
     p.draw        = true;                      // 产出渲染图（默认即 true）
-    
+
+    // ---- 解码 / 回拷：四个参数都能在这里直接设，也都能在 ini 里设 ----
+    // 优先级：这里的赋值 > configs/base.ini 的 [source] 段 > 代码默认。
+    // 不赋值（保持空串 / -1）= 完全交给 ini；下面写的是显式的等值形式，
+    // 删掉某一行就退回"读 ini"，效果一样。
+    p.decode          = "ffmpeg";  // opencv | ffmpeg | auto（图片/目录/摄像头恒走 opencv）
+    p.hwaccel         = "auto";    // auto | none | nvdec（仅 decode=ffmpeg 有意义）
+    p.need_host_copy  = "auto";    // auto | on | off
+    p.open_timeout_ms  = 5000;     // 仅 URL 流；0 = 不限，-1 = 用 ini
+    p.read_timeout_ms  = 5000;
+    //   need_host_copy 三个取值的区别：
+    //     auto = 只在真有人读主机像素时才拷（draw / show / save 打开就叫"有人"）
+    //     on   = 总是拷 —— draw=false 但还想用 frame.image() 时设它
+    //     off  = 总不拷，像素留在显存。NVDEC 1080p 每帧省一次 6.2 MB 的 D2H
+    //            （实测 0.475 ms / 帧）。⚠ 必须同时 draw=false，否则构造期就报错
+    //            （渲染器不能在显存上画）；此时 frame.image() 返回空视图。
+
     trt_alpha::Infer  model(p);
     trt_alpha::Stream stream = model.async();
 
@@ -270,11 +286,22 @@ void sample_yolov26_sem(const std::string& source)
 
 int main(int argc, char** argv)
 {
-    sample_yolov26_det("F:/VideoAlpha/huaxue1.mp4");
-    //sample_yolov26_cls("F:/VideoAlpha/huaxue1.mp4");
-    //sample_yolov26_seg("F:/VideoAlpha/huaxue1.mp4");
-    //sample_yolov26_pose("F:/VideoAlpha/huaxue1.mp4");
-    //sample_yolov26_obb("D:/Data/boats.mp4");
-    //sample_yolov26_depth("F:/VideoAlpha/korea-night.mp4");
+    // Infer 在参数非法时抛 std::exception（例如 need_host_copy=off 却还开着
+    // draw，或引擎与 ini 的类别数不符）。示例里接住它，把原因打出来 ——
+    // 不接的话进程直接 abort，看不到任何提示。
+    try
+    {
+        sample_yolov26_det("F:/VideoAlpha/huaxue1.mp4");
+        //sample_yolov26_cls("F:/VideoAlpha/huaxue1.mp4");
+        //sample_yolov26_seg("F:/VideoAlpha/huaxue1.mp4");
+        //sample_yolov26_pose("F:/VideoAlpha/huaxue1.mp4");
+        //sample_yolov26_obb("D:/Data/boats.mp4");
+        //sample_yolov26_depth("F:/VideoAlpha/korea-night.mp4");
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "sample_infer: " << e.what() << "\n";
+        return 1;
+    }
     return 0;
 }

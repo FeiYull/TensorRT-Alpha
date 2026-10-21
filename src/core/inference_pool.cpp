@@ -147,6 +147,22 @@ InferencePool::InferencePool(const ModelConfig& cfg,
     TRT_LOG_INFO("[InferencePool] ready with " << m_workers.size() << " worker(s)");
 }
 
+bool InferencePool::acceptsDevicePixels() const noexcept
+{
+    if (m_workers.empty())
+    {
+        return false;
+    }
+    for (const Worker& w : m_workers)
+    {
+        if (!w.model || !w.model->acceptsDevicePixels())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 InferencePool::~InferencePool()
 {
     shutdown();
@@ -294,6 +310,16 @@ BatchResult InferencePool::runBatch(std::size_t workerIndex, Batch batch)
     TRT_LOG_DEBUG("[InferencePool] worker[" << workerIndex << "] runBatch: n=" << n
                  << "/" << batch.views.size());
 
+    // The source filled the host copy asynchronously; block here (in the worker,
+    // not in the decode thread) before anything reads those pixels. By the time a
+    // worker picks the batch up the copy has long finished, so this is ~free.
+    // It also has to happen before batch's deviceBuffer can go back to the pool:
+    // the copy reads from it.
+    if (batch.hostReady)
+    {
+        batch.hostReady->wait();
+    }
+
     const auto tPreStart = std::chrono::steady_clock::now();
     model.setBatch(batch);
     const auto tPreEnd = std::chrono::steady_clock::now();
@@ -330,6 +356,9 @@ BatchResult InferencePool::runBatch(std::size_t workerIndex, Batch batch)
     result.views = std::move(batch.views);
     result.validCount = batch.validCount;
     result.frameNames = std::move(batch.frameNames);
+    // Hand the completion mark to the renderer as well: drawResult() writes into
+    // views[i], which is the same host buffer the async copy filled.
+    result.hostReady = std::move(batch.hostReady);
 
     // 模型把结果 move 进 result（基类实现，无 dynamic_cast）
     model.commitResult(result);

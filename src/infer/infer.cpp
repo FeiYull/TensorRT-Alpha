@@ -10,6 +10,7 @@
 #include "trt_alpha/core/paths.hpp"
 #include "trt_alpha/datasource/opencv_source.hpp"
 #include "trt_alpha/datasource/source_config.hpp"
+#include "trt_alpha/datasource/source_factory.hpp"
 #include "trt_alpha/pipeline/pipeline.hpp"
 #include "trt_alpha/pipeline/pipeline_config.hpp"
 #include "trt_alpha/renderer/opencv_renderer.hpp"
@@ -74,12 +75,35 @@ core::QueueFullPolicy to_queue_policy(QueuePolicy p, bool realtime)
 //! 构造数据源（根据 source / camera_id 推断类型）。
 //! source 的判别交给 datasource::resolveSource —— 与 CLI `--source` 共用同一套
 //! 规则（URL / 视频后缀 / 纯数字摄像头 / 其余=图片），避免两处各写一份慢慢走偏。
-datasource::SourceConfig build_source_config(const InferParams& p, int batch_size)
+//!
+//! 解码相关的键从 ini 的 `[source]` 段读，优先级 InferParams > ini > 代码默认
+//! （与 CLI 的 `--decode` > ini > 默认 是同一条链）。
+//! batch_size 只是占位：async() 会换成池解析后的真实 batch —— 静态引擎会忽略
+//! 请求值、动态引擎越界直接报错，按原值攒批会写越界。
+datasource::SourceConfig build_source_config(const InferParams& p,
+                                             const core::ModelConfig& ini,
+                                             int batch_size)
 {
     datasource::SourceConfig cfg;
     cfg.batchSize = batch_size;
     cfg.sourceId = 0;
     cfg.loop = p.loop;
+
+    const std::string decodeName =
+        p.decode.empty() ? ini.getString("source.decode", "opencv") : p.decode;
+    const std::string hwaccelName =
+        p.hwaccel.empty() ? ini.getString("source.hwaccel", "auto") : p.hwaccel;
+
+    cfg.decodeBackend = datasource::requireDecodeBackend(decodeName);
+    cfg.hwAccel = datasource::requireHwAccel(hwaccelName);
+
+    // 0 是合法值（= 交给后端默认），所以这里按 >= 0 判"用户给了"，-1 才是用 ini。
+    cfg.openTimeoutMs = (p.open_timeout_ms >= 0)
+                            ? p.open_timeout_ms
+                            : ini.getInt("source.open_timeout_ms", 5000);
+    cfg.readTimeoutMs = (p.read_timeout_ms >= 0)
+                            ? p.read_timeout_ms
+                            : ini.getInt("source.read_timeout_ms", 5000);
 
     if (!p.source.empty())
     {
@@ -127,7 +151,16 @@ core::BufferView Frame::image() const
     if (!validSlot(m_result == nullptr ? 0 : m_result->views.size())) {
         return {};
     }
-    return m_result->views[m_index];
+    const core::BufferView& v = m_result->views[m_index];
+    // With draw / show / save all off, a source may skip its host copy and then
+    // these views describe DEVICE memory (see SourceConfig::needHostCopy). Handing
+    // that back as an image would be a pointer the caller must not wrap in cv::Mat
+    // or feed to imshow, so report "no image" instead of a trap. The detections /
+    // masks / depth are unaffected -- only the pixels are gone.
+    if (v.space != core::MemorySpace::Host) {
+        return {};
+    }
+    return v;
 }
 
 core::BufferView Frame::rendered() const
@@ -138,7 +171,13 @@ core::BufferView Frame::rendered() const
     if (!validSlot(m_result->renderedViews.size())) {
         return {};
     }
-    return m_result->renderedViews[m_index];
+    const core::BufferView& v = m_result->renderedViews[m_index];
+    // Same guard: a rendered copy only exists when a renderer ran, so this is
+    // host memory in practice -- but never hand out a device pointer as an image.
+    if (v.space != core::MemorySpace::Host) {
+        return {};
+    }
+    return v;
 }
 
 const std::vector<det::Detection>& Frame::boxes() const
@@ -294,6 +333,12 @@ struct Infer::Impl
 {
     InferParams params;
     core::ModelConfig final_cfg;
+    //! 源的解码选项（不含 batch / 回拷决策）：构造期就从 ini 读好，这样
+    //! readKeys 会随 final_cfg 一起拷进池，配置框不会把 [source] 的键误标
+    //! 成 [unused]。async() 只补 batchSize 和 needHostCopy。
+    datasource::SourceConfig src_template;
+    //! need_host_copy 的三态（auto 要等池建好、知道模型能力才能落地）。
+    datasource::HostCopy host_mode = datasource::HostCopy::Auto;
     std::shared_ptr<core::InferencePool> pool;
     renderer::OpenCVRenderer renderer;
 
@@ -379,6 +424,14 @@ Infer::Infer(const InferParams& p)
     m_impl->final_cfg = m_impl->merge_config();
     // 配置展示推迟到 ensure_pool()（首次 run/async）：那时才有引擎真相，
     // 且模型 init 的"读取痕迹"才完整 —— 目的是只打一次、且打的是真生效的口径。
+    // 但 [source] 的键必须现在就读完：池构造时才拷贝 final_cfg，晚读的键
+    // 不会进池副本，配置框会把它们标成 [unused]（看着像没生效）。
+    m_impl->src_template = build_source_config(p, m_impl->final_cfg, 1);
+    const std::string hostCopyName =
+        p.need_host_copy.empty()
+            ? m_impl->final_cfg.getString("source.need_host_copy", "auto")
+            : p.need_host_copy;
+    m_impl->host_mode = datasource::requireHostCopy(hostCopyName);
 }
 
 Infer::~Infer() = default;
@@ -455,14 +508,62 @@ Stream Infer::async()
                         m_impl->params.show ||
                         m_impl->params.save.enabled;
 
-    datasource::SourceConfig srcCfg =
-        build_source_config(m_impl->params, m_impl->pool->resolvedBatch());
+    datasource::SourceConfig srcCfg = m_impl->src_template;
+    // batch 取池解析后的真实值（模板里那个 1 只是占位）。
+    srcCfg.batchSize = m_impl->pool->resolvedBatch();
+
+    const bool devicePixels = m_impl->pool->acceptsDevicePixels();
+
+    // Same rule as the CLI run command (see SourceConfig::needHostCopy): the host
+    // copy exists so the renderer can draw into it. With draw / show / save all
+    // off nothing reads host pixels, and a hardware decoder can leave them in
+    // device memory -- 0.475 ms of a 1.70 ms 1080p frame. A model that still
+    // uploads from the host needs the copy regardless, hence the pool check.
+    // need_host_copy turns the two explicit overrides on top of that.
+    srcCfg.needHostCopy = render || !devicePixels;
+    switch (m_impl->host_mode)
+    {
+    case datasource::HostCopy::On:
+        // 显式要求：即使没人读也留着（调用方要拿 Frame::image()）。
+        srcCfg.needHostCopy = true;
+        break;
+    case datasource::HostCopy::Off:
+        // 这两条中任一条成立时"不拷"根本不可能满足：渲染器会把显存指针当主机
+        // 图像画，模型会在空缓冲上做 H2D。报错，绝不悄悄改回 true。
+        if (render)
+        {
+            throw std::runtime_error(
+                "InferParams: need_host_copy = off cannot be honoured together with "
+                "draw / show / save (the renderer draws into the host copy); "
+                "use auto or on");
+        }
+        if (!devicePixels)
+        {
+            throw std::runtime_error(
+                "InferParams: need_host_copy = off cannot be honoured with this model "
+                "(it uploads pixels from the host); use auto or on");
+        }
+        srcCfg.needHostCopy = false;
+        break;
+    case datasource::HostCopy::Auto:
+    default:
+        break;
+    }
+
+    TRT_LOG_INFO("Infer: host pixel copy " << (srcCfg.needHostCopy ? "ON" : "OFF")
+                 << " (render=" << (render ? "on" : "off")
+                 << ", model " << (devicePixels ? "supports" : "does not support")
+                 << " device pixels, decode="
+                 << datasource::toString(srcCfg.decodeBackend)
+                 << ", hwaccel=" << datasource::toString(srcCfg.hwAccel)
+                 << ", need_host_copy=" << datasource::toString(m_impl->host_mode)
+                 << ")");
     const bool realtime =
         (srcCfg.type == datasource::SourceType::Camera) ||
         core::Paths::isUrl(m_impl->params.source);
 
     pipeline::PipelineConfig pcfg;
-    pcfg.sources.push_back(std::make_unique<datasource::OpenCVSource>(srcCfg));
+    pcfg.sources.push_back(datasource::makeSource(srcCfg));
     pcfg.pools = { m_impl->pool.get() };
     pcfg.sourceToPool = { 0 };
     pcfg.classNames = m_impl->final_cfg.classNames;

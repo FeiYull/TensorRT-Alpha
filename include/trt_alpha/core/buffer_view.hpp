@@ -36,6 +36,25 @@ enum class MemorySpace : std::uint8_t
     Device,   //!< GPU device memory
 };
 
+//! Pixel layout of an image block.
+//!
+//! Why this exists: "the data source produces BGR8" used to be an unwritten
+//! agreement between producer and consumer, which works while there is exactly
+//! one producer (OpenCV). A hardware decoder hands out NV12 (two planes, two
+//! pitches), so the layout has to be explicit instead of agreed.
+//!
+//! Unknown = the block is not an image (a tensor) or the producer did not say.
+enum class PixelFormat : std::uint8_t
+{
+    Unknown = 0,
+    BGR8,       //!< 8-bit 3-channel, OpenCV's native order
+    RGB8,       //!< 8-bit 3-channel, RGB order
+    GRAY8,      //!< 8-bit 1-channel
+    NV12,       //!< 8-bit 4:2:0, plane 0 = Y, plane 1 = interleaved UV (see plane1)
+    NV12_10LE,  //!< 10-bit 4:2:0 packed in 16-bit words
+    P010,       //!< 10-bit 4:2:0, MSB-aligned
+};
+
 //! Read-only view over a block of memory.
 //!
 //! Fields:
@@ -46,12 +65,14 @@ enum class MemorySpace : std::uint8_t
 //!   channels -- number of channels (images are usually 1/3/4; a tensor may be 1)
 //!   dtype    -- type of each element
 //!   space    -- whether the data is on Host or Device
+//!   format   -- pixel layout (BGR8 for every current source; NV12 once the
+//!               hardware decoders land)
 //!
 //! Usage conventions:
 //!   * Data is tightly packed (elements are split into rows by stride and are
 //!     tight within a row)
-//!   * Colour / tensor semantics are agreed between producer and consumer (e.g.
-//!     "the data source produces BGR8")
+//!   * Colour / tensor semantics come from `format`; BGR8 is the only value the
+//!     current models understand
 //!   * Lifetime is guaranteed externally (usually used together with
 //!     shared_ptr<Buffer>)
 struct BufferView
@@ -63,6 +84,7 @@ struct BufferView
     int channels = 0;                   //!< number of channels
     DataType dtype = DataType::UInt8;   //!< type of each element
     MemorySpace space = MemorySpace::Host;
+    PixelFormat format = PixelFormat::Unknown;   //!< pixel layout of an image block
 
     //! Whether the view is empty.
     [[nodiscard]] bool empty() const noexcept

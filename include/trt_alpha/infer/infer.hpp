@@ -149,6 +149,8 @@ struct SaveOption
 //    * a source: source (image / video / URL) or camera_id (camera), one of them
 //
 //  Optional (empty / -1 / Unset = no override, use the ini):
+//    * source:      decode / hwaccel / need_host_copy / open_timeout_ms /
+//                   read_timeout_ms          (ini `[source]`)
 //    * load time:   engine / class_names_file / batch_size / dst_h / dst_w
 //    * run time:    conf_thresh / iou_thresh / top_k
 //    * concurrency: workers / max_queue_size / result_queue_size / policy
@@ -172,6 +174,36 @@ struct InferParams
     int         camera_id = -1;     // explicit camera id (alternative to source="0")
     bool        loop = false;       // loop the video (only when source is a video)
 
+    //! Which library decodes a video: "opencv" / "ffmpeg" / "auto".
+    //! Images, image directories and cameras always go through OpenCV.
+    //! "ffmpeg" on a build without FFmpeg support throws instead of downgrading.
+    //! Empty = use the ini `[source] decode` (which defaults to opencv).
+    std::string decode = "";
+
+    //! FFmpeg hardware decode preference: "auto" (NVDEC, fall back to CPU) /
+    //! "none" (libavcodec on the CPU) / "nvdec" (require NVDEC, else throw).
+    //! Empty = use the ini `[source] hwaccel` (which defaults to auto).
+    std::string hwaccel = "";
+
+    //! Copy decoded frames back to host memory: "auto" / "on" / "off".
+    //!   auto -- copy only when something reads host pixels (draw / show / save,
+    //!           or a model that still uploads from the host). This is the default.
+    //!   on   -- always copy; needed when the caller reads Frame::image() while
+    //!           draw / show / save are all off.
+    //!   off  -- never copy. On NVDEC that saves one 6.2 MB device-to-host copy
+    //!           per 1080p frame (0.475 ms of 1.70 ms). Frame::image() and
+    //!           rendered() then come back empty; detections / masks / depth are
+    //!           unaffected. Combining "off" with draw / show / save, or with a
+    //!           model that uploads from the host, throws instead of silently
+    //!           switching back on.
+    //! Empty = use the ini `[source] need_host_copy` (which defaults to auto).
+    std::string need_host_copy = "auto";
+
+    //! Stream open / read timeouts in ms (URL streams on the FFmpeg backend only).
+    //! <= 0 in the ini = backend default (no limit). -1 here = use the ini.
+    int open_timeout_ms = -1;
+    int read_timeout_ms = -1;
+
     // ---- Override the ini (load time) ----
     std::string engine;             // empty = use the ini
     std::string class_names_file;   // empty = use the ini
@@ -194,6 +226,11 @@ struct InferParams
     //! raw source + annotated copy + results. It does NOT write to disk or open a
     //! window -- that stays the job of save / show. Set it to false when you only
     //! want the data and want to skip the per-frame draw + copy entirely.
+    //!
+    //! With draw / show / save *all* off, the decoder also stops copying frames
+    //! back to the host: nothing would ever read them, and on NVDEC that copy is
+    //! 0.475 ms of a 1.70 ms 1080p frame. Frame::image() and rendered() then come
+    //! back empty -- the detections / masks / depth are unaffected.
     bool        draw = true;
 
     // ---- Override the ini (concurrency) ----

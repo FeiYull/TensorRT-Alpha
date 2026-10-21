@@ -12,6 +12,15 @@ API call / command-line flags   >   configs/<model>.ini   >   configs/base.ini
 
 ## base.ini
 
+### `[source]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `decode` | `opencv` | Which library decodes a video: `opencv` / `ffmpeg` / `auto` (= FFmpeg when the build has it, else OpenCV). Images, image directories and cameras always stay on OpenCV. `--decode` wins |
+| `hwaccel` | `auto` | FFmpeg decode preference: `auto` (NVDEC when possible, silent fallback to the CPU), `none` (libavcodec), `nvdec` (required; throws when unavailable). Ignored by the OpenCV backend. `--hwaccel` wins |
+| `open_timeout_ms` / `read_timeout_ms` | `5000` | Stream open / single-read timeout in ms, URL streams on the FFmpeg backend only. `<= 0` = backend default (no limit) |
+| `need_host_copy` | `auto` | Whether decoded frames are copied back to host memory. `auto` = only when something reads host pixels (draw / show / save, or a model that uploads from the host); `on` = always; `off` = never, the pixels stay on the device (saves one 6.2 MB D2H per 1080p NVDEC frame, measured at 0.475 ms). With `off`, `Frame::image()` / `rendered()` come back empty and detections / masks / depth are unaffected. `off` combined with a renderer or a host-uploading model **fails at startup** rather than silently switching back on; it has no effect on the OpenCV backend. `--host-copy` wins |
+
 ### `[input]`
 
 | Key | Default | Meaning |

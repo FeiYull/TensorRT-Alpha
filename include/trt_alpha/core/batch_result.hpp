@@ -27,6 +27,7 @@
 #include "trt_alpha/cls/types.hpp"
 #include "trt_alpha/core/buffer.hpp"
 #include "trt_alpha/core/buffer_view.hpp"
+#include "trt_alpha/core/gpu_event.hpp"
 #include "trt_alpha/depth/types.hpp"
 #include "trt_alpha/det/types.hpp"
 #include "trt_alpha/obb/types.hpp"
@@ -57,6 +58,11 @@ struct BatchResult
     //! Files are named after it when saved (image source = original filename);
     //! when empty the renderer falls back to frame_<index>.
     std::vector<std::string> frameNames;
+
+    //! Mirrored from Batch: when set, `views[i].data` is only readable after
+    //! wait(). The renderer waits once before drawing; the inference path has
+    //! already waited before it touched the pixels.
+    std::shared_ptr<GpuEvent> hostReady;
 
     // ---- Rendered images (optional; only when a renderer is attached) ----
     //! The drawn-on copy of the batch. It lives in its OWN buffer on purpose: the
