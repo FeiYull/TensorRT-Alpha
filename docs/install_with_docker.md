@@ -1,7 +1,12 @@
 # Docker
 
-`docker/Dockerfile` downloads and builds CUDA + TensorRT + OpenCV + `trt_alpha` inside one image, so nothing has
-to be installed on the host. Verified result: 9.34 GB image, `list` returns 21 models on a 5060 Ti.
+`docker/Dockerfile` downloads and builds CUDA + TensorRT + OpenCV + FFmpeg + `trt_alpha` inside one image, so
+nothing has to be installed on the host. Verified result: ~9.5 GB image (9.34 GB before FFmpeg was added),
+`list` returns 21 models on a 5060 Ti.
+
+The image is built with `-DTRT_ALPHA_WITH_FFMPEG=ON`, i.e. `--decode ffmpeg` and `--hwaccel nvdec` work out of the
+box. FFmpeg is a **hard runtime dependency** of that build, which is why `/opt/ffmpeg` is copied into the run stage
+and registered in `ld.so.conf`.
 
 ## 0. Prerequisites
 
@@ -50,6 +55,7 @@ Build arguments (all optional):
 | `TRT_DIR` | `10.16.1` | TensorRT download directory (three fields) |
 | `CUDA_VERSION` | `12.9.1` | CUDA tag component |
 | `UBUNTU_TAG` | `ubuntu24.04` | CUDA image tag suffix |
+| `FFMPEG_BUILD` | `ffmpeg-n9.0-latest-linux64-gpl-shared-9.0` | BtbN asset name, pinned to the same `n9.0` as the Windows package |
 | `JOBS` | `16` | parallel compile jobs |
 | `WITH_BUILDER` | `0` | `1` keeps `libnvinfer_builder_resource_*.so` (+2.9 GB) |
 | `CUDA_ARCH` | `75;86;89;120` | passed as `-DTRT_ALPHA_CUDA_ARCH` |
@@ -58,7 +64,8 @@ Build arguments (all optional):
 docker build -f docker/Dockerfile --build-arg JOBS=32 --build-arg WITH_BUILDER=1 -t trt-alpha:full .
 
 # single stage, for debugging
-docker build -f docker/Dockerfile --target opencv -t trt-alpha-ocv .
+docker build -f docker/Dockerfile --target opencv  -t trt-alpha-ocv .
+docker build -f docker/Dockerfile --target ffmpeg  -t trt-alpha-ff  .
 ```
 
 ## 2. Run
@@ -70,12 +77,32 @@ docker run --rm --gpus all \
   -v "$PWD/engines:/app/engines:ro" -v "$PWD/save:/app/save" \
   trt-alpha:latest run --net yolov26 --source data/bus.jpg --save
 
+# FFmpeg backend + NVDEC
+docker run --rm --gpus all \
+  -v "$PWD/engines:/app/engines:ro" -v "$PWD/save:/app/save" \
+  trt-alpha:latest run --net yolov26 --source data/people.mp4 \
+      --decode ffmpeg --hwaccel nvdec --save
+
 docker run --rm -it --gpus all --entrypoint bash trt-alpha:latest
 ```
 
 `engines/` and `onnx/` are not in the image, mount your own. `--gpus all` is required, otherwise `trtexec` prints
 `CUDA driver version is insufficient for CUDA runtime version`. Add `--user "$(id -u):$(id -g)"` to keep
 `save/` outputs owned by you.
+
+NVDEC additionally needs the `video` driver capability, which the image already requests
+(`NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`). If you override that variable, keep `video`, otherwise
+`av_hwdevice_ctx_create` fails and `--hwaccel nvdec` reports the CUDA device as unavailable.
+
+Verify the FFmpeg side inside a container:
+
+```bash
+docker run --rm --gpus all --entrypoint bash trt-alpha:latest -lc \
+  'ldd /app/build/bin/Release/trt_alpha | grep -E "avcodec|avformat|not found"; \
+   /app/build/bin/Release/trt_alpha --help | grep -- --decode'
+```
+
+Images, image directories and cameras still go through OpenCV even with `--decode ffmpeg`.
 
 ## 3. Clean up
 

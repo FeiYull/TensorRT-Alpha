@@ -106,13 +106,14 @@ More: [Disabling rectangular inference when aligning](docs/rect_false.md)
 <details open>
 <summary><small>Linux</small></summary>
 
-| Dependency | Version |
-|---|---|
-| gcc | 13.3.0 |
-| C++ | C++17 |
-| [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 |
-| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
-| CUDA | 12.9 |
+| Dependency | Version | Notes |
+|---|---|---|
+| gcc | 13.3.0 | |
+| C++ | C++17 | |
+| [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 | will be removed in the future for performance reasons |
+| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | |
+| CUDA | 12.9 | |
+| [FFmpeg](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-shared-9.0.tar.xz) | 9.0 | optional, only needed by `--decode ffmpeg` |
 
 Detailed steps: [Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](docs/install_with_docker.md)
 
@@ -121,13 +122,14 @@ Detailed steps: [Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](
 <details open>
 <summary><small>Windows</small></summary>
 
-| Dependency | Version |
-|---|---|
-| Visual Studio | 2017 / 2019 / 2022 |
-| C++ | C++17 |
-| [OpenCV](https://release-assets.githubusercontent.com/github-production-release-asset/5108051/2d11b48c-60e6-4f11-acc4-158da7fcb799?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-10-16T02%3A28%3A08Z&rscd=attachment%3B+filename%3Dopencv-4.8.1-windows.exe&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-10-16T01%3A27%3A29Z&ske=2026-10-16T02%3A28%3A08Z&sks=b&skv=2018-11-09&sig=OcWdIQ0t5iJThr4cjQEp%2BbsEw865e73NiQWS4Fsz0V8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5MjExODU1OCwibmJmIjoxNzkyMTE0OTU4LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.THYDLnoAwzXO-Ha4OP4HwG83NRh5N-X5_1xaqFRjxFA&response-content-disposition=attachment%3B%20filename%3Dopencv-4.8.1-windows.exe&response-content-type=application%2Foctet-stream) | >= 4.5 |
-| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-12.9.zip?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 |
-| CUDA | 12.9 |
+| Dependency | Version | Notes |
+|---|---|---|
+| Visual Studio | 2017 / 2019 / 2022 | |
+| C++ | C++17 | |
+| [OpenCV](https://release-assets.githubusercontent.com/github-production-release-asset/5108051/2d11b48c-60e6-4f11-acc4-158da7fcb799?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-10-16T02%3A28%3A08Z&rscd=attachment%3B+filename%3Dopencv-4.8.1-windows.exe&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-10-16T01%3A27%3A29Z&ske=2026-10-16T02%3A28%3A08Z&sks=b&skv=2018-11-09&sig=OcWdIQ0t5iJThr4cjQEp%2BbsEw865e73NiQWS4Fsz0V8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5MjExODU1OCwibmJmIjoxNzkyMTE0OTU4LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.THYDLnoAwzXO-Ha4OP4HwG83NRh5N-X5_1xaqFRjxFA&response-content-disposition=attachment%3B%20filename%3Dopencv-4.8.1-windows.exe&response-content-type=application%2Foctet-stream) | >= 4.5 | will be removed in the future for performance reasons |
+| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-12.9.zip?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | |
+| CUDA | 12.9 | |
+| [FFmpeg](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-gpl-shared-9.0.zip) | 9.0 | optional, only needed by `--decode ffmpeg` |
 
 Detailed steps: [Windows](docs/install_for_windows.md)
 
@@ -328,6 +330,7 @@ scripts/             platform scripts (linux/ = engine serialization, parameter-
 ### [1. Configuration](docs/config.md)
 ### [2. Quantization](docs/quantization.md)
 ### [3.Train and deploy custom model](docs/train_and_deploy_custom.md)
+### [4.Decode video with FFmpeg for higher performance](docs/install_ffmpeg_en.md)
 ## Citation
 ```bibtex
 @misc{FeiYull_TensorRT-Alpha,

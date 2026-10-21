@@ -60,22 +60,52 @@ Result: `/home/feiyull/thirdparty/opencv4.8.1/{bin,include,lib,share}`
 
 Three similar names, do not mix them up: `opencv-4.8.1/` is the extracted source, `opencv-4.8.1-build/` is the build tree, and `opencv4.8.1/` (no hyphen) is the install prefix. Step 3 passes `-DOpenCV_DIR=<prefix>/lib/cmake/opencv4`, because `OpenCVConfig.cmake` is installed there, not at the prefix root.
 
-## 3. Build the repository
+## 3. FFmpeg 9.0 (optional, only for `--decode ffmpeg`)
+
+The distro's `libavcodec-dev` is built without cuvid, so NVDEC would not exist.
+Use BtbN's shared build instead (same version as the Windows package).
+
+[Download ffmpeg-n9.0-latest-linux64-gpl-shared-9.0.tar.xz (66 MB)](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-shared-9.0.tar.xz)
+
+```bash
+cd /home/feiyull/thirdparty
+wget -O ffmpeg.tar.xz \
+  "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-shared-9.0.tar.xz"
+mkdir -p ffmpeg-shared
+tar -xJf ffmpeg.tar.xz --strip-components=1 -C ffmpeg-shared
+rm ffmpeg.tar.xz
+ffmpeg-shared/bin/ffmpeg -hwaccels                       # must list cuda
+ffmpeg-shared/bin/ffmpeg -hide_banner -decoders | grep cuvid   # must list h264_cuvid
+```
+
+Result: `/home/feiyull/thirdparty/ffmpeg-shared/{bin,include,lib}`
+
+Details and the Windows equivalent: [install_ffmpeg_en.md](install_ffmpeg_en.md) /
+[install_ffmpeg_zh.md](install_ffmpeg_zh.md).
+
+## 4. Build the repository
 
 ```bash
 cd ~/workspace/TensorRT-Alpha
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
       -DOpenCV_DIR=/home/feiyull/thirdparty/opencv4.8.1/lib/cmake/opencv4 \
-      -DTensorRT_ROOT=/home/feiyull/thirdparty/TensorRT-10.16.1.11
+      -DTensorRT_ROOT=/home/feiyull/thirdparty/TensorRT-10.16.1.11 \
+      -DTRT_ALPHA_WITH_FFMPEG=ON \
+      -DFFMPEG_ROOT=/home/feiyull/thirdparty/ffmpeg-shared
 cmake --build build -j"$(nproc)"
 ./build/bin/Release/trt_alpha list          # 21 models
 ```
 
-## 4. Uninstall
+Drop the two FFmpeg lines to build without it (the default; `--decode ffmpeg` then
+reports an error at run time instead of silently falling back to OpenCV).
+The configure output must say `FFmpeg: ON  (...)` when it is enabled.
+
+## 5. Uninstall
 
 ```bash
 rm -rf /home/feiyull/thirdparty/opencv4.8.1 \
        /home/feiyull/thirdparty/opencv-4.8.1 \
        /home/feiyull/thirdparty/opencv-4.8.1-build \
-       /home/feiyull/thirdparty/TensorRT-10.16.1.11
+       /home/feiyull/thirdparty/TensorRT-10.16.1.11 \
+       /home/feiyull/thirdparty/ffmpeg-shared
 ```

@@ -45,6 +45,9 @@ Two optional switches, both OFF by default:
 -DTRT_ALPHA_DEPLOY_CUDA_MATH=ON   # add if cublas64_*.dll / cudnn64_*.dll is reported missing, +730 MB
 ```
 
+FFmpeg video backend (`--decode ffmpeg`, NVDEC) is optional and OFF by default:
+see [install_ffmpeg_en.md](install_ffmpeg_en.md) / [install_ffmpeg_zh.md](install_ffmpeg_zh.md).
+
 ## 4. Uninstall
 
 ```powershell

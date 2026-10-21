@@ -174,6 +174,13 @@ target_include_directories(trt_alpha_core
 #   exe。下载：BtbN FFmpeg-Builds 的 *-win64-gpl-shared.zip
 #   只链 4 个库：avformat / avcodec / avutil（+ swscale 给软件解码路径做
 #   YUV->BGR）。avfilter / avdevice 不用。
+#
+#   Linux 特有的坑：BtbN 的 shared 包**自身不带 RPATH**，而 libavcodec.so 是
+#   DT_NEEDED libswresample.so / libavutil.so。glibc 的 DT_RUNPATH **不向传递
+#   依赖传播**（只管直接依赖），所以只在 RUNPATH 里写 ${FFMPEG_ROOT}/lib 的话，
+#   程序能加载 libavcodec、却在找 libswresample 时直接死：
+#       "libswresample.so.7: cannot open shared object file"
+#   修法见下面对 --disable-new-dtags 的注释。Windows 无此问题（DLL 在 exe 旁）。
 # =============================================================================
 set(TRT_ALPHA_WITH_FFMPEG "OFF" CACHE STRING
     "FFmpeg video decode backend: OFF (default) | ON (require) | AUTO (use if found)")
@@ -243,6 +250,22 @@ if(TRT_ALPHA_FFMPEG_ENABLED)
 
     target_link_libraries(trt_alpha_core PUBLIC
         ffmpeg::avformat ffmpeg::avcodec ffmpeg::avutil ffmpeg::swscale)
+
+    # Linux: 让构建树里的二进制自己找到 FFmpeg 的 .so，不要求用户 export
+    # LD_LIBRARY_PATH —— 与本仓库"靠绝对 RUNPATH 开箱即用"的策略一致。
+    #
+    # 关键在 --disable-new-dtags：它让链接器写老式 DT_RPATH 而不是 DT_RUNPATH。
+    # 两者只有一个区别，但正好卡在这件事上：
+    #   DT_RPATH   会被所有后代对象继承（libavcodec 找 libswresample 时用得上）
+    #   DT_RUNPATH 只对"直接依赖"生效（glibc 明确不做传递查找）
+    # 不加它的话，RUNPATH 里明明写着 ${FFMPEG_ROOT}/lib，libavcodec 也加载成功，
+    # 但它在找自己的 libswresample 时完全看不见这个目录。
+    # （不额外 set CMAKE_BUILD_RPATH：CMake 本来就把 imported target 的目录写进
+    #  构建树 RPATH，我们只是把 DT_RUNPATH 改成 DT_RPATH，不覆盖已有内容。）
+    if(NOT WIN32)
+        add_link_options("-Wl,--disable-new-dtags")
+    endif()
+
     target_compile_definitions(trt_alpha_core PUBLIC TRT_ALPHA_WITH_FFMPEG=1)
     message(STATUS "FFmpeg: ON  (${FFMPEG_ROOT})")
 elseif(TRT_ALPHA_FF_MODE STREQUAL "ON")
