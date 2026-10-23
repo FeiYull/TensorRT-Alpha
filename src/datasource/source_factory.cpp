@@ -11,7 +11,10 @@
 
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/datasource/ffmpeg_source.hpp"
-#include "trt_alpha/datasource/opencv_source.hpp"
+
+#if defined(TRT_ALPHA_WITH_OPENCV) && TRT_ALPHA_WITH_OPENCV
+#  include "trt_alpha/datasource/opencv_source.hpp"
+#endif
 
 #include <stdexcept>
 #include <string>
@@ -29,6 +32,24 @@ const char* typeName(SourceType t) noexcept
     case SourceType::Camera: return "camera";
     }
     return "unknown";
+}
+
+//! Build the OpenCV-backed source, or fail loudly in an OpenCV-less build.
+//!
+//! Every non-video source type still routes here: a per-OS capture backend for
+//! cameras is out of scope, and image decoding without OpenCV is a separate
+//! step. Failing loudly beats silently handing back FFmpegSource for a camera.
+std::unique_ptr<IDataSource> makeOpenCVSource(const SourceConfig& cfg)
+{
+#if defined(TRT_ALPHA_WITH_OPENCV) && TRT_ALPHA_WITH_OPENCV
+    return std::make_unique<OpenCVSource>(cfg);
+#else
+    throw std::runtime_error(
+        std::string("makeSource: source type '") + typeName(cfg.type) +
+        "' needs the OpenCV backend, but this build has none "
+        "(TRT_ALPHA_WITH_OPENCV=OFF). Video files can still use the FFmpeg "
+        "backend (-DTRT_ALPHA_WITH_FFMPEG=ON).");
+#endif
 }
 
 }  // namespace
@@ -53,7 +74,7 @@ std::unique_ptr<IDataSource> makeSource(const SourceConfig& cfg)
             TRT_LOG_WARN("makeSource: the FFmpeg backend decodes video only, source type '"
                          << typeName(cfg.type) << "' stays on OpenCV");
         }
-        return std::make_unique<OpenCVSource>(cfg);
+        return makeOpenCVSource(cfg);
     }
 
     DecodeBackend want = cfg.decodeBackend;
@@ -77,7 +98,7 @@ std::unique_ptr<IDataSource> makeSource(const SourceConfig& cfg)
         return std::make_unique<FFmpegSource>(cfg);
     }
 
-    return std::make_unique<OpenCVSource>(cfg);
+    return makeOpenCVSource(cfg);
 }
 
 void applyBackendArgs(int argc, char* const argv[], SourceConfig& cfg)

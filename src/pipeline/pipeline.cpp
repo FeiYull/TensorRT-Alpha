@@ -12,6 +12,7 @@
 #include "trt_alpha/renderer/i_renderer.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -191,6 +192,16 @@ void Pipeline::start()
     m_running.store(true);
     m_sourcesRunning = m_cfg.sources.size();
 
+    // Per-source ended flags (atomic<bool> has no value-initialised default, so
+    // store(false) explicitly; reading an uninitialised atomic is UB). atomic<bool>
+    // is non-copyable/non-movable, hence a raw unique_ptr array instead of vector.
+    const std::size_t sourceCount = m_cfg.sources.size();
+    m_sourceEnded = std::make_unique<std::atomic<bool>[]>(sourceCount);
+    for (std::size_t i = 0; i < sourceCount; ++i)
+    {
+        m_sourceEnded[i].store(false);
+    }
+
     // ---- 起渲染线程（仅 renderer != nullptr 时）----
     if (m_cfg.renderer != nullptr)
     {
@@ -319,6 +330,12 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
 
     TRT_LOG_INFO("Pipeline: source[" << sourceIndex << "] exiting");
 
+    // 标记该源结束：渲染线程据此把对应 tile 切成 "NO SIGNAL"。
+    if (sourceIndex < m_cfg.sources.size())
+    {
+        m_sourceEnded[sourceIndex].store(true);
+    }
+
     // 通知"有一个源结束"
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -350,6 +367,10 @@ void Pipeline::renderLoop()
             TRT_LOG_INFO("Pipeline: render loop pop() returned false, exiting");
             break;
         }
+
+        // 先通知"已结束的源"（NO SIGNAL），再画本帧 —— 先播完的路不会冻结在
+        // 最后一帧，而是立刻切成 NO SIGNAL。
+        notifyEndedSources();
 
         TRT_LOG_DEBUG("Pipeline: render loop got future, valid=" << future.valid());
 
@@ -467,6 +488,17 @@ void Pipeline::renderLoop()
             }
         }
 
+        // 窗口被用户关闭（右上角 X / ESC / q）→ 安全停止整个管线并退出渲染
+        // 循环。之前这里没有出口：present() 只是跳过，渲染线程继续 pop、源
+        // 线程继续解码，程序一直跑到视频结束才退，表现为"点关闭卡死"。
+        if (m_cfg.showEnabled && m_cfg.renderer != nullptr &&
+            m_cfg.renderer->shouldClose())
+        {
+            TRT_LOG_INFO("Pipeline: display window closed, stopping the run");
+            stop();
+            break;
+        }
+
         // 还原原图：渲染只借用了像素克隆，swap 回来把【原图】留给调用方。
         if (keepRaw && savedBuffer != nullptr)
         {
@@ -486,12 +518,45 @@ void Pipeline::renderLoop()
         }
     }
 
+    // 所有源结束、结果队列已关闭。若窗口还开着（--show），保持它显示 NO SIGNAL
+    // 直到用户关闭 —— 多路监控里"先播完的路"停在 NO SIGNAL 而不是冻结在最后
+    // 一帧，程序也不会在视频一结束就消失。
+    if (m_cfg.showEnabled && m_cfg.renderer != nullptr)
+    {
+        notifyEndedSources();
+        TRT_LOG_INFO("Pipeline: all sources ended; keeping the window open until closed");
+        while (!m_stopRequested.load() && !m_cfg.renderer->shouldClose())
+        {
+            m_cfg.renderer->pump();
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }
+        if (m_cfg.renderer->shouldClose())
+        {
+            TRT_LOG_INFO("Pipeline: window closed after end of stream");
+        }
+    }
+
     if (m_processedQueue != nullptr)
     {
         m_processedQueue->close();
     }
 
     TRT_LOG_INFO("Pipeline: render loop exiting");
+}
+
+void Pipeline::notifyEndedSources()
+{
+    if (m_cfg.renderer == nullptr)
+    {
+        return;
+    }
+    for (std::size_t i = 0; i < m_cfg.sources.size(); ++i)
+    {
+        if (m_sourceEnded[i].load())
+        {
+            m_cfg.renderer->onSourceEnded(static_cast<int>(i));
+        }
+    }
 }
 
 void Pipeline::stop()

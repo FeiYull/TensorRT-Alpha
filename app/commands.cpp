@@ -14,12 +14,11 @@
 #include "trt_alpha/core/model_registry.hpp"
 #include "trt_alpha/core/paths.hpp"
 #include "trt_alpha/datasource/i_data_source.hpp"
-#include "trt_alpha/datasource/opencv_source.hpp"
 #include "trt_alpha/datasource/source_config.hpp"
 #include "trt_alpha/datasource/source_factory.hpp"
 #include "trt_alpha/pipeline/pipeline.hpp"
 #include "trt_alpha/pipeline/pipeline_config.hpp"
-#include "trt_alpha/renderer/opencv_renderer.hpp"
+#include "trt_alpha/renderer/renderer_factory.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -91,6 +90,8 @@ void printUsage()
         "                      data/people.mp4      -> local video file\n"
         "                      rtsp://host:554/s1   -> network stream (rtsp/rtmp/http(s)/udp)\n"
         "                      0                    -> camera device id\n"
+        "                    repeatable: each --source starts one independent stream\n"
+        "                    (multiple videos / streams run side by side)\n"
         "  --net <name>      model name (default: yolov8)\n"
         "  --config <ini>    model INI (default: configs/<net>.ini)\n"
         "  --engine <trt>    override INI's engine path\n"
@@ -98,6 +99,8 @@ void printUsage()
         "  --workers <n>     inference pool workers (default: INI [pool].workers)\n"
         "  --save [dir]      save result images (default dir: save/<net>)\n"
         "  --show            show result window\n"
+        "  --render <name>   render backend: auto (default) | opencv | gl\n"
+        "                    (gl needs a build with TRT_ALPHA_WITH_GL; display only)\n"
         "  --decode <name>   video decode backend: opencv (default) | ffmpeg | auto\n"
         "                    (ffmpeg needs a build with TRT_ALPHA_WITH_FFMPEG)\n"
         "  --hwaccel <mode>  FFmpeg only: auto (default) | none | nvdec\n"
@@ -125,6 +128,7 @@ void printUsage()
         "  trt_alpha run --source data/people.mp4 --net yolor --show\n"
         "  trt_alpha run --source rtsp://192.168.1.10:554/stream1 --net yolov8 --show\n"
         "  trt_alpha run --source 0 --net yolov8_pose --show\n"
+        "  trt_alpha run --source a.mp4 --source b.mp4 --source c.mp4 --net yolov8 --show --render gl\n"
         "  trt_alpha bench --net yolov8 --iters 100 --warmup 10\n"
         "  trt_alpha run --source data/bus.jpg --net yolov8 --engine D:/models/yolov8n.trt\n";
 }
@@ -261,6 +265,21 @@ int runCommand(const std::vector<std::string>& args)
     const trt_alpha::datasource::HostCopy hostCopy =
         trt_alpha::datasource::requireHostCopy(hostCopyName);
 
+    // 两个队列的满时策略：只从 base.ini 读（CLI 不提供覆盖开关）。
+    // 🔴 必须在 pool 构造之前读 —— pool 会拷贝 modelCfg，晚读的 readKeys 痕迹
+    // 进不了副本，配置框会把这两个键误标 [unused]（看起来像没生效）。
+    const std::string taskQueuePolicyName =
+        modelCfg.getString("pool.task_queue_policy", "block");
+    if (taskQueuePolicyName != "block")
+    {
+        TRT_LOG_WARN("run: pool.task_queue_policy='" << taskQueuePolicyName
+                     << "' ignored; the inference task queue is always 'block' "
+                     << "(dropping a task leaves its future unresolved and hangs "
+                     << "the render thread)");
+    }
+    const std::string queueFullPolicyName =
+        modelCfg.getString("pool.queue_full_policy", "auto");
+
     // 推理池
     trt_alpha::core::InferencePool pool(
         modelCfg,
@@ -278,31 +297,43 @@ int runCommand(const std::vector<std::string>& args)
     trt_alpha::core::logConfigBox(pool.modelConfig(), opt.net, iniPath,
                                   &pool.ioDesc(), pool.resolvedBatch());
 
-    // 数据源
-    trt_alpha::datasource::SourceConfig srcCfg;
-    // batch 必须取【引擎解析后】的值，不能用 ini / CLI 的原值：
-    // 静态引擎会忽略请求值、动态引擎越界直接报错 —— 若按原值攒批，
-    // 数据源的批大小会与模型实际 batch 不一致 → 越界写。
-    srcCfg.batchSize = pool.resolvedBatch();
-    srcCfg.sourceId = 0;
-
-    // 一个 --source 涵盖图片 / 目录 / 视频 / 网络流 / 摄像头 id；类型由
-    // datasource::resolveSource 统一判别（与高层 Infer 共用同一套规则），
-    // 命令行不再需要区分。目录会在源内部自动升级为 Images。
+    // 数据源：支持多路 --source（可重复出现），每路一个 SourceConfig + 独立
+    // sourceId（sourceId 会被 inference_pool 原样填回 BatchResult，渲染侧据此
+    // 把结果分派到对应 tile / 按源归集）。
+    std::vector<trt_alpha::datasource::SourceConfig> srcConfigs;
+    srcConfigs.reserve(opt.sources.size());
     {
-        const trt_alpha::datasource::ResolvedSource rs =
-            trt_alpha::datasource::resolveSource(opt.source);
-        srcCfg.type     = rs.type;
-        srcCfg.path     = rs.path;
-        srcCfg.cameraId = rs.cameraId;
-    }
+        int sourceId = 0;
+        for (const std::string& src : opt.sources)
+        {
+            trt_alpha::datasource::SourceConfig sc;
 
-    // 解码后端：取值已在函数前半段按 CLI > ini > 默认 的顺序定好并解析过
-    // （那一步必须赶在配置框之前，见 decodeBackend / hwAccel）。
-    srcCfg.decodeBackend = decodeBackend;
-    srcCfg.hwAccel = hwAccel;
-    srcCfg.openTimeoutMs = openTimeoutMs;
-    srcCfg.readTimeoutMs = readTimeoutMs;
+            // batch 必须取【引擎解析后】的值，不能用 ini / CLI 的原值：
+            // 静态引擎会忽略请求值、动态引擎越界直接报错 —— 若按原值攒批，
+            // 数据源的批大小会与模型实际 batch 不一致 → 越界写。
+            sc.batchSize = pool.resolvedBatch();
+            sc.sourceId = sourceId++;
+
+            // 一个 --source 涵盖图片 / 目录 / 视频 / 网络流 / 摄像头 id；类型由
+            // datasource::resolveSource 统一判别（与高层 Infer 共用同一套规则），
+            // 命令行不再需要区分。目录会在源内部自动升级为 Images。
+            const trt_alpha::datasource::ResolvedSource rs =
+                trt_alpha::datasource::resolveSource(src);
+            sc.type     = rs.type;
+            sc.path     = rs.path;
+            sc.cameraId = rs.cameraId;
+
+            // 解码后端：取值已在函数前半段按 CLI > ini > 默认 的顺序定好并解析过
+            // （那一步必须赶在配置框之前，见 decodeBackend / hwAccel）。
+            // 多路源共享同一套解码 / 硬解 / 回拷参数（它们来自同一个 CLI / ini）。
+            sc.decodeBackend  = decodeBackend;
+            sc.hwAccel        = hwAccel;
+            sc.openTimeoutMs  = openTimeoutMs;
+            sc.readTimeoutMs  = readTimeoutMs;
+
+            srcConfigs.push_back(std::move(sc));
+        }
+    }
 
     // 安全守卫：结果按"原文件名"存盘 ⇒ 输出路径可能正好是输入文件本身。
     // 旧判据只处理"输入是目录"，漏掉了最常见的一种：输入是【单张图】而
@@ -310,11 +341,17 @@ int runCommand(const std::vector<std::string>& args)
     // 此时输出 data/bus.jpg == 输入，原图被覆盖成画框版，不可逆。
     // 新判据：把每个输入文件按渲染器的落盘规则算出输出路径，与输入逐一比对。
     // 只有图片 / 图片目录源会产出"原文件名"，视频与相机天然无此风险。
-    if (opt.save &&
-        (srcCfg.type == trt_alpha::datasource::SourceType::Image ||
-         srcCfg.type == trt_alpha::datasource::SourceType::Images) &&
-        !trt_alpha::core::Paths::isUrl(srcCfg.path))
+    // 多路源：逐源检查（任一路命中就整体拒绝）。
+    for (const auto& srcCfg : srcConfigs)
     {
+        if (!opt.save ||
+            (srcCfg.type != trt_alpha::datasource::SourceType::Image &&
+             srcCfg.type != trt_alpha::datasource::SourceType::Images) ||
+            trt_alpha::core::Paths::isUrl(srcCfg.path))
+        {
+            continue;
+        }
+
         std::error_code ec;
         const fs::path inRoot  = trt_alpha::core::Paths::resolve(srcCfg.path);
         const fs::path outRoot = trt_alpha::core::Paths::resolve(saveDir);
@@ -356,14 +393,29 @@ int runCommand(const std::vector<std::string>& args)
     // 折合 22% 的帧预算）。
     const bool needRender = opt.save || opt.show;
 
+    // 渲染后端（CLI --render，默认 auto = 构建里第一个可用后端）。拼写错误在这里
+    // 就炸，而不是跑到建窗口才发现。
+    const trt_alpha::renderer::Backend renderBackend =
+        trt_alpha::renderer::requireBackend(opt.render);
+
+    // GL 后端 v1 只做显示（GPU 网格 + 图元），落盘走 nvEnc 是后续项。显式拒绝，
+    // 不让 --render gl --save 静默写出一堆没画框的图。
+    if (renderBackend == trt_alpha::renderer::Backend::GL && opt.save)
+    {
+        throw std::runtime_error(
+            "run: --render gl does not support --save yet (the GL backend draws on the "
+            "GPU at show time); use --show, or --render opencv for --save");
+    }
+
     // 主机副本只在渲染器会读的时候才需要。但模型若还不认识 Batch::deviceBuffer，
     // 它照样从主机上传像素 —— 那种情况必须保留副本，否则它读到的是空指针。
     // 所以 auto 的条件是"要渲染 或 模型不支持设备像素"，只有两条都不成立才真的省。
-    srcCfg.needHostCopy = needRender || !pool.acceptsDevicePixels();
+    // 多路源共享同一份决策（同一个模型 + 同一渲染开关 + 同一 hostCopy 覆盖）。
+    bool needHost = needRender || !pool.acceptsDevicePixels();
     if (hostCopy == trt_alpha::datasource::HostCopy::On)
     {
         // 显式要求：即使没人读，也留着（源码里要拿 image() 就必须它）。
-        srcCfg.needHostCopy = true;
+        needHost = true;
     }
     else if (hostCopy == trt_alpha::datasource::HostCopy::Off)
     {
@@ -388,42 +440,67 @@ int runCommand(const std::vector<std::string>& args)
             TRT_LOG_WARN("run: source.need_host_copy = off has no effect on the "
                          "OpenCV backend, which always decodes into host memory");
         }
-        srcCfg.needHostCopy = false;
+        needHost = false;
+    }
+    for (auto& sc : srcConfigs)
+    {
+        sc.needHostCopy = needHost;
     }
 
     // 本次回拷决策的最终口径（与高层 Infer 的那条日志同名同序，便于对照）。
-    TRT_LOG_INFO("run: host pixel copy " << (srcCfg.needHostCopy ? "ON" : "OFF")
+    TRT_LOG_INFO("run: host pixel copy " << (needHost ? "ON" : "OFF")
                  << " (render=" << (needRender ? "on" : "off")
                  << ", model "
                  << (pool.acceptsDevicePixels() ? "supports" : "does not support")
                  << " device pixels, decode="
-                 << trt_alpha::datasource::toString(srcCfg.decodeBackend)
-                 << ", hwaccel=" << trt_alpha::datasource::toString(srcCfg.hwAccel)
+                 << trt_alpha::datasource::toString(decodeBackend)
+                 << ", hwaccel=" << trt_alpha::datasource::toString(hwAccel)
                  << ", need_host_copy="
                  << trt_alpha::datasource::toString(hostCopy) << ")");
 
     std::vector<std::unique_ptr<trt_alpha::datasource::IDataSource>> sources;
-    sources.push_back(trt_alpha::datasource::makeSource(srcCfg));
-
-    trt_alpha::renderer::OpenCVRenderer renderer;
-
-    // 把输入源登记给渲染器：save() 会拒绝对这些路径的写入（"输出 == 输入"的
-    // 最后一道闸门，任何数据源都躲不过）。
-    if (opt.save && !trt_alpha::core::Paths::isUrl(srcCfg.path))
+    sources.reserve(srcConfigs.size());
+    for (auto& sc : srcConfigs)
     {
-        renderer.addInputSource(trt_alpha::core::Paths::resolve(srcCfg.path).string());
+        sources.push_back(trt_alpha::datasource::makeSource(sc));
     }
 
-    // JPEG 质量（只影响 --save 落盘）：1..100，默认 95 = OpenCV 默认值。
-    // 读取在函数前半段（见 jpegQuality），保证配置框不会把该键误标 [unused]。
-    renderer.setJpegQuality(jpegQuality);
+    // 渲染后端由工厂决定（opencv / gl / auto）。只在确实要 画/存/显示 时才创建
+    // —— 一个没有 OpenCV 的构建，不带 --save/--show 时不该因为缺后端就抛异常。
+    std::unique_ptr<trt_alpha::renderer::IRenderer> renderer;
+    if (needRender)
+    {
+        trt_alpha::renderer::RendererConfig rcfg;
+        rcfg.backend = renderBackend;
+        rcfg.numTiles = static_cast<int>(srcConfigs.size());
+        rcfg.jpegQuality = jpegQuality;
+
+        // 把输入源登记给渲染器：save() 会拒绝对这些路径的写入（"输出 == 输入"的
+        // 最后一道闸门，任何数据源都躲不过）。
+        for (const auto& sc : srcConfigs)
+        {
+            if (opt.save && !trt_alpha::core::Paths::isUrl(sc.path))
+            {
+                rcfg.inputPaths.push_back(
+                    trt_alpha::core::Paths::resolve(sc.path).string());
+            }
+        }
+
+        renderer = trt_alpha::renderer::makeRenderer(rcfg);
+
+        // JPEG 质量（只影响 --save 落盘）：1..100，默认 95 = OpenCV 默认值。
+        // 读取在函数前半段（见 jpegQuality），保证配置框不会把该键误标 [unused]。
+        renderer->setJpegQuality(jpegQuality);
+    }
 
     // 队列满时策略：ini 的 pool.queue_full_policy 显式指定 > 按源类型自动。
     //   实时源（摄像头 / RTSP / HTTP 流）→ drop_oldest：宁可丢旧帧，也不让延迟累积
     //   离线源（单图 / 图片目录 / 视频文件）→ block：一帧不落（备忘录第 9 条的口径）
     trt_alpha::core::QueueFullPolicy queuePolicy = trt_alpha::core::QueueFullPolicy::Block;
     {
-        const std::string pol = modelCfg.getString("pool.queue_full_policy", "auto");
+        // 已在 pool 构造前读过（见 queueFullPolicyName），这里只做解析，避免
+        // 配置框把该键误标 [unused]。
+        const std::string pol = queueFullPolicyName;
         if (pol == "block")
         {
             queuePolicy = trt_alpha::core::QueueFullPolicy::Block;
@@ -443,9 +520,18 @@ int runCommand(const std::vector<std::string>& args)
                 TRT_LOG_WARN("run: unknown pool.queue_full_policy '" << pol
                              << "', falling back to auto");
             }
-            const bool realtime =
-                (srcCfg.type == trt_alpha::datasource::SourceType::Camera) ||
-                trt_alpha::core::Paths::isUrl(srcCfg.path);
+            // 多路源：任一路是实时源（摄像头 / 流）就整体按实时处理 —— 只要有一路
+            // 会累积延迟，block 就会拖垮整个结果队列。
+            bool realtime = false;
+            for (const auto& sc : srcConfigs)
+            {
+                if (sc.type == trt_alpha::datasource::SourceType::Camera ||
+                    trt_alpha::core::Paths::isUrl(sc.path))
+                {
+                    realtime = true;
+                    break;
+                }
+            }
             queuePolicy = realtime ? trt_alpha::core::QueueFullPolicy::DropOldest
                                    : trt_alpha::core::QueueFullPolicy::Block;
         }
@@ -455,7 +541,7 @@ int runCommand(const std::vector<std::string>& args)
     trt_alpha::pipeline::PipelineConfig pcfg;
     pcfg.sources = std::move(sources);
     pcfg.pools = { &pool };
-    pcfg.renderer = needRender ? &renderer : nullptr;
+    pcfg.renderer = renderer.get();
     pcfg.classNames = modelCfg.classNames;
     pcfg.renderOptions = renderOptions;
     pcfg.resultQueueSize = (qResult > 0) ? static_cast<std::size_t>(qResult) : std::size_t{32};

@@ -17,7 +17,8 @@ struct RunOptions
     // ---- 数据源 ----
     //! --source <path|url|id>：一个参数涵盖图片 / 目录 / 视频 / 网络流 / 摄像头 id。
     //! 具体类型由框架内部判别（datasource::resolveSource），命令行不再区分。
-    std::string source;
+    //! 可重复出现：每个 --source 起一路独立数据源（多路视频 / 多路流）。
+    std::vector<std::string> sources;
 
     //! --decode <opencv|ffmpeg|auto>：视频用哪个库解码。默认 opencv（保持现状）。
     //! 图片 / 目录 / 摄像头始终走 OpenCV。
@@ -40,6 +41,7 @@ struct RunOptions
     bool show = false;
     bool save = false;
     std::string saveDir;        //!< --save [dir]：显式输出目录；空 = 默认 save/<net>
+    std::string render = "auto"; //!< --render <auto|opencv|gl>：渲染后端（默认 auto）
 
     // ---- 池 ----
     int workers = -1;           //!< --workers <n>（<=0 = 用 INI [pool].workers）
@@ -47,7 +49,7 @@ struct RunOptions
     // ---- 全局 ----
     std::string root;           //!< --root <dir>
 
-    //! 校验：只允许一个源；数值合法。
+    //! 校验：至少一个源；数值合法。
     void validate() const;
 
     //! 是否指定了任何数据源。

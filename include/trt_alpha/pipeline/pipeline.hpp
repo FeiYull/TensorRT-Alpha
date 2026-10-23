@@ -104,6 +104,11 @@ private:
     void sourceLoop(std::size_t sourceIndex);
     void renderLoop();
 
+    //! Tell the renderer which sources have ended (NO SIGNAL placeholder).
+    //! Idempotent: the renderer keeps per-tile state, so calling it every frame
+    //! is harmless and needs no extra bookkeeping.
+    void notifyEndedSources();
+
     //! Record an error: set the failed flag + remember the first description
     //! (thread-safe, idempotent).
     void markFailed(const std::string& what);
@@ -118,6 +123,15 @@ private:
     // Threads
     std::vector<std::thread> m_sourceThreads;
     std::vector<std::thread> m_renderThreads;
+
+    // Per-source "ended" flags: set by the source thread when it exits (EOF /
+    // stop), read by the render thread so it can tell the renderer to show a
+    // "NO SIGNAL" placeholder for that source's tile. std::atomic<bool> is
+    // neither copyable nor movable, so it cannot live in a std::vector (resize
+    // needs a copy); a heap array built with make_unique sidesteps that. Each
+    // element is store(false)'d explicitly in start() (the default constructor
+    // leaves the value uninitialised, which would be UB to read).
+    std::unique_ptr<std::atomic<bool>[]> m_sourceEnded;
 
     // Lifetime
     std::atomic<bool> m_running{false};

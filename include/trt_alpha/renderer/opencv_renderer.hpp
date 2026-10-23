@@ -35,7 +35,7 @@ public:
     //! when it hits these paths -- this is the last gate for "output == input",
     //! which no data source and no call path (CLI / Infer) can escape. Must be
     //! called before start() (save() only reads it, so save can stay const).
-    void addInputSource(const std::string& resolvedPath);
+    void addInputSource(const std::string& resolvedPath) override;
 
     [[nodiscard]] bool protectsInputs() const noexcept { return !m_inputPaths.empty(); }
 
@@ -43,7 +43,7 @@ public:
     //! Out-of-range values are clamped (and reported), never silently applied.
     //! Must be called before start(): save() only reads it, so save stays const
     //! and the several render threads need no extra locking.
-    void setJpegQuality(int quality);
+    void setJpegQuality(int quality) override;
 
     void drawResult(core::BatchResult& result,
                     const std::vector<core::ClassInfo>& classNames,

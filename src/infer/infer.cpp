@@ -8,12 +8,11 @@
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"
 #include "trt_alpha/core/paths.hpp"
-#include "trt_alpha/datasource/opencv_source.hpp"
 #include "trt_alpha/datasource/source_config.hpp"
 #include "trt_alpha/datasource/source_factory.hpp"
 #include "trt_alpha/pipeline/pipeline.hpp"
 #include "trt_alpha/pipeline/pipeline_config.hpp"
-#include "trt_alpha/renderer/opencv_renderer.hpp"
+#include "trt_alpha/renderer/renderer_factory.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -340,7 +339,9 @@ struct Infer::Impl
     //! need_host_copy 的三态（auto 要等池建好、知道模型能力才能落地）。
     datasource::HostCopy host_mode = datasource::HostCopy::Auto;
     std::shared_ptr<core::InferencePool> pool;
-    renderer::OpenCVRenderer renderer;
+    //! 渲染后端由工厂决定（opencv / gl / auto）。nullptr == 还没建；
+    //! 第一次需要渲染时创建，此后随 Impl 一直保活（Pipeline 只记裸指针）。
+    std::unique_ptr<renderer::IRenderer> renderer;
 
     core::ModelConfig merge_config() const;
     void ensure_pool();
@@ -575,7 +576,11 @@ Stream Infer::async()
     pcfg.queueFullPolicy = to_queue_policy(m_impl->params.policy, realtime);
 
     if (render) {
-        pcfg.renderer = &m_impl->renderer;
+        // 惰性创建：一次 Infer 可能开多个 Stream，渲染器共用同一个实例。
+        if (!m_impl->renderer) {
+            m_impl->renderer = renderer::makeRenderer(renderer::RendererConfig{});
+        }
+        pcfg.renderer = m_impl->renderer.get();
         // Stream::get() 在有渲染器时走 popProcessed ⇒ 必须先声明要消费
         pcfg.exposeProcessed = true;
         pcfg.saveEnabled = m_impl->params.save.enabled;
@@ -602,7 +607,7 @@ Stream Infer::async()
 
         // 登记输入源：save() 据此拒绝覆盖原图（输出 == 输入的最后一道闸门）
         if (m_impl->params.save.enabled && !core::Paths::isUrl(m_impl->params.source)) {
-            m_impl->renderer.addInputSource(
+            m_impl->renderer->addInputSource(
                 core::Paths::resolve(m_impl->params.source).string());
         }
     } else {

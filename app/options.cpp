@@ -99,7 +99,7 @@ void parseSize(const std::string& text, const std::string& flag, int& w, int& h)
 
 bool RunOptions::hasSource() const noexcept
 {
-    return !source.empty();
+    return !sources.empty();
 }
 
 std::string RunOptions::resolveConfigPath() const
@@ -110,11 +110,12 @@ std::string RunOptions::resolveConfigPath() const
 
 void RunOptions::validate() const
 {
-    if (source.empty())
+    if (sources.empty())
     {
         throw std::runtime_error(
-            "run: no source specified (use --source <path|url|id>; image / directory / "
-            "video / stream / camera id are detected automatically)");
+            "run: no source specified (use --source <path|url|id>, repeatable for "
+            "multiple streams; image / directory / video / stream / camera id are "
+            "detected automatically)");
     }
 
     if (batch == 0 || batch < -1)
@@ -141,7 +142,7 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
     {
         const std::string& a = args[i];
 
-        if      (a == "--source")   { opt.source = nextArg(args, i, a); }
+        if      (a == "--source")   { opt.sources.push_back(nextArg(args, i, a)); }
         else if (a == "--decode")   { opt.decode = nextArg(args, i, a); }
         else if (a == "--hwaccel")  { opt.hwaccel = nextArg(args, i, a); }
         else if (a == "--host-copy"){ opt.hostCopy = nextArg(args, i, a); }
@@ -151,6 +152,7 @@ RunOptions parseRunOptions(const std::vector<std::string>& args)
         else if (a == "--batch")    { opt.batch = nextPositiveIntArg(args, i, a); }
         else if (a == "--workers")  { opt.workers = nextPositiveIntArg(args, i, a); }
         else if (a == "--root")     { opt.root = nextArg(args, i, a); }
+        else if (a == "--render")   { opt.render = nextArg(args, i, a); }
         else if (a == "--save")
         {
             opt.save = true;

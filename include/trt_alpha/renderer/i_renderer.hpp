@@ -81,6 +81,45 @@ public:
     virtual void show(const core::BatchResult& result,
                       const std::string& windowName) const = 0;
 
+    // ---- display lifecycle (default no-op) ----------------------------------
+    // These concern the *window*, not the drawing. The OpenCV backend keeps the
+    // no-op defaults (imshow has no persistent window state to report); only a
+    // backend that owns a window (the GL backend) overrides them.
+
+    //! True once the user asked to close the display window (title-bar X / ESC /
+    //! q). The pipeline polls it after each show() and stops the run.
+    virtual bool shouldClose() const noexcept { return false; }
+
+    //! A source ended (video EOF / image done). The backend should show a
+    //! "no signal" state for that source's tile instead of its last frame.
+    virtual void onSourceEnded(int sourceId) { (void)sourceId; }
+
+    //! Drive the display when there is no new frame to show: poll events, keep
+    //! the window responsive (so shouldClose() flips), and redraw if needed.
+    //! The pipeline calls it after the last result while the window stays open.
+    virtual void pump() const {}
+
+    // ---- optional capabilities (default no-op) ------------------------------
+    // These are configuration, not drawing: they are set once before start()
+    // and only read afterwards. Backends that do not write files (or do not
+    // care) simply keep the no-op default, so adding a backend never requires
+    // implementing them.
+
+    //! Register an input source (file or directory, already resolved). save()
+    //! must refuse to write over these paths -- the last gate for
+    //! "output == input", which no data source or call path can escape.
+    virtual void addInputSource(const std::string& resolvedPath)
+    {
+        (void)resolvedPath;
+    }
+
+    //! Quality used by save() when the output format is JPEG (1..100).
+    //! Out-of-range values are clamped and reported, never applied silently.
+    virtual void setJpegQuality(int quality)
+    {
+        (void)quality;
+    }
+
 protected:
     IRenderer() = default;
 };

@@ -91,6 +91,7 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(OpenCV)
+include(GL)              # 可选 OpenGL 后端（默认 OFF；-DTRT_ALPHA_WITH_GL=ON 开启）
 include(TensorRT)
 include(DeployRuntime)   # 提供 trt_alpha_deploy_runtime(<target>)：把第三方 DLL 拷到 exe 旁
 
@@ -122,6 +123,17 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/${_trt_alpha_cfg}")
 file(GLOB_RECURSE TRT_ALPHA_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/*.cpp"
   "${CMAKE_SOURCE_DIR}/src/*.cu")
+
+# 🔴 可选后端：关掉某个后端时，必须把它独占的源文件从编译列表里摘掉。
+#    GLOB 会自动收新文件（CONFIGURE_DEPENDS），所以【新增后端独占文件时
+#    要在这里同步登记】，否则 OFF 构建会因为找不到第三方头而失败。
+if(NOT TRT_ALPHA_WITH_OPENCV)
+  list(FILTER TRT_ALPHA_SOURCES EXCLUDE REGEX "/opencv_(source|renderer)\\.cpp$")
+  message(STATUS "Sources: excluded opencv_source.cpp / opencv_renderer.cpp")
+endif()
+if(NOT TRT_ALPHA_WITH_GL)
+  list(FILTER TRT_ALPHA_SOURCES EXCLUDE REGEX "/gl_(renderer|context)\\.cpp$")
+endif()
 
 add_library(trt_alpha_core STATIC ${TRT_ALPHA_SOURCES})
 
@@ -286,8 +298,12 @@ else()
     endif()
 endif()
 
+# ocv::ocv / gl::glfw 在这种写法下始终存在（OFF 时是空的 INTERFACE target），
+# 因此这里不需要再包 if()。两者的 TRT_ALPHA_WITH_* 宏通过 INTERFACE 传播到
+# 所有下游 target，保证 #if 判断处处一致。
 target_link_libraries(trt_alpha_core
   PUBLIC  ocv::ocv
+          gl::glfw
   PRIVATE trt::trt)
 
 
