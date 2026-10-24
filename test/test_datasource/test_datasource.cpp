@@ -260,8 +260,7 @@ int main(int argc, char** argv)
             cfg.type = SourceType::Video;
             cfg.path = "rtsp://127.0.0.1:1/none";
             cfg.batchSize = 1;
-            cfg.openTimeoutMs = 400;
-            cfg.readTimeoutMs = 400;
+            cfg.timeoutMs = 400;
             OpenCVSource source(cfg);
         }
         catch (const std::runtime_error& e) { msg = e.what(); }

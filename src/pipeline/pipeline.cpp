@@ -12,6 +12,7 @@
 #include "trt_alpha/renderer/i_renderer.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -52,11 +53,22 @@ Pipeline::Pipeline(PipelineConfig cfg)
 {
     validateConfig();
 
-    // 两个队列都用配置里的策略（默认 Block：批处理不丢帧）。
+    // 结果队列 + 处理后队列都用配置里的策略（默认 Block：批处理不丢帧）。
     // 注意 Block 的安全性由 stop() / waitForCompletion() 保证 —— 它们会在 join
     // 之前 close() 队列，让阻塞在 push 上的线程有出口（否则会挂死）。
-    m_resultQueue = std::make_unique<core::BoundedQueue<std::future<core::BatchResult>>>(
-        m_cfg.resultQueueSize, m_cfg.queueFullPolicy);
+    // 结果队列按 sourceToQueue 拆成一条或多条（默认每 source 一条）。
+    std::size_t queueCount = 1;
+    for (std::size_t k : m_cfg.sourceToQueue)
+    {
+        queueCount = std::max(queueCount, k + 1);
+    }
+    m_resultQueues.reserve(queueCount);
+    for (std::size_t i = 0; i < queueCount; ++i)
+    {
+        m_resultQueues.push_back(
+            std::make_unique<core::BoundedQueue<std::future<core::BatchResult>>>(
+                m_cfg.resultQueueSize, m_cfg.queueFullPolicy));
+    }
 
     m_processedQueue = std::make_unique<core::BoundedQueue<core::BatchResult>>(
         m_cfg.resultQueueSize, m_cfg.queueFullPolicy);
@@ -121,6 +133,24 @@ void Pipeline::validateConfig()
                 std::to_string(m_cfg.sourceToPool[i]) + " >= pools size " +
                 std::to_string(m_cfg.pools.size()));
         }
+    }
+
+    // sourceToQueue 校验（对标 sourceToPool）：空 = 每 source 一条独立队列。
+    // 队列本身是泛型模板，数量在构造函数里据 max(sourceToQueue)+1 创建。
+    if (m_cfg.sourceToQueue.empty())
+    {
+        m_cfg.sourceToQueue.resize(m_cfg.sources.size());
+        for (std::size_t i = 0; i < m_cfg.sources.size(); ++i)
+        {
+            m_cfg.sourceToQueue[i] = i;
+        }
+    }
+    else if (m_cfg.sourceToQueue.size() != m_cfg.sources.size())
+    {
+        throw std::runtime_error(
+            "Pipeline: sourceToQueue size (" +
+            std::to_string(m_cfg.sourceToQueue.size()) +
+            ") != sources size (" + std::to_string(m_cfg.sources.size()) + ")");
     }
 
     if (m_cfg.resultQueueSize == 0)
@@ -301,11 +331,14 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
             break;
         }
 
-        // 推到结果队列
+        // 推到该源的队列（sourceToQueue[sourceIndex]）。每 source 一条队列时，
+        // 慢源只堵自己，不阻塞其它源。
         TRT_LOG_DEBUG("Pipeline: source[" << sourceIndex
-                     << "] pushing future to result queue");
+                     << "] pushing future to result queue "
+                     << m_cfg.sourceToQueue[sourceIndex]);
         bool dropped = false;
-        if (!m_resultQueue->push(std::move(future), &dropped))
+        auto& queue = *m_resultQueues[m_cfg.sourceToQueue[sourceIndex]];
+        if (!queue.push(std::move(future), &dropped))
         {
             TRT_LOG_WARN("Pipeline: source[" << sourceIndex
                          << "] result queue closed");
@@ -315,10 +348,11 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
         {
             // 丢帧必须留痕，且必须是默认可见的 WARN 级（DEBUG 在 Release 被编译掉）。
             // 逐帧刷屏没意义：首次报一条，之后每 100 条报一次，末尾再汇总一次。
-            const std::size_t total = m_resultQueue->droppedTotal();
+            const std::size_t total = queue.droppedTotal();
             if (total == 1 || total % 100 == 0)
             {
-                TRT_LOG_WARN("Pipeline: result queue full (size=" << m_cfg.resultQueueSize
+                TRT_LOG_WARN("Pipeline: source[" << sourceIndex
+                             << "] result queue full (size=" << m_cfg.resultQueueSize
                              << "), dropped the oldest result(s); total dropped=" << total
                              << " - set queue_full_policy=block to never drop");
             }
@@ -344,7 +378,11 @@ void Pipeline::sourceLoop(std::size_t sourceIndex)
         }
         if (m_sourcesRunning == 0)
         {
-            m_resultQueue->close();
+            // 全部源结束 → 关闭所有结果队列，让渲染线程 / popResult 排空后退出。
+            for (auto& q : m_resultQueues)
+            {
+                q->close();
+            }
         }
     }
 }
@@ -361,7 +399,7 @@ void Pipeline::renderLoop()
                      << ": waiting for future");
 
         std::future<core::BatchResult> future;
-        if (!m_resultQueue->pop(future))
+        if (!popAnyResult(future))
         {
             TRT_LOG_INFO("Pipeline: render loop pop() returned false, exiting");
             break;
@@ -513,7 +551,21 @@ void Pipeline::renderLoop()
         // Block 策略下渲染线程会写满队列后永久阻塞（Drop 策略下则纯属白丢）。
         if (keepRaw)
         {
-            m_processedQueue->push(std::move(result));
+            // 处理后队列也可能满（DropOldest）——丢帧必须留痕，接住 droppedOut
+            // 并计入 droppedResults()，绝不静默。首次报一条，之后每 100 条一次。
+            bool procDropped = false;
+            m_processedQueue->push(std::move(result), &procDropped);
+            if (procDropped)
+            {
+                const std::size_t total = m_processedQueue->droppedTotal();
+                if (total == 1 || total % 100 == 0)
+                {
+                    TRT_LOG_WARN("Pipeline: processed queue full (size="
+                                 << m_cfg.resultQueueSize
+                                 << "), dropped the oldest processed result(s); total dropped="
+                                 << total << " - drain popProcessed() faster");
+                }
+            }
         }
     }
 
@@ -573,7 +625,10 @@ void Pipeline::stop()
     // 关掉结果队列：Block 策略下源线程可能正阻塞在 push 上，
     // 不 close 它就没机会回到 while 顶部看到 m_stopRequested → join 会挂死。
     // close 之后队列里已有的元素仍可被渲染线程排空，不会丢。
-    m_resultQueue->close();
+    for (auto& q : m_resultQueues)
+    {
+        q->close();
+    }
 }
 
 void Pipeline::waitForCompletion()
@@ -589,7 +644,10 @@ void Pipeline::waitForCompletion()
     m_sourceThreads.clear();
 
     // 源都结束了 → 确保队列关闭
-    m_resultQueue->close();
+    for (auto& q : m_resultQueues)
+    {
+        q->close();
+    }
 
     // 渲染线程可能在 Block 策略下阻塞于 m_processedQueue 的 push（消费者跟不上）。
     // 必须在 join 之前 close，否则会永久挂死。
@@ -610,7 +668,12 @@ void Pipeline::waitForCompletion()
 
     m_running.store(false);
 
-    const std::size_t dropped = droppedResults();
+    const std::vector<std::size_t> perSource = droppedResultsPerSource();
+    std::size_t dropped = 0;
+    for (std::size_t c : perSource)
+    {
+        dropped += c;
+    }
     if (dropped > 0)
     {
         TRT_LOG_WARN("Pipeline: finished with " << dropped
@@ -620,24 +683,87 @@ void Pipeline::waitForCompletion()
                              : (m_cfg.queueFullPolicy == core::QueueFullPolicy::DropNewest
                                     ? "drop_newest" : "drop_oldest"))
                      << ", result_queue_size=" << m_cfg.resultQueueSize);
+        // 按源明细：默认每 source 一条队列时精确到路；共享队列时同队列多源会重复。
+        for (std::size_t i = 0; i < perSource.size(); ++i)
+        {
+            if (perSource[i] > 0)
+            {
+                TRT_LOG_WARN("Pipeline:   source[" << i << "] dropped "
+                             << perSource[i] << " result(s)");
+            }
+        }
     }
     TRT_LOG_INFO("Pipeline: all threads joined");
 }
 
 std::size_t Pipeline::droppedResults() const noexcept
 {
-    return m_resultQueue ? m_resultQueue->droppedTotal() : 0;
+    std::size_t total = 0;
+    for (const auto& q : m_resultQueues)
+    {
+        total += q->droppedTotal();
+    }
+    // 处理后队列也可能丢帧（exposeProcessed + DropOldest），一并计入，绝不静默。
+    if (m_processedQueue != nullptr)
+    {
+        total += m_processedQueue->droppedTotal();
+    }
+    return total;
+}
+
+std::vector<std::size_t> Pipeline::droppedResultsPerSource() const noexcept
+{
+    std::vector<std::size_t> out(m_cfg.sources.size(), 0);
+    for (std::size_t i = 0; i < m_cfg.sources.size(); ++i)
+    {
+        const std::size_t q = m_cfg.sourceToQueue[i];
+        if (q < m_resultQueues.size())
+        {
+            out[i] = m_resultQueues[q]->droppedTotal();
+        }
+    }
+    return out;
+}
+
+bool Pipeline::popAnyResult(std::future<core::BatchResult>& out)
+{
+    while (true)
+    {
+        const std::size_t n = m_resultQueues.size();
+        for (std::size_t round = 0; round < n; ++round)
+        {
+            const std::size_t idx = (m_nextQueue + round) % n;
+            if (m_resultQueues[idx]->tryPop(out))
+            {
+                m_nextQueue = (idx + 1) % n;
+                return true;
+            }
+        }
+        if (allResultQueuesClosed())
+        {
+            return false;
+        }
+        // 全空但未关闭：让出 CPU，避免忙等。500µs 对 30fps 渲染可忽略。
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
+    }
+}
+
+bool Pipeline::allResultQueuesClosed() const
+{
+    for (const auto& q : m_resultQueues)
+    {
+        if (!q->closed() || q->size() > 0)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Pipeline::popResult(core::BatchResult& out)
 {
-    if (m_resultQueue == nullptr)
-    {
-        return false;
-    }
-
     std::future<core::BatchResult> fut;
-    if (!m_resultQueue->pop(fut))
+    if (!popAnyResult(fut))
     {
         return false;
     }

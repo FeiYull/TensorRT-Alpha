@@ -49,6 +49,13 @@ struct PipelineConfig
     //! sourceToPool[i] = k means source i uses pools[k].
     std::vector<std::size_t> sourceToPool;
 
+    //! Which result queue source i pushes its futures to.
+    //! Empty = each source gets its own queue (source i -> queue i): a slow
+    //! source then only backs up its own queue and never blocks a fast one, and
+    //! dropped results are attributed per source. Set it explicitly to share a
+    //! queue across sources (mirrors sourceToPool).
+    std::vector<std::size_t> sourceToQueue;
+
     // ---- Rendering ----
     renderer::IRenderer* renderer = nullptr;
     std::vector<core::ClassInfo> classNames;

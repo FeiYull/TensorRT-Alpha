@@ -100,9 +100,21 @@ public:
     //! "incomplete results" as a failure.
     [[nodiscard]] std::size_t droppedResults() const noexcept;
 
+    //! Per-source drop count (index = source index). A source that shares a
+    //! queue with others reports that queue's count (the queue is the unit of
+    //! dropping); the default one-queue-per-source layout makes each entry exact.
+    [[nodiscard]] std::vector<std::size_t> droppedResultsPerSource() const noexcept;
+
 private:
     void sourceLoop(std::size_t sourceIndex);
     void renderLoop();
+
+    //! Round-robin pop across every result queue (fair across sources). Blocking:
+    //! returns false only when all queues are closed and drained.
+    bool popAnyResult(std::future<core::BatchResult>& out);
+
+    //! True once every result queue is closed and empty (the drain condition).
+    bool allResultQueuesClosed() const;
 
     //! Tell the renderer which sources have ended (NO SIGNAL placeholder).
     //! Idempotent: the renderer keeps per-tile state, so calling it every frame
@@ -117,8 +129,14 @@ private:
 
     PipelineConfig m_cfg;
 
-    // Result queue: future<BatchResult>
-    std::unique_ptr<core::BoundedQueue<std::future<core::BatchResult>>> m_resultQueue;
+    // Result queues: future<BatchResult>, one per logical queue (default one per
+    // source, see PipelineConfig::sourceToQueue). A vector so a slow source only
+    // backs up its own queue instead of blocking every source on a shared one.
+    std::vector<std::unique_ptr<core::BoundedQueue<std::future<core::BatchResult>>>> m_resultQueues;
+
+    //! Round-robin cursor into m_resultQueues (renderLoop / popResult). Both are
+    //! single consumers that never run concurrently, so no lock is needed.
+    std::size_t m_nextQueue = 0;
 
     // Threads
     std::vector<std::thread> m_sourceThreads;

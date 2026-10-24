@@ -100,7 +100,7 @@ cmake --build build -j"$(nproc)"
 
 - `--decode ffmpeg --hwaccel nvdec` = 硬解 + 显存直通；`--hwaccel none` = FFmpeg 软解。
 - 图片、图片目录、摄像头**永远走 OpenCV**，不受这两个开关影响。
-- 配置文件的 `[source]` 段可写死同样的值（`decode` / `hwaccel` / `open_timeout_ms` / `read_timeout_ms` / `need_host_copy`）。
+- 配置文件的 `[source]` 段可写死同样的值（`decode` / `hwaccel` / `timeout_ms` / `need_host_copy`）。
 
 ## 4. 不开 FFmpeg 时
 

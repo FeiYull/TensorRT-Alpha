@@ -174,18 +174,16 @@ void OpenCVSource::openVideo()
     {
         m_isStream = true;
 
-        // 打开 / 读取超时（毫秒，仅 FFmpeg/GStreamer 后端支持）：
+        // 打开 + 读取超时（毫秒，仅 FFmpeg/GStreamer 后端支持）：
         // 没有它，不可达的流会按后端默认值长时间阻塞（实测 rtsp 默认约 30s）。
+        // 一个值同时驱动 open / read 两个属性（与 FFmpeg 后端的 rw_timeout 同义）。
         std::vector<int> params;
-        if (m_cfg.openTimeoutMs > 0)
+        if (m_cfg.timeoutMs > 0)
         {
             params.push_back(cv::CAP_PROP_OPEN_TIMEOUT_MSEC);
-            params.push_back(m_cfg.openTimeoutMs);
-        }
-        if (m_cfg.readTimeoutMs > 0)
-        {
+            params.push_back(m_cfg.timeoutMs);
             params.push_back(cv::CAP_PROP_READ_TIMEOUT_MSEC);
-            params.push_back(m_cfg.readTimeoutMs);
+            params.push_back(m_cfg.timeoutMs);
         }
 
         if (!m_capture.open(m_cfg.path, cv::CAP_FFMPEG, params))
@@ -196,8 +194,7 @@ void OpenCVSource::openVideo()
                 "rtsp / rtmp / http / https / udp");
         }
         TRT_LOG_INFO("OpenCVSource: opened stream " << m_cfg.path
-                     << " (openTimeout=" << m_cfg.openTimeoutMs
-                     << "ms readTimeout=" << m_cfg.readTimeoutMs << "ms)");
+                     << " (timeout=" << m_cfg.timeoutMs << "ms)");
         return;
     }
 

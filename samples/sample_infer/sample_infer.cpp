@@ -80,8 +80,7 @@ void sample_yolov26_det(const std::string& source)
     p.decode          = "ffmpeg";  // opencv | ffmpeg | auto（图片/目录/摄像头恒走 opencv）
     p.hwaccel         = "auto";    // auto | none | nvdec（仅 decode=ffmpeg 有意义）
     p.need_host_copy  = "auto";    // auto | on | off
-    p.open_timeout_ms  = 5000;     // 仅 URL 流；0 = 不限，-1 = 用 ini
-    p.read_timeout_ms  = 5000;
+    p.timeout_ms       = 5000;     // 仅 URL 流；0 = 不限，-1 = 用 ini
     //   need_host_copy 三个取值的区别：
     //     auto = 只在真有人读主机像素时才拷（draw / show / save 打开就叫"有人"）
     //     on   = 总是拷 —— draw=false 但还想用 frame.image() 时设它

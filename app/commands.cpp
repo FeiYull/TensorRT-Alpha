@@ -254,8 +254,7 @@ int runCommand(const std::vector<std::string>& args)
     const std::string hostCopyName =
         opt.hostCopy.empty() ? modelCfg.getString("source.need_host_copy", "auto")
                              : opt.hostCopy;
-    const int openTimeoutMs = modelCfg.getInt("source.open_timeout_ms", 5000);
-    const int readTimeoutMs = modelCfg.getInt("source.read_timeout_ms", 5000);
+    const int timeoutMs = modelCfg.getInt("source.timeout_ms", 5000);
 
     // 立即解析：拼写错误要在这里就炸，而不是等到打开视频才发现。
     const trt_alpha::datasource::DecodeBackend decodeBackend =
@@ -328,8 +327,7 @@ int runCommand(const std::vector<std::string>& args)
             // 多路源共享同一套解码 / 硬解 / 回拷参数（它们来自同一个 CLI / ini）。
             sc.decodeBackend  = decodeBackend;
             sc.hwAccel        = hwAccel;
-            sc.openTimeoutMs  = openTimeoutMs;
-            sc.readTimeoutMs  = readTimeoutMs;
+            sc.timeoutMs      = timeoutMs;
 
             srcConfigs.push_back(std::move(sc));
         }

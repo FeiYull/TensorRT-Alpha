@@ -103,12 +103,14 @@ struct SourceConfig
     //! Decoder preference for the FFmpeg backend (see HwAccel).
     HwAccel hwAccel = HwAccel::Auto;
 
-    //! Stream open / read timeouts (ms; only effective for URL streams on the
-    //! FFmpeg backend). <= 0 = leave it to the backend default (i.e. wait
-    //! forever; an unreachable stream blocks for a long time). Default 5s:
-    //! enough slack for a slow stream, yet it will not hang forever.
-    int openTimeoutMs = 5000;
-    int readTimeoutMs = 5000;
+    //! Stream open + read timeout (ms; only effective for URL streams).
+    //! One knob drives both: the FFmpeg backend maps it to avformat's rw_timeout
+    //! (open + read combined), the OpenCV backend maps it to
+    //! CAP_PROP_OPEN_TIMEOUT_MSEC and CAP_PROP_READ_TIMEOUT_MSEC. <= 0 = leave it
+    //! to the backend default (i.e. wait forever; an unreachable stream blocks
+    //! for a long time). Default 5s: enough slack for a slow stream, yet it will
+    //! not hang forever.
+    int timeoutMs = 5000;
 
     //! Whether the host copy of every decoded frame is actually needed.
     //!

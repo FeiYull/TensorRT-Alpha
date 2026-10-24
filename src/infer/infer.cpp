@@ -97,12 +97,8 @@ datasource::SourceConfig build_source_config(const InferParams& p,
     cfg.hwAccel = datasource::requireHwAccel(hwaccelName);
 
     // 0 是合法值（= 交给后端默认），所以这里按 >= 0 判"用户给了"，-1 才是用 ini。
-    cfg.openTimeoutMs = (p.open_timeout_ms >= 0)
-                            ? p.open_timeout_ms
-                            : ini.getInt("source.open_timeout_ms", 5000);
-    cfg.readTimeoutMs = (p.read_timeout_ms >= 0)
-                            ? p.read_timeout_ms
-                            : ini.getInt("source.read_timeout_ms", 5000);
+    cfg.timeoutMs = (p.timeout_ms >= 0) ? p.timeout_ms
+                                        : ini.getInt("source.timeout_ms", 5000);
 
     if (!p.source.empty())
     {

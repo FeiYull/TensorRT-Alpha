@@ -263,10 +263,10 @@ void FFmpegSource::Impl::open()
     AVDictionary* opts = nullptr;
     // Network streams: cap the blocking time so an unreachable camera fails fast
     // instead of hanging the source thread forever.
-    if (cfg.openTimeoutMs > 0 && core::Paths::isUrl(cfg.path))
+    if (cfg.timeoutMs > 0 && core::Paths::isUrl(cfg.path))
     {
         av_dict_set(&opts, "rw_timeout",
-                    std::to_string(static_cast<long long>(cfg.openTimeoutMs) * 1000).c_str(), 0);
+                    std::to_string(static_cast<long long>(cfg.timeoutMs) * 1000).c_str(), 0);
         // TCP by default: UDP RTSP loses whole GOPs on a lossy link.
         av_dict_set(&opts, "rtsp_transport", "tcp", 0);
     }

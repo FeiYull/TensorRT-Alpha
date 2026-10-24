@@ -149,8 +149,7 @@ struct SaveOption
 //    * a source: source (image / video / URL) or camera_id (camera), one of them
 //
 //  Optional (empty / -1 / Unset = no override, use the ini):
-//    * source:      decode / hwaccel / need_host_copy / open_timeout_ms /
-//                   read_timeout_ms          (ini `[source]`)
+    //    * source:      decode / hwaccel / need_host_copy / timeout_ms (ini `[source]`)
 //    * load time:   engine / class_names_file / batch_size / dst_h / dst_w
 //    * run time:    conf_thresh / iou_thresh / top_k
 //    * concurrency: workers / max_queue_size / result_queue_size / policy
@@ -199,10 +198,9 @@ struct InferParams
     //! Empty = use the ini `[source] need_host_copy` (which defaults to auto).
     std::string need_host_copy = "auto";
 
-    //! Stream open / read timeouts in ms (URL streams on the FFmpeg backend only).
-    //! <= 0 in the ini = backend default (no limit). -1 here = use the ini.
-    int open_timeout_ms = -1;
-    int read_timeout_ms = -1;
+    //! Stream open + read timeout in ms (URL streams only). <= 0 in the ini =
+    //! backend default (no limit). -1 here = use the ini.
+    int timeout_ms = -1;
 
     // ---- Override the ini (load time) ----
     std::string engine;             // empty = use the ini

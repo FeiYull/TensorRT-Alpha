@@ -103,8 +103,8 @@ propagate it to transitive dependencies.
 
 - `--decode ffmpeg --hwaccel nvdec` = hardware decode + zero-copy device path; `--hwaccel none` = FFmpeg software decode.
 - Images, image directories and cameras **always stay on OpenCV**, regardless of these two flags.
-- The same values can be pinned in the `[source]` INI section (`decode` / `hwaccel` / `open_timeout_ms` /
-  `read_timeout_ms` / `need_host_copy`).
+- The same values can be pinned in the `[source]` INI section (`decode` / `hwaccel` / `timeout_ms` /
+  `need_host_copy`).
 
 ## 4. Without FFmpeg
 
