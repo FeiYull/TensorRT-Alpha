@@ -52,7 +52,7 @@ bool showFrame(const std::string& tag, const trt_alpha::Frame& f)
     if (!raw.empty())   { cv::imshow(tag + " | raw", raw); }
     if (!drawn.empty()) { cv::imshow(tag + " | rendered", drawn); }
 
-    const int key = cv::waitKey(1);
+    const int key = cv::waitKey(0);
     return !(key == 27 || key == 'q');
 }
 
@@ -149,11 +149,14 @@ void sample_yolov26_seg(const std::string& source)
     {
         for (const auto& f : r.frames())
         {
-            for (const auto& s : f.masks())
+            for (const auto& s : f.masks()){
+                cv::Mat maskNet = toMat(s.mask);        // 网络尺寸，始终有值（如 640x640，含 letterbox 黑边）
+                cv::Mat maskOrig = toMat(s.maskOrig);    // 原图尺寸，默认空（见下面坑）
                 std::cout << "  seg label=" << s.box.label
-                          << " conf=" << s.box.confidence
-                          << " mask=" << s.mask.width << "x" << s.mask.height     // 网络尺寸
-                          << " maskOrig=" << s.maskOrig.width << "x" << s.maskOrig.height << "\n";
+                    << " conf=" << s.box.confidence
+                    << " mask=" << s.mask.width << "x" << s.mask.height     // 网络尺寸
+                    << " maskOrig=" << s.maskOrig.width << "x" << s.maskOrig.height << "\n";
+            }
             if (!showFrame("yolov26 seg", f)) { stream.stop(); return; }
         }
     }
@@ -291,9 +294,9 @@ int main(int argc, char** argv)
     // 不接的话进程直接 abort，看不到任何提示。
     try
     {
-        sample_yolov26_det("F:/VideoAlpha/huaxue1.mp4");
+        //sample_yolov26_det("F:/VideoAlpha/huaxue1.mp4");
         //sample_yolov26_cls("F:/VideoAlpha/huaxue1.mp4");
-        //sample_yolov26_seg("F:/VideoAlpha/huaxue1.mp4");
+        sample_yolov26_seg("D:/Data/bus.jpg");
         //sample_yolov26_pose("F:/VideoAlpha/huaxue1.mp4");
         //sample_yolov26_obb("D:/Data/boats.mp4");
         //sample_yolov26_depth("F:/VideoAlpha/korea-night.mp4");

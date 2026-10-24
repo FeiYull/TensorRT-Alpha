@@ -407,11 +407,45 @@ int runCommand(const std::vector<std::string>& args)
             "GPU at show time); use --show, or --render opencv for --save");
     }
 
+    // 渲染后端由工厂决定（opencv / gl / auto）。在 needHostCopy 决策【之前】就建好：
+    // 决策要读它的 acceptsDevicePixels()（GL 走 CUDA-GL interop 能直接显示显存帧，
+    // 那样 --show 就不再强制 host copy）。一个没有 OpenCV 的构建，不带
+    // --save/--show 时不该因为缺后端就抛异常 —— 所以只在确实要 画/存/显示 时才建。
+    std::unique_ptr<trt_alpha::renderer::IRenderer> renderer;
+    if (needRender)
+    {
+        trt_alpha::renderer::RendererConfig rcfg;
+        rcfg.backend = renderBackend;
+        rcfg.numTiles = static_cast<int>(srcConfigs.size());
+        rcfg.jpegQuality = jpegQuality;
+
+        // 把输入源登记给渲染器：save() 会拒绝对这些路径的写入（"输出 == 输入"的
+        // 最后一道闸门，任何数据源都躲不过）。
+        for (const auto& sc : srcConfigs)
+        {
+            if (opt.save && !trt_alpha::core::Paths::isUrl(sc.path))
+            {
+                rcfg.inputPaths.push_back(
+                    trt_alpha::core::Paths::resolve(sc.path).string());
+            }
+        }
+
+        renderer = trt_alpha::renderer::makeRenderer(rcfg);
+
+        // JPEG 质量（只影响 --save 落盘）：1..100，默认 95 = OpenCV 默认值。
+        // 读取在函数前半段（见 jpegQuality），保证配置框不会把该键误标 [unused]。
+        renderer->setJpegQuality(jpegQuality);
+    }
+
     // 主机副本只在渲染器会读的时候才需要。但模型若还不认识 Batch::deviceBuffer，
     // 它照样从主机上传像素 —— 那种情况必须保留副本，否则它读到的是空指针。
-    // 所以 auto 的条件是"要渲染 或 模型不支持设备像素"，只有两条都不成立才真的省。
-    // 多路源共享同一份决策（同一个模型 + 同一渲染开关 + 同一 hostCopy 覆盖）。
-    bool needHost = needRender || !pool.acceptsDevicePixels();
+    // 渲染器若能从显存直接显示（GL 的 CUDA-GL interop），render 这项就不强制拷回；
+    // OpenCV 后端只能 host，render 仍强制。所以 auto 的条件是"要渲染但渲染器不吃
+    // 显存帧 或 模型不支持设备像素"，两项都不成立才真的省。多路源共享同一份决策
+    // （同一个模型 + 同一渲染开关 + 同一 hostCopy 覆盖）。
+    const bool rendererAcceptsDevice =
+        needRender && renderer != nullptr && renderer->acceptsDevicePixels();
+    bool needHost = (needRender && !rendererAcceptsDevice) || !pool.acceptsDevicePixels();
     if (hostCopy == trt_alpha::datasource::HostCopy::On)
     {
         // 显式要求：即使没人读，也留着（源码里要拿 image() 就必须它）。
@@ -422,7 +456,7 @@ int runCommand(const std::vector<std::string>& args)
         // 显式要求不拷，但这两条中任一条成立时"不拷"根本不可能满足：渲染器会
         // 拿着显存指针当主机图像画，模型会在空缓冲上做 H2D。当场报错，绝不
         // 悄悄改回 true —— 那正是 ini 值静默失效。
-        if (needRender)
+        if (needRender && !rendererAcceptsDevice)
         {
             throw std::runtime_error(
                 "run: source.need_host_copy = off cannot be honoured together with "
@@ -465,33 +499,8 @@ int runCommand(const std::vector<std::string>& args)
         sources.push_back(trt_alpha::datasource::makeSource(sc));
     }
 
-    // 渲染后端由工厂决定（opencv / gl / auto）。只在确实要 画/存/显示 时才创建
-    // —— 一个没有 OpenCV 的构建，不带 --save/--show 时不该因为缺后端就抛异常。
-    std::unique_ptr<trt_alpha::renderer::IRenderer> renderer;
-    if (needRender)
-    {
-        trt_alpha::renderer::RendererConfig rcfg;
-        rcfg.backend = renderBackend;
-        rcfg.numTiles = static_cast<int>(srcConfigs.size());
-        rcfg.jpegQuality = jpegQuality;
-
-        // 把输入源登记给渲染器：save() 会拒绝对这些路径的写入（"输出 == 输入"的
-        // 最后一道闸门，任何数据源都躲不过）。
-        for (const auto& sc : srcConfigs)
-        {
-            if (opt.save && !trt_alpha::core::Paths::isUrl(sc.path))
-            {
-                rcfg.inputPaths.push_back(
-                    trt_alpha::core::Paths::resolve(sc.path).string());
-            }
-        }
-
-        renderer = trt_alpha::renderer::makeRenderer(rcfg);
-
-        // JPEG 质量（只影响 --save 落盘）：1..100，默认 95 = OpenCV 默认值。
-        // 读取在函数前半段（见 jpegQuality），保证配置框不会把该键误标 [unused]。
-        renderer->setJpegQuality(jpegQuality);
-    }
+    // 渲染器已在上面的 needHostCopy 决策之前创建（见 acceptsDevicePixels 的
+    // 决策点），这里不再重复。
 
     // 队列满时策略：ini 的 pool.queue_full_policy 显式指定 > 按源类型自动。
     //   实时源（摄像头 / RTSP / HTTP 流）→ drop_oldest：宁可丢旧帧，也不让延迟累积

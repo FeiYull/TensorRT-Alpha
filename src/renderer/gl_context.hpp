@@ -8,9 +8,14 @@
 //  Single-threaded by contract: the render thread owns it (Pipeline forces
 //  render_threads = 1 whenever --show is on), so there is no locking here.
 //
-//  v1 uploads HOST BGR8 frames via glTexSubImage2D (a device -> texture path via
-//  CUDA-GL interop is a follow-up; it needs `IRenderer::acceptsDevicePixels` to
-//  let the host-copy policy keep frames on the device).
+//  Frames reach the texture through one of two paths:
+//    * host BGR8  -> glTexSubImage2D (GL expands RGB -> RGBA, alpha = 1.0)
+//    * device BGR8 -> CUDA-GL interop: a kernel writes into a mapped PBO
+//      (pixel-unpack buffer), then glTexSubImage2D DMAs the PBO into the texture
+//      -- both on the GPU, no D2H copy.
+//  Both store (B, G, R, alpha) in an RGBA8 texture so a single `.bgr` fragment
+//  shader serves both. The device path only engages when the host-copy policy
+//  kept frames on the device (see IRenderer::acceptsDevicePixels).
 // =============================================================================
 #pragma once
 
@@ -47,8 +52,21 @@ public:
     //! instead of the (frozen) last frame. Idempotent.
     void markNoSignal(int tile);
 
+    //! Index of the zoomed tile, or -1 while the full grid is shown. The render
+    //! loop reads this so it only emits primitives for the zoomed source; clicks
+    //! inside the window flip it (see the mouse callback registered in init()).
+    [[nodiscard]] int focusedTile() const;
+
     //! Upload a tightly-packed BGR8 host frame into tile `tile`'s texture.
     void uploadFrame(int tile, const std::uint8_t* data, int w, int h, int stride);
+
+    //! Upload a tightly-packed BGR8 DEVICE frame into tile `tile`'s texture via
+    //! CUDA-GL interop (zero copy): a kernel expands BGR8 -> RGBA8 into a mapped
+    //! PBO (pixel-unpack buffer), then glTexSubImage2D DMAs the PBO into the
+    //! texture -- no D2H. `devData` is a device pointer with `stride` bytes per
+    //! row (== w * 3 for the decoder's tight layout). The PBO is registered /
+    //! mapped / unmapped lazily and cached across frames.
+    void uploadFrameDevice(int tile, const std::uint8_t* devData, int w, int h, int stride);
 
     //! Begin a new frame: poll events, refresh the letterbox layout from the
     //! current framebuffer, and clear the primitive batch buffers. Call before

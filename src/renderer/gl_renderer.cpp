@@ -397,31 +397,56 @@ void GLRenderer::show(const core::BatchResult& result,
     {
         return;
     }
-    if (v.space != core::MemorySpace::Host)
-    {
-        // v1 uploads host frames; a device -> texture path (CUDA-GL interop) is
-        // a follow-up and needs IRenderer::acceptsDevicePixels.
-        TRT_LOG_WARN("GLRenderer: device-resident frame on source " << tile
-                     << " not displayed (v1 uploads host frames only)");
-        return;
-    }
 
-    m_impl->ctx.uploadFrame(tile, v.data, v.width, v.height, v.stride);
+    if (v.space == core::MemorySpace::Device)
+    {
+        // Zero-copy path: the frame never left the card, so upload it straight
+        // into the GL texture through CUDA-GL interop (no D2H, no glTexSubImage).
+        m_impl->ctx.uploadFrameDevice(tile, v.data, v.width, v.height, v.stride);
+    }
+    else
+    {
+        m_impl->ctx.uploadFrame(tile, v.data, v.width, v.height, v.stride);
+    }
     m_impl->ctx.beginFrame();
 
-    for (const Prim& p : m_impl->scene[static_cast<std::size_t>(tile)])
-    {
-        switch (p.kind)
+    // beginFrame() just cleared the shared primitive batch, so EVERY visible
+    // tile must re-emit its boxes/labels this frame. show() receives only one
+    // source per call; emitting just `tile` would drop the other tiles' overlays
+    // every frame (boxes flicker / vanish on all but the most recently popped
+    // source). scene[] is the persistent per-tile primitive store, so we only
+    // re-emit here -- no re-run of drawResult() needed.
+    const int focus = m_impl->ctx.focusedTile();
+    const auto emitTile = [&](int t) {
+        for (const Prim& p : m_impl->scene[static_cast<std::size_t>(t)])
         {
-        case Kind::Rect:
-            m_impl->ctx.drawRect(tile, p.x0, p.y0, p.x1, p.y1, p.r, p.g, p.b);
-            break;
-        case Kind::Line:
-            m_impl->ctx.drawLine(tile, p.x0, p.y0, p.x1, p.y1, p.r, p.g, p.b);
-            break;
-        case Kind::Text:
-            m_impl->ctx.drawText(tile, p.x0, p.y0, p.text, p.r, p.g, p.b);
-            break;
+            switch (p.kind)
+            {
+            case Kind::Rect:
+                m_impl->ctx.drawRect(t, p.x0, p.y0, p.x1, p.y1, p.r, p.g, p.b);
+                break;
+            case Kind::Line:
+                m_impl->ctx.drawLine(t, p.x0, p.y0, p.x1, p.y1, p.r, p.g, p.b);
+                break;
+            case Kind::Text:
+                m_impl->ctx.drawText(t, p.x0, p.y0, p.text, p.r, p.g, p.b);
+                break;
+            }
+        }
+    };
+
+    if (focus >= 0)
+    {
+        // Zoomed: only the focused source. The hidden tiles' layouts are zeroed,
+        // so emitting them would draw their overlays at a bogus scale on top of
+        // the zoomed frame.
+        emitTile(focus);
+    }
+    else
+    {
+        for (int t = 0; t < static_cast<int>(m_impl->scene.size()); ++t)
+        {
+            emitTile(t);
         }
     }
 
@@ -453,6 +478,14 @@ void GLRenderer::pump() const
     }
     m_impl->ctx.beginFrame();
     m_impl->ctx.present();
+}
+
+bool GLRenderer::acceptsDevicePixels() const noexcept
+{
+    // The GL backend uploads frames through CUDA-GL interop, so it can display
+    // device-resident frames without a D2H copy. Keeps the host-copy policy from
+    // forcing needHostCopy on just because --show is on.
+    return true;
 }
 
 }  // namespace trt_alpha::renderer

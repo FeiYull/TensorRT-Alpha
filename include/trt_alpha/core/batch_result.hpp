@@ -54,6 +54,16 @@ struct BatchResult
     std::vector<BufferView> views;               //!< view of each image
     int validCount = 0;                          //!< number of valid frames (<= views.size())
 
+    //! The very same pixels resident in device memory, when the source skipped
+    //! its host copy (needHostCopy == false on an NVDEC source). Mirrors
+    //! Batch::deviceBuffer: `buffer` stays null and `views` describes THIS block
+    //! (space == MemorySpace::Device). A renderer that can display device frames
+    //! (GL via CUDA-GL interop) reads them straight from here; a renderer that
+    //! cannot must have forced needHostCopy on and never sees this path.
+    //! Kept alive across inference on purpose: InferencePool::runBatch hands it
+    //! over so `views[i].data` stays valid until the result is dropped.
+    std::shared_ptr<Buffer> deviceBuffer;
+
     //! Per-frame "source stem" (extension / index stripped); length == validCount.
     //! Files are named after it when saved (image source = original filename);
     //! when empty the renderer falls back to frame_<index>.
@@ -89,10 +99,12 @@ struct BatchResult
     //! actual GPU work is counted inside this total.
     double inferenceMs = 0.0;
 
-    //! Whether the result is empty.
+    //! Whether the result is empty. A device-only result (host copy skipped) has
+    //! `buffer == nullptr` but `deviceBuffer != nullptr`, so both owners are
+    //! checked -- the same rule Batch::empty() uses.
     [[nodiscard]] bool empty() const noexcept
     {
-        return buffer == nullptr || views.empty();
+        return views.empty() || (buffer == nullptr && deviceBuffer == nullptr);
     }
 
     //! Batch size.

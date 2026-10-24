@@ -356,6 +356,12 @@ BatchResult InferencePool::runBatch(std::size_t workerIndex, Batch batch)
     result.views = std::move(batch.views);
     result.validCount = batch.validCount;
     result.frameNames = std::move(batch.frameNames);
+    // Keep the device pixels alive across inference: when the source skipped its
+    // host copy (needHostCopy == false), `buffer` is null and only `deviceBuffer`
+    // owns the pixels `views` describes. Dropping it here would leave the renderer
+    // a dangling device pointer. (The model has already consumed the pixels
+    // through setBatch/preprocess by the time we reach this point.)
+    result.deviceBuffer = std::move(batch.deviceBuffer);
     // Hand the completion mark to the renderer as well: drawResult() writes into
     // views[i], which is the same host buffer the async copy filled.
     result.hostReady = std::move(batch.hostReady);

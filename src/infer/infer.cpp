@@ -515,13 +515,24 @@ Stream Infer::async()
 
     const bool devicePixels = m_impl->pool->acceptsDevicePixels();
 
+    // 渲染器若需要，提前建好（下面那个惰性创建会因已建而跳过）：决策 needHostCopy
+    // 要读它的 acceptsDevicePixels()。GL 后端走 CUDA-GL interop，能直接显示显存帧，
+    // render 就不再强制 host copy；OpenCV 后端只能 host，render 仍强制拷回。
+    if (render && !m_impl->renderer)
+    {
+        m_impl->renderer = renderer::makeRenderer(renderer::RendererConfig{});
+    }
+    const bool rendererAcceptsDevice =
+        render && m_impl->renderer->acceptsDevicePixels();
+
     // Same rule as the CLI run command (see SourceConfig::needHostCopy): the host
     // copy exists so the renderer can draw into it. With draw / show / save all
     // off nothing reads host pixels, and a hardware decoder can leave them in
     // device memory -- 0.475 ms of a 1.70 ms 1080p frame. A model that still
     // uploads from the host needs the copy regardless, hence the pool check.
-    // need_host_copy turns the two explicit overrides on top of that.
-    srcCfg.needHostCopy = render || !devicePixels;
+    // A device-capable renderer (GL) removes the render term. need_host_copy turns
+    // the two explicit overrides on top of that.
+    srcCfg.needHostCopy = (render && !rendererAcceptsDevice) || !devicePixels;
     switch (m_impl->host_mode)
     {
     case datasource::HostCopy::On:
@@ -531,7 +542,7 @@ Stream Infer::async()
     case datasource::HostCopy::Off:
         // 这两条中任一条成立时"不拷"根本不可能满足：渲染器会把显存指针当主机
         // 图像画，模型会在空缓冲上做 H2D。报错，绝不悄悄改回 true。
-        if (render)
+        if (render && !rendererAcceptsDevice)
         {
             throw std::runtime_error(
                 "InferParams: need_host_copy = off cannot be honoured together with "

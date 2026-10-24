@@ -120,6 +120,14 @@ public:
         (void)quality;
     }
 
+    //! Whether this backend can consume frames that live in DEVICE memory
+    //! (MemorySpace::Device), i.e. display them without a D2H copy. Only a GPU
+    //! backend with CUDA-GL interop returns true; the OpenCV backend (and any
+    //! host-only backend) keeps the default false. The host-copy policy reads
+    //! this: when a device-capable renderer is attached, `render` no longer
+    //! forces needHostCopy, so a hardware decoder can leave frames on the GPU.
+    virtual bool acceptsDevicePixels() const noexcept { return false; }
+
 protected:
     IRenderer() = default;
 };

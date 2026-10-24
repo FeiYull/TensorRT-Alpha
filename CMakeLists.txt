@@ -133,6 +133,7 @@ if(NOT TRT_ALPHA_WITH_OPENCV)
 endif()
 if(NOT TRT_ALPHA_WITH_GL)
   list(FILTER TRT_ALPHA_SOURCES EXCLUDE REGEX "/gl_(renderer|context)\\.cpp$")
+  list(FILTER TRT_ALPHA_SOURCES EXCLUDE REGEX "/bgr_to_rgba\\.cu$")
 endif()
 
 add_library(trt_alpha_core STATIC ${TRT_ALPHA_SOURCES})

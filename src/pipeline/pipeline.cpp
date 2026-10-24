@@ -12,7 +12,6 @@
 #include "trt_alpha/renderer/i_renderer.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -518,22 +517,15 @@ void Pipeline::renderLoop()
         }
     }
 
-    // 所有源结束、结果队列已关闭。若窗口还开着（--show），保持它显示 NO SIGNAL
-    // 直到用户关闭 —— 多路监控里"先播完的路"停在 NO SIGNAL 而不是冻结在最后
-    // 一帧，程序也不会在视频一结束就消失。
+    // 所有源结束、结果队列已关闭。窗口（若开着）直接关闭并释放 —— 用户要求
+    // "跑完所有视频自动关闭"，不再常驻等手动关闭。NO SIGNAL 的中间态显示由上面
+    // 每帧 pop 后的 notifyEndedSources() 保证：先播完的路停在 NO SIGNAL，直到
+    // 全部播完、窗口随之关闭。渲染线程退出后，窗口随 renderer 析构（glfwDestroyWindow）
+    // 一起释放。
     if (m_cfg.showEnabled && m_cfg.renderer != nullptr)
     {
         notifyEndedSources();
-        TRT_LOG_INFO("Pipeline: all sources ended; keeping the window open until closed");
-        while (!m_stopRequested.load() && !m_cfg.renderer->shouldClose())
-        {
-            m_cfg.renderer->pump();
-            std::this_thread::sleep_for(std::chrono::milliseconds(16));
-        }
-        if (m_cfg.renderer->shouldClose())
-        {
-            TRT_LOG_INFO("Pipeline: window closed after end of stream");
-        }
+        TRT_LOG_INFO("Pipeline: all sources ended; closing the window");
     }
 
     if (m_processedQueue != nullptr)

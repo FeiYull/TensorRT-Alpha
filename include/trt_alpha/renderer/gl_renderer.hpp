@@ -3,19 +3,22 @@
 // -----------------------------------------------------------------------------
 //  GLRenderer -- the OpenGL implementation of IRenderer (GPU display).
 //
-//  What it does in v1:
 //    * drawResult() collects boxes / labels / keypoints as primitives (in frame
 //      pixel coordinates); it does NOT write into result.views (the pixels stay
 //      raw, so no renderedBuffer is produced).
-//    * show() uploads the host frame of the result's source and draws its tile
-//      plus the collected primitives into a grid window (GPU rasterization), one
-//      tile per source (sourceId -> tile).
+//    * show() uploads the frame of the result's source and draws its tile plus
+//      the collected primitives into a grid window (GPU rasterization), one tile
+//      per source (sourceId -> tile).
 //    * save() is NOT implemented (disk output is a follow-up: nvEnc). The CLI
 //      rejects `--render gl --save` up front, so this only trips on misuse.
 //
-//  v1 uploads HOST frames only (glTexSubImage2D). A device -> texture path via
-//  CUDA-GL interop is the next step and needs IRenderer::acceptsDevicePixels()
-//  so the host-copy policy can keep NVDEC frames on the device.
+//  Frames are uploaded by whichever path their memory space dictates:
+//    * HOST   frames -> glTexSubImage2D (BGR8 -> RGBA8 texture)
+//    * DEVICE frames -> CUDA-GL interop (a kernel expands BGR8 -> RGBA8 into a
+//      mapped PBO, then glTexSubImage2D DMAs it into the texture; no D2H). This
+//      is what acceptsDevicePixels() == true enables: the host-copy policy can
+//      keep NVDEC frames on the device because the GL backend can display them
+//      directly.
 //
 //  Thread safety: single render thread owns the GL context (Pipeline forces
 //  render_threads = 1 when --show is on).
@@ -51,6 +54,7 @@ public:
     bool shouldClose() const noexcept override;
     void onSourceEnded(int sourceId) override;
     void pump() const override;
+    bool acceptsDevicePixels() const noexcept override;
 
 private:
     struct Impl;

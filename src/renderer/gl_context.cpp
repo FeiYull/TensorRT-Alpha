@@ -6,10 +6,14 @@
 #define GLFW_INCLUDE_NONE
 #include "gl_context.hpp"
 
+#include "bgr_to_rgba.hpp"
 #include "gl_loader.hpp"
 #include "trt_alpha/core/logger.hpp"
 
 #include <GLFW/glfw3.h>
+
+#include <cuda_gl_interop.h>
+#include <cuda_runtime.h>
 
 #include <algorithm>
 #include <cmath>
@@ -127,6 +131,12 @@ struct GLContext::Impl
         int frameW = 0, frameH = 0; //!< last uploaded frame size
         float offX = 0, offY = 0, scale = 1; //!< letterbox layout (framebuffer px)
         bool noSignal = false;    //!< source ended -> draw a "NO SIGNAL" placeholder
+
+        // ---- CUDA-GL interop (device upload path only) ----
+        GLuint pbo = 0;                          //!< GL_PIXEL_UNPACK_BUFFER staging
+        int pboW = 0, pboH = 0;                  //!< PBO size (0 = not allocated)
+        cudaGraphicsResource* cuRes = nullptr;   //!< registered PBO
+        int cuW = 0, cuH = 0;                    //!< PBO size at registration (0 = none)
     };
     std::vector<Tile> tiles;
 
@@ -148,9 +158,92 @@ struct GLContext::Impl
     int fbw = 0, fbh = 0;
     int cols = 1, rows = 1;
 
+    //! Zoomed tile (-1 = grid). A click on a tile zooms it to fill the window;
+    //! a second click (anywhere) returns to the grid. Owned here because the
+    //! GLFW mouse callback fires inside GLContext, not the renderer.
+    int focusedTile = -1;
+
     bool warnedNonTight = false;
 
+    //! Handle a left click in WINDOW coordinates (GLFW: top-left origin, y down).
+    //! Zooms the clicked tile, or drops back to the grid when already zoomed.
+    void handleClick(double winX, double winY)
+    {
+        if (fbw <= 0 || fbh <= 0)
+        {
+            return;
+        }
+
+        // Window size may differ from the framebuffer (HiDPI), so rescale the
+        // cursor into framebuffer space first.
+        int winW = 0, winH = 0;
+        glfwGetWindowSize(window, &winW, &winH);
+        if (winW <= 0 || winH <= 0) { winW = fbw; winH = fbh; }
+        const double fx = winX * static_cast<double>(fbw) / static_cast<double>(winW);
+        // No Y flip: both the GLFW cursor and the layout's offY grow downward
+        // from the top (toNdc maps sy=0 -> top, sy=fbh -> bottom). Flipping here
+        // would hit the vertically-mirrored tile (click row 0 -> row rows-1).
+        const double fy = winY * static_cast<double>(fbh) / static_cast<double>(winH);
+
+        if (focusedTile >= 0)
+        {
+            focusedTile = -1;   // any click while zoomed returns to the grid
+            return;
+        }
+
+        for (int i = 0; i < numTiles; ++i)
+        {
+            const Tile& t = tiles[static_cast<std::size_t>(i)];
+            if (t.frameW <= 0 || t.frameH <= 0)
+            {
+                continue;
+            }
+            const double x0 = t.offX, y0 = t.offY;
+            const double x1 = t.offX + static_cast<double>(t.frameW) * t.scale;
+            const double y1 = t.offY + static_cast<double>(t.frameH) * t.scale;
+            if (fx >= x0 && fx < x1 && fy >= y0 && fy < y1)
+            {
+                focusedTile = i;
+                return;
+            }
+        }
+    }
+
+    // CUDA-GL interop stream (created lazily on the first device upload). One
+    // non-blocking stream serves every tile: map -> kernel -> unmap are all
+    // ordered on it, so the unmapped texture is GL-ready without an explicit sync.
+    cudaStream_t interopStream = nullptr;
+    bool interopStreamReady = false;
+
     // ---- GL helpers ----
+    //! Ensure tile `t` has an RGBA8 texture sized w x h, allocating / reallocating
+    //! as needed. Returns true if the storage was (re)allocated this call.
+    bool ensureVideoTexture(Tile& t, int w, int h)
+    {
+        const bool realloc = (t.texW != w || t.texH != h);
+        if (t.tex == 0)
+        {
+            glGenTextures(1, &t.tex);
+            glBindTexture(GL_TEXTURE_2D, t.tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+        else
+        {
+            glBindTexture(GL_TEXTURE_2D, t.tex);
+        }
+        if (realloc)
+        {
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            t.texW = w;
+            t.texH = h;
+        }
+        return realloc;
+    }
     GLuint compileShader(GLenum type, const char* src, bool* okOut)
     {
         GLuint s = glCreateShader(type);
@@ -235,6 +328,35 @@ struct GLContext::Impl
     void ensureLayout(int w, int h)
     {
         fbw = w; fbh = h;
+
+        // Single-tile zoom: only the focused tile gets a layout (letterboxed to
+        // the full window). The rest are zeroed out so they neither rasterize
+        // (present() skips them) nor turn primitives into a bogus-scale draw.
+        if (focusedTile >= 0 && focusedTile < numTiles)
+        {
+            for (int i = 0; i < numTiles; ++i)
+            {
+                tiles[static_cast<std::size_t>(i)].offX = 0;
+                tiles[static_cast<std::size_t>(i)].offY = 0;
+                tiles[static_cast<std::size_t>(i)].scale = 0;
+            }
+            Tile& t = tiles[static_cast<std::size_t>(focusedTile)];
+            int fw = t.frameW, fh = t.frameH;
+            if (fw <= 0 || fh <= 0) { fw = 1; fh = 1; }
+
+            const float margin = 8.0f;
+            const float cw = static_cast<float>(w) - 2 * margin;
+            const float ch = static_cast<float>(h) - 2 * margin;
+            const float s = std::min(cw / static_cast<float>(fw),
+                                     ch / static_cast<float>(fh));
+            const float dw = static_cast<float>(fw) * s;
+            const float dh = static_cast<float>(fh) * s;
+            t.offX = (static_cast<float>(w) - dw) * 0.5f;
+            t.offY = (static_cast<float>(h) - dh) * 0.5f;
+            t.scale = s;
+            return;
+        }
+
         cols = std::max(1, static_cast<int>(std::ceil(std::sqrt(static_cast<double>(numTiles)))));
         rows = std::max(1, (numTiles + cols - 1) / cols);
 
@@ -339,6 +461,65 @@ struct GLContext::Impl
         drawTextFramebuffer((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, "NO SIGNAL",
                             GLContext::kGlyphCellPx * 3, 220, 60, 60);
     }
+
+    // ---- CUDA-GL interop helpers ----
+    //! Create the interop stream once. Fails loudly (and returns false) so the
+    //! caller can fall back instead of silently skipping the frame.
+    bool ensureInteropStream()
+    {
+        if (interopStreamReady)
+        {
+            return true;
+        }
+        const cudaError_t e =
+            cudaStreamCreateWithFlags(&interopStream, cudaStreamNonBlocking);
+        if (e != cudaSuccess)
+        {
+            TRT_LOG_ERROR("GLContext: cudaStreamCreate failed: " << cudaGetErrorString(e));
+            return false;
+        }
+        interopStreamReady = true;
+        return true;
+    }
+
+    //! Drop the CUDA side of a tile: unregister the mapped PBO. Called before a
+    //! PBO reallocation and at teardown. A stream sync first guarantees no kernel
+    //! is still writing the buffer.
+    void releaseTileInterop(Tile& t)
+    {
+        if (t.cuRes == nullptr)
+        {
+            return;
+        }
+        if (interopStream != nullptr)
+        {
+            cudaStreamSynchronize(interopStream);
+        }
+        cudaGraphicsUnregisterResource(t.cuRes);
+        t.cuRes = nullptr;
+        t.cuW = 0;
+        t.cuH = 0;
+    }
+
+    //! Ensure tile `t` has a PBO sized w x h (RGBA8 = w * h * 4 bytes), allocating
+    //! or reallocating as needed.
+    void ensurePbo(Tile& t, int w, int h)
+    {
+        if (t.pbo == 0)
+        {
+            glGenBuffers(1, &t.pbo);
+        }
+        if (t.pboW != w || t.pboH != h)
+        {
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, t.pbo);
+            glBufferData(GL_PIXEL_UNPACK_BUFFER,
+                         static_cast<trt_gl::GLsizeiptrT>(w) * h * 4,
+                         nullptr, GL_STREAM_DRAW);
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            t.pboW = w;
+            t.pboH = h;
+        }
+    }
 };
 
 GLContext::GLContext(int numTiles)
@@ -350,6 +531,19 @@ GLContext::GLContext(int numTiles)
 
 GLContext::~GLContext()
 {
+    // Release the CUDA-GL interop FIRST: the registered PBOs live under the
+    // window's GL context, so they must be unregistered before that context goes
+    // away. The stream is a pure CUDA resource and would leak if not freed here.
+    for (auto& t : m_impl->tiles)
+    {
+        m_impl->releaseTileInterop(t);
+    }
+    if (m_impl->interopStream != nullptr)
+    {
+        cudaStreamDestroy(m_impl->interopStream);
+        m_impl->interopStream = nullptr;
+    }
+
     // The GL objects (textures / buffers / programs) all live under the window's
     // context, so destroying the window frees them. This destructor runs on the
     // thread that owns the GLRenderer (the main thread), while the context was
@@ -387,6 +581,26 @@ bool GLContext::init(const std::string& title)
     }
     glfwMakeContextCurrent(m_impl->window);
     glfwSwapInterval(0);
+
+    // Click-to-zoom: a left click zooms the tile under the cursor; a second
+    // click returns to the grid. The callback forwards window coordinates to
+    // Impl::handleClick (which flips Y and hit-tests the current layout).
+    glfwSetWindowUserPointer(m_impl->window, this);
+    glfwSetMouseButtonCallback(
+        m_impl->window,
+        [](GLFWwindow* w, int button, int action, int /*mods*/) {
+            if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+            {
+                auto* self = static_cast<GLContext*>(glfwGetWindowUserPointer(w));
+                if (self == nullptr)
+                {
+                    return;
+                }
+                double mx = 0, my = 0;
+                glfwGetCursorPos(w, &mx, &my);
+                self->m_impl->handleClick(mx, my);
+            }
+        });
 
     const char* missing = nullptr;
     if (!trt_gl::load(&missing))
@@ -476,6 +690,11 @@ void GLContext::markNoSignal(int tile)
     m_impl->tiles[static_cast<std::size_t>(tile)].noSignal = true;
 }
 
+int GLContext::focusedTile() const
+{
+    return m_impl->focusedTile;
+}
+
 void GLContext::uploadFrame(int tile, const std::uint8_t* data, int w, int h, int stride)
 {
     if (tile < 0 || tile >= m_impl->numTiles || data == nullptr || w <= 0 || h <= 0)
@@ -491,36 +710,100 @@ void GLContext::uploadFrame(int tile, const std::uint8_t* data, int w, int h, in
                      << "; the GL backend expects tightly-packed BGR8 and may skew");
     }
 
-    if (t.tex == 0)
-    {
-        glGenTextures(1, &t.tex);
-        glBindTexture(GL_TEXTURE_2D, t.tex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-    else
-    {
-        glBindTexture(GL_TEXTURE_2D, t.tex);
-    }
+    m_impl->ensureVideoTexture(t, w, h);
 
-    if (t.texW != w || t.texH != h)
-    {
-        // (re)allocate storage when the stream resolution changes
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-        t.texW = w;
-        t.texH = h;
-    }
-
-    // The bytes are BGR8; GL is told they are RGB, and the video fragment shader
-    // swaps .bgr back to true RGB.
+    // The bytes are BGR8; GL is told they are RGB (3 bytes/pixel) and expands
+    // alpha to 1.0 into the RGBA8 texture. The video fragment shader swaps .bgr
+    // back to true RGB. The device path below stores the same (B, G, R, 255)
+    // texels, so one shader serves both.
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, data);
     t.frameW = w;
     t.frameH = h;
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void GLContext::uploadFrameDevice(int tile, const std::uint8_t* devData, int w, int h, int stride)
+{
+    if (tile < 0 || tile >= m_impl->numTiles || devData == nullptr || w <= 0 || h <= 0)
+    {
+        return;
+    }
+    Impl::Tile& t = m_impl->tiles[static_cast<std::size_t>(tile)];
+
+    if (!m_impl->ensureInteropStream())
+    {
+        return;
+    }
+
+    // The PBO must have storage before it can be registered; if it is about to
+    // be (re)allocated, the old registration must go first -- it refers to the
+    // buffer object that glBufferData is about to replace.
+    const bool realloc = (t.pboW != w || t.pboH != h);
+    if (realloc && t.cuRes != nullptr)
+    {
+        m_impl->releaseTileInterop(t);
+    }
+    m_impl->ensurePbo(t, w, h);
+
+    if (t.cuRes == nullptr)
+    {
+        const cudaError_t e = cudaGraphicsGLRegisterBuffer(
+            &t.cuRes, t.pbo, cudaGraphicsRegisterFlagsWriteDiscard);
+        if (e != cudaSuccess)
+        {
+            TRT_LOG_ERROR("GLContext: cudaGraphicsGLRegisterBuffer failed: "
+                          << cudaGetErrorString(e));
+            return;
+        }
+        t.cuW = w;
+        t.cuH = h;
+    }
+
+    cudaError_t e = cudaGraphicsMapResources(1, &t.cuRes, m_impl->interopStream);
+    if (e != cudaSuccess)
+    {
+        TRT_LOG_ERROR("GLContext: cudaGraphicsMapResources failed: "
+                      << cudaGetErrorString(e));
+        return;
+    }
+
+    // A buffer resource maps to a plain writable device pointer -- no surface
+    // object, no read-only cudaArray. This is the interop path that has always
+    // worked across drivers/architectures.
+    void* pboPtr = nullptr;
+    std::size_t pboSize = 0;
+    e = cudaGraphicsResourceGetMappedPointer(&pboPtr, &pboSize, t.cuRes);
+    if (e != cudaSuccess)
+    {
+        TRT_LOG_ERROR("GLContext: cudaGraphicsResourceGetMappedPointer failed: "
+                      << cudaGetErrorString(e));
+        cudaGraphicsUnmapResources(1, &t.cuRes, m_impl->interopStream);
+        return;
+    }
+
+    e = bgr8ToRgba(m_impl->interopStream, devData, stride,
+                   static_cast<std::uint8_t*>(pboPtr), w, h);
+    if (e != cudaSuccess)
+    {
+        TRT_LOG_ERROR("GLContext: bgr8ToRgba failed: " << cudaGetErrorString(e));
+    }
+
+    // Same stream as the kernel: the unmap's bookkeeping is ordered after it, so
+    // the PBO is GL-ready for the glTexSubImage2D below -- no explicit sync.
+    cudaGraphicsUnmapResources(1, &t.cuRes, m_impl->interopStream);
+
+    // DMA the PBO into the texture (still on the GPU). The texture is bound by
+    // ensureVideoTexture below.
+    m_impl->ensureVideoTexture(t, w, h);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, t.pbo);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    t.frameW = w;
+    t.frameH = h;
 }
 
 void GLContext::drawRect(int tile, float x0, float y0, float x1, float y1,
@@ -657,6 +940,11 @@ void GLContext::present()
     glBindBuffer(GL_ARRAY_BUFFER, m_impl->vboVideo);
     for (int i = 0; i < m_impl->numTiles; ++i)
     {
+        // Zoomed: rasterize only the focused tile (its layout fills the window).
+        if (m_impl->focusedTile >= 0 && i != m_impl->focusedTile)
+        {
+            continue;
+        }
         Impl::Tile& t = m_impl->tiles[static_cast<std::size_t>(i)];
         if (t.noSignal)
         {
