@@ -482,10 +482,14 @@ void GLRenderer::pump() const
 
 bool GLRenderer::acceptsDevicePixels() const noexcept
 {
-    // The GL backend uploads frames through CUDA-GL interop, so it can display
-    // device-resident frames without a D2H copy. Keeps the host-copy policy from
-    // forcing needHostCopy on just because --show is on.
-    return true;
+    // The GL backend can display device-resident frames through CUDA-GL interop,
+    // but only where CUDA can actually reach the GL context. On software
+    // rasterizers (WSL/WSLg hands out Mesa's llvmpipe) interop is impossible, so
+    // probe it (on a throwaway hidden context) and let the host-copy policy fall
+    // back to a D2H copy when it is unavailable. The render thread's own context
+    // is untouched: probing must not create it here, or WGL would bind interop
+    // to this thread and deadlock the render thread.
+    return GLContext::probeInterop();
 }
 
 }  // namespace trt_alpha::renderer

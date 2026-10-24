@@ -695,6 +695,46 @@ int GLContext::focusedTile() const
     return m_impl->focusedTile;
 }
 
+bool GLContext::probeInterop()
+{
+    // Build a throwaway HIDDEN window + GL context on the calling thread, ask
+    // CUDA whether it can reach it, then tear everything down. This runs on the
+    // host-copy policy's thread BEFORE the render thread exists, so it must NOT
+    // reuse (or leave behind) the renderer's context: WGL on Windows ties
+    // CUDA-GL interop to the thread that created the context, and handing that
+    // context to the render thread deadlocks on the first register/map.
+    if (!glfwInit())
+    {
+        TRT_LOG_ERROR("GLContext: probe glfwInit failed");
+        return false;
+    }
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);   // no flash
+
+    GLFWwindow* probe = glfwCreateWindow(1, 1, "trt_alpha-probe", nullptr, nullptr);
+    if (probe == nullptr)
+    {
+        TRT_LOG_ERROR("GLContext: probe could not create a GL 3.3 context");
+        glfwTerminate();
+        return false;
+    }
+    glfwMakeContextCurrent(probe);
+
+    unsigned int glDevCount = 0;
+    const bool ok = (cudaGLGetDevices(&glDevCount, nullptr, 0, cudaGLDeviceListAll) ==
+                         cudaSuccess &&
+                     glDevCount > 0);
+    TRT_LOG_INFO("GLContext: CUDA-GL interop "
+                 << (ok ? "available" : "UNAVAILABLE (host copy)"));
+
+    glfwMakeContextCurrent(nullptr);
+    glfwDestroyWindow(probe);
+    glfwTerminate();
+    return ok;
+}
+
 void GLContext::uploadFrame(int tile, const std::uint8_t* data, int w, int h, int stride)
 {
     if (tile < 0 || tile >= m_impl->numTiles || data == nullptr || w <= 0 || h <= 0)

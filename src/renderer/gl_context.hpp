@@ -57,6 +57,15 @@ public:
     //! inside the window flip it (see the mouse callback registered in init()).
     [[nodiscard]] int focusedTile() const;
 
+    //! Probe whether CUDA-GL interop is possible on this machine, using a
+    //! throwaway HIDDEN GL context that is destroyed before returning. It must
+    //! NOT reuse the render thread's context: handing a context across threads
+    //! breaks CUDA-GL interop on Windows (WGL ties interop to the creating
+    //! thread's context). False on software rasterizers (WSL/WSLg hands out
+    //! Mesa's llvmpipe), where the device upload path is impossible and the
+    //! host-copy policy must fall back to a D2H copy + glTexSubImage2D upload.
+    static bool probeInterop();
+
     //! Upload a tightly-packed BGR8 host frame into tile `tile`'s texture.
     void uploadFrame(int tile, const std::uint8_t* data, int w, int h, int stride);
 
