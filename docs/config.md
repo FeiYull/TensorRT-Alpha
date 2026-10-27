@@ -35,7 +35,7 @@ API call / command-line flags   >   configs/<model>.ini   >   configs/base.ini
 | Key | Default | Meaning |
 |---|---|---|
 | `scale` | `255.0` | Normalization divisor. Honoured by every model |
-| `mean` | `0.0,0.0,0.0` | Per-channel mean, comma separated. **Only the legacy preprocess honours it** (`yolov3`-`yolov7`, `yolov8_old`, `yolov8_pose_old`, `yolov8_seg_old`, `yolox`, `yolor`, `yolo_nas`, `u2net`). The fused preprocess (`yolov26`, `yolov11`, the new `yolov8` family — all tasks —, `yolov9`, `yolov10`, plus `depth` / `sem`) has no slot for it: a non-identity value fails at startup instead of being silently dropped |
+| `mean` | `0.0,0.0,0.0` | Per-channel mean, comma separated. **Only the legacy preprocess honours it** (`yolov3`-`yolov7`, `yolox`, `yolor`, `yolo_nas`, `u2net`). The fused preprocess (`yolov26`, `yolov11`, the new `yolov8` family — all tasks —, `yolov9`, `yolov10`, plus `depth` / `sem`) has no slot for it: a non-identity value fails at startup instead of being silently dropped |
 | `std` | `1.0,1.0,1.0` | Per-channel std, same rule as `mean` |
 | `pad_value` | `114.0` | Letterbox fill value (matches ultralytics' 114) |
 

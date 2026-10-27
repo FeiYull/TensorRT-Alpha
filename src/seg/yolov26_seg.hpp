@@ -54,6 +54,7 @@
 #include "trt_alpha/kernels/ops/postprocess_fused_vec_yolov26_det.hpp"
 #include "trt_alpha/kernels/ops/preprocess_fused_vec_yolov26_det.hpp"
 #include "trt_alpha/kernels/ops/scale_mask_yolov26.hpp"
+#include "trt_alpha/kernels/ops/seg_mask_post.hpp"
 #include "trt_alpha/seg/segmentor.hpp"
 
 #include <cstdint>
@@ -97,6 +98,7 @@ private:
     void buildPlans();
     void allocateBuffers();
     void ensurePreprocessPlan();
+    void ensureMaskOrigPlans();
 
     std::unique_ptr<core::TrtEngine> m_engine;
     std::string m_inputName;    // "images"
@@ -123,22 +125,33 @@ private:
     core::PinnedBuffer m_detsHost;
     core::PinnedBuffer m_countsHost;
 
-    //! Mask scratch. The dot / upsample pair still runs one detection at a time
-    //! (stage 2 needs a full 640x640 workspace per instance), but the device and
-    //! host copies are staged kMaskChunk instances deep, so a whole chunk costs
-    //! ONE cudaMemcpyAsync batch + ONE synchronize() instead of one each per
-    //! instance. 8 keeps the scratch under 14 MB while cutting 39 sync points
-    //! per batch down to 5.
+    //! Mask scratch. The dot / upsample / binarize chain runs one detection at a
+    //! time (stage 2 needs a full netW x netH workspace per instance), but the
+    //! stages are staged kMaskChunk instances deep so the D2H of a whole chunk is
+    //! ONE cudaMemcpyAsync + ONE synchronize() instead of one each per instance.
+    //!
+    //! Note what is NOT copied back any more: the float up-plane. Stage 3 runs on
+    //! the device (seg_mask_post.cu), so only the finished uint8 mask travels
+    //! home -- 409 KB per instance instead of 1.6 MB.
     static constexpr int kMaskChunk = 8;
-    core::DeviceBuffer m_logits;      // [kMaskChunk] x protoH*protoW
-    core::DeviceBuffer m_maskUp;      // [kMaskChunk] x dstW*dstH
-    core::PinnedBuffer m_maskUpHost;  // [kMaskChunk] x dstW*dstH
+    core::DeviceBuffer m_logits;        // [kMaskChunk] x protoH*protoW  f32
+    core::DeviceBuffer m_maskUp;        // [kMaskChunk] x dstW*dstH      f32
+    core::DeviceBuffer m_maskU8;        // [kMaskChunk] x dstW*dstH      u8
+    core::PinnedBuffer m_maskU8Host;    // [kMaskChunk] x dstW*dstH      u8
+    core::DeviceBuffer m_maskCounts;    // [kMaskChunk] i32 (foreground px)
+    core::PinnedBuffer m_maskCountsHost;// [kMaskChunk] i32
 
-    //! Emit Segmentation::maskOrig (a full dstW->srcW bilinear resize per
-    //! instance, ~616 us of the 1135 us per-instance budget at 1912x1080).
+    //! Emit Segmentation::maskOrig (a full srcW x srcH resize per instance).
     //! Off by default: the built-in renderer rescales Segmentation::mask itself
     //! and never reads maskOrig. INI: [model] mask_orig.
     bool m_emitMaskOrig = false;
+
+    //! mask_orig scratch. One instance at a time: the float plane alone is
+    //! srcW*srcH*4 bytes (8.3 MB at 1912x1080), so staging it per chunk would
+    //! cost tens of megabytes for an output nobody reads by default.
+    core::DeviceBuffer m_origF;         // srcW*srcH f32 (resize target)
+    core::DeviceBuffer m_origU8;        // srcW*srcH u8  (thresholded)
+    core::PinnedBuffer m_origU8Host;    // srcW*srcH u8
 
     //! Preprocess plan + its letterbox geometry -- the inverse transform for the
     //! boxes comes from the *same* object as the forward one, so they cannot drift.
@@ -149,6 +162,11 @@ private:
     std::unique_ptr<kernels::ops::CvProprocessFusedVecYoloV26Plan> m_pp;
     std::unique_ptr<kernels::ops::CvMaskCoeffDotPlan>              m_dot;
     std::unique_ptr<kernels::ops::CvScaleMaskPlan<float>>          m_scale;
+
+    //! Stage-2 equivalent for the un-letterbox step (mask_orig): the same ATen
+    //! bilinear port, fed the binarized 0/1 float mask and cropped back onto the
+    //! source image. Built only when m_emitMaskOrig is on.
+    std::unique_ptr<kernels::ops::CvScaleMaskPlan<float>> m_origScale;
 };
 
 }  // namespace trt_alpha::seg

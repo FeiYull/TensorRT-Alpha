@@ -30,8 +30,7 @@ namespace trt_alpha {
 namespace {
 
 const char* kModelNames[] = {
-    "yolov3", "yolov4", "yolov5", "yolov6", "yolov7", "yolov8_old",
-    "yolov8_pose_old", "yolov8_seg_old",
+    "yolov3", "yolov4", "yolov5", "yolov6", "yolov7",
     "yolox", "yolor", "yolo_nas",
     "efficientdet", "yunet", "u2net",
     "yolov26",

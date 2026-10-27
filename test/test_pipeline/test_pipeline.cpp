@@ -11,7 +11,7 @@
 //
 //  用法：
 //    test_pipeline <engine.trt> <image_or_video>
-//    不带参数时用默认探针 engines/yolov8n.trt + data/bus.jpg（缺则跳过）
+//    不带参数时用默认探针 engines/yolov5n.trt + data/bus.jpg（缺则跳过）
 // =============================================================================
 #include "trt_alpha/core/model_registry.hpp"
 #include "trt_alpha/core/paths.hpp"
@@ -85,7 +85,7 @@ int main(int argc, char** argv)
     {
         // 无参数 → 用仓库自带探针（有则跑，无则跳过）。
         // 这样本测试在全量回归里是真的在跑，而不是只打印一行 usage。
-        enginePath = "engines/yolov8n.trt";
+        enginePath = "engines/yolov5n.trt";
         inputPath  = "data/bus.jpg";
         if (!fs::exists(enginePath) || !fs::exists(inputPath))
         {
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
         InferencePool pool(
             modelCfg,
             []() -> std::unique_ptr<trt_alpha::IModel> {
-                return ModelRegistry::instance().create("yolov8_old");
+                return ModelRegistry::instance().create("yolov5");
             },
             /*workers=*/1,
             /*maxQueueSize=*/16);

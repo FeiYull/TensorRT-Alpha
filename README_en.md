@@ -26,6 +26,7 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 - **Multi-batch inference**: `1 engine + N contexts` running concurrently, each worker owning its own `cudaStream`.
 - **Bit-exact replication of the original PyTorch inference**: aligned with the official ultralytics implementation — see [Bit-exact Accuracy Alignment](#bit-exact-accuracy-alignment).
 - **Many input sources**: images, image directories, video streams (RTSP / RTMP / HTTP(S) / UDP), webcams and URLs — a single `--source` argument figures out the type by itself.
+- **Hardware video decoding**: [FFmpeg hardware decoding](docs/build_ffmpeg.md) (NVDEC) keeps decoding off the CPU.
 
 </details>
 
@@ -45,7 +46,15 @@ A C++ inference repository built on **TensorRT + CUDA**, with **every CUDA C ope
 <details>
 <summary><b>Changelog</b></summary>
 
-- 2026.10.18 🚀 YOLOV11 / YOLOV8 / YOLOV9 / YOLOV10 support, all on the YOLO26 fused pre/post-processing: yolov11 (5 tasks); yolov8 rewritten for all 5 tasks (the old dynamic engines stay as `yolov8*_old` for A/B); yolov9 det + seg; yolov10 det (one2many only). Measured against Python per box: boxes within 3.4e-4 px, conf within 2e-6, zero mismatched mask pixels
+- 2026.10.27 📚 Docs rebuilt: the README keeps a single default path (TensorRT + OpenCV); FFmpeg decoding and FFmpeg + OpenGL rendering each get their own document; the six build scripts follow `build_<os>_<libs>`
+- 2026.10.24 🎮 Multi-stream rendering completed: zero-copy CUDA-GL interop display, click-to-zoom, per-source result queues; 9x 1080p stable (pinned memory falls back with a single warning when `RLIMIT_MEMLOCK` is tight)
+- 2026.10.24 🧩 Three build trees fixed (`build` / `build-ffm` / `build-gl`) + two switches (tests off, samples on by default); yolov8_old / yolov8_pose_old / yolov8_seg_old removed
+- 2026.10.24 ⚡ seg / depth / sem result composition moved entirely to CUDA; the OpenCV and GL renderers now share one implementation
+- 2026.10.23 🖼️ Multi-stream video + OpenGL render backend (GLFW + CUDA-GL interop); OpenCV demoted to an optional backend (`-DTRT_ALPHA_WITH_OPENCV=OFF`)
+- 2026.10.21 🚀 release v1.3.0: FFmpeg decoding is now compile-time optional (`--decode ffmpeg` / `--hwaccel nvdec`), NVDEC device pass-through + pinned copy-back, `[source]` section and tri-state `HostCopy`
+- 2026.10.20 🐛 Fixed the `float4` alignment overrun in fused preprocessing for non-640 inputs (e.g. 672)
+- 2026.10.19 📦 samples switched to one sample per task; unused parameters and `input_output_names` removed; training / deployment docs added (EN / ZH)
+- 2026.10.18 🚀 YOLOV11 / YOLOV8 / YOLOV9 / YOLOV10 support, all on the YOLO26 fused pre/post-processing: yolov11 (5 tasks); yolov8 rewritten for all 5 tasks; yolov9 det + seg; yolov10 det (one2many only). Measured against Python per box: boxes within 3.4e-4 px, conf within 2e-6, zero mismatched mask pixels
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux support: GCC 13 port, unified line-ending / editor policy, engine serialization script; automatic Windows runtime DLL deployment; hardened argument parsing and source detection + a full-parameter-matrix `run` test script
 - 2026.10.14 🧠 Complete YOLO26 task family: cls / depth / obb / pose / seg / sem; the pipeline diagram on the landing page
@@ -103,37 +112,22 @@ More: [Disabling rectangular inference when aligning](docs/rect_false.md)
 
 ## Installation
 
-<details open>
-<summary><small>Linux</small></summary>
-
 | Dependency | Version | Notes |
 |---|---|---|
-| gcc | 13.3.0 | |
+| CUDA | 12.9 | CUDA C pre/post-processing, dual batch supported |
+| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | FP32 / FP16 / INT8 quantization |
+| [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 | decoding, window, saving images |
 | C++ | C++17 | |
-| [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 | will be removed in the future for performance reasons |
-| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | |
-| CUDA | 12.9 | |
-| [FFmpeg](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-shared-9.0.tar.xz) | 9.0 | 🚀 [optional](#4decode-video-with-ffmpeg-for-higher-performance), higher performance |
+| gcc (Linux) | 13.3 | |
+| Visual Studio (Windows) | 2017 / 2019 / 2022 | |
 
-Detailed steps: [Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](docs/install_with_docker.md)
+Detailed steps: [Windows](docs/install_for_windows.md)　or　[Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](docs/install_with_docker.md)
 
-</details>
+Hardware video decoding and multi-stream GL rendering are two optional paths, each with its
+own document covering dependencies, build and run:
 
-<details open>
-<summary><small>Windows</small></summary>
-
-| Dependency | Version | Notes |
-|---|---|---|
-| Visual Studio | 2017 / 2019 / 2022 | |
-| C++ | C++17 | |
-| [OpenCV](https://release-assets.githubusercontent.com/github-production-release-asset/5108051/2d11b48c-60e6-4f11-acc4-158da7fcb799?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-10-16T02%3A28%3A08Z&rscd=attachment%3B+filename%3Dopencv-4.8.1-windows.exe&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-10-16T01%3A27%3A29Z&ske=2026-10-16T02%3A28%3A08Z&sks=b&skv=2018-11-09&sig=OcWdIQ0t5iJThr4cjQEp%2BbsEw865e73NiQWS4Fsz0V8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5MjExODU1OCwibmJmIjoxNzkyMTE0OTU4LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.THYDLnoAwzXO-Ha4OP4HwG83NRh5N-X5_1xaqFRjxFA&response-content-disposition=attachment%3B%20filename%3Dopencv-4.8.1-windows.exe&response-content-type=application%2Foctet-stream) | >= 4.5 | will be removed in the future for performance reasons |
-| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-12.9.zip?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | |
-| CUDA | 12.9 | |
-| [FFmpeg](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-gpl-shared-9.0.zip) | 9.0 | 🚀 [optional](#4decode-video-with-ffmpeg-for-higher-performance), higher performance |
-
-Detailed steps: [Windows](docs/install_for_windows.md)
-
-</details>
+- [FFmpeg hardware decoding](docs/build_ffmpeg.md)
+- [FFmpeg + OpenGL multi-stream rendering](docs/build_ffmpeg_opengl.md)
 
 ## Quick Start
 
@@ -155,14 +149,9 @@ cmake -S D:\VS2022_Project\TensorRT-Alpha `
       -DOpenCV_DIR=D:/ThirdParty/opencv/build/x64/vc16/lib `
       -DTensorRT_ROOT=D:/ThirdParty/TensorRT-10.16.1.11
 
-cmake --build build --config Debug   -j 24
 cmake --build build --config Release -j 24
-
-# verify
-./build/bin/Debug/trt_alpha.exe list
-
+.\build\bin\Release\trt_alpha.exe list
 ```
-
 
 </details>
 
@@ -173,14 +162,14 @@ cmake --build build --config Release -j 24
 cmake -S ~/workspace/TensorRT-Alpha -B ~/workspace/TensorRT-Alpha/build \
       -DCMAKE_BUILD_TYPE=Release \
       -DOpenCV_DIR=/home/feiyull/thirdparty/opencv4.8.1/lib/cmake/opencv4 \
-      -DTensorRT_ROOT=/home/feiyull/thirdparty/TensorRT-10.16.1.11
+      -DTensorRT_ROOT=/home/feiyull/thirdparty/TensorRT-10.16.1.11 \
+      -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.9/bin/nvcc
 
 cmake --build build -j24
-# verify
 ./build/bin/Release/trt_alpha list
 ```
 
-Output: `build/bin/Release/trt_alpha`. For a Debug build, reconfigure with `-DCMAKE_BUILD_TYPE=Debug`; the output goes to `build/bin/Debug/`.
+Debug: use `--config Debug`, or `-DCMAKE_BUILD_TYPE=Debug` on a single-config generator; the output goes to `bin/Debug/`.
 
 </details>
 
@@ -200,18 +189,24 @@ trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 
 More: [Exporting and serializing](docs/export_and_serialize.md)
 
+> The `yolo export` line is **only an ultralytics example**, not a requirement. Any other framework (MMDetection, Detectron2, PaddleDetection, your own PyTorch training script) follows the same flow: **export to ONNX manually** inside that framework, then let `trtexec` serialize it. This repository only consumes ONNX — it does not export models.
+
 </details>
 
 <details open>
 <summary><b>3. Run</b></summary>
 
 ```bash
-./trt_alpha run --net yolov26 --source data/bus.jpg --show
-./trt_alpha run --net yolov26 --source data/xxx.mp4 --config configs/yolov26.ini --save
-./trt_alpha run --net yolov26 --source rtsp:xxxxx --engine yolov26.trt --save output/det/
-# load a quantized engine
-./trt_alpha run --net yolov26 --source data/xxx.mp4 --engine yolov26_fp16.trt
+./build/bin/Release/trt_alpha run --net yolov26 --source data/bus.jpg --show    # image
+./build/bin/Release/trt_alpha run --net yolov26 --source data/people.mp4 --show  # video
+./build/bin/Release/trt_alpha run --net yolov26 --source data/images/ --save output/det/  # directory
+./build/bin/Release/trt_alpha run --net yolov26 --source 0 --show                # camera
+./build/bin/Release/trt_alpha run --net yolov26 --source data/bus.jpg --save output/det/
+# quantized engine: swap in --engine
+./build/bin/Release/trt_alpha run --net yolov26 --source data/bus.jpg --engine engines/yolov26n_fp16.trt --show
 ```
+
+On Windows, use `.\build\bin\Release\trt_alpha.exe` instead.
 
 More: [Full CLI reference](docs/cli.md)
 
@@ -319,8 +314,8 @@ include/trt_alpha/   public headers
   └── det|seg|kpt|cls|depth|sem|obb/  task types and models
 src/                 implementations
 samples/             usage examples (including the high-level sample_infer API sample)
-test/                unit tests (CTest)
-scripts/             platform scripts (linux/ = engine serialization, parameter-matrix testing)
+test/                unit tests (off by default, -DTRT_ALPHA_BUILD_TESTS=ON)
+scripts/             build scripts (build_<os>_<libs>) + engine serialization / parameter matrix
 ```
 
 </details>
@@ -330,7 +325,10 @@ scripts/             platform scripts (linux/ = engine serialization, parameter-
 ### [1. Configuration](docs/config.md)
 ### [2. Quantization](docs/quantization.md)
 ### [3.Train and deploy custom model](docs/train_and_deploy_custom.md)
-### [4.Decode video with FFmpeg for higher performance](docs/install_ffmpeg_en.md)
+### [4.FFmpeg hardware decoding (`--decode` / `--hwaccel`)](docs/build_ffmpeg.md)
+
+### [5.FFmpeg + OpenGL multi-stream rendering (`--render gl`)](docs/build_ffmpeg_opengl.md)
+
 ## Citation
 ```bibtex
 @misc{FeiYull_TensorRT-Alpha,

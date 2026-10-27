@@ -15,18 +15,6 @@
 namespace trt_alpha::core {
 namespace {
 
-void checkCuda(cudaError_t err, const char* op, std::size_t bytes)
-{
-    if (err != cudaSuccess)
-    {
-        const std::string msg = std::string("MemoryPool: ") + op + " failed for " +
-                                std::to_string(bytes) + " bytes: " +
-                                cudaGetErrorString(err);
-        TRT_LOG_ERROR(msg);
-        throw std::runtime_error(msg);
-    }
-}
-
 //! Really free one block. Always called outside the lock (cudaFree and the host
 //! deallocator are both heavyweight).
 void freeBlock(MemoryPool::Kind kind, void* ptr) noexcept
@@ -95,8 +83,12 @@ MemoryPool::~MemoryPool()
     }
 }
 
-MemoryPool::Block MemoryPool::allocate(Kind kind, std::size_t bytes)
+MemoryPool::Block MemoryPool::allocateImpl(Kind kind, std::size_t bytes, int* cudaErr)
 {
+    if (cudaErr != nullptr)
+    {
+        *cudaErr = 0;
+    }
     if (bytes == 0)
     {
         return {};
@@ -131,23 +123,40 @@ MemoryPool::Block MemoryPool::allocate(Kind kind, std::size_t bytes)
     }
 
     // ---- 2) 未命中：锁外做重量级分配（不阻塞其它线程命中）----
+    // Failure returns an empty Block instead of throwing: the caller decides
+    // whether it is fatal (allocate) or has a fallback (tryAllocate). The CUDA
+    // last-error is cleared here so a later cudaGetLastError() on this thread
+    // does not report this stale failure as its own.
     void* ptr = nullptr;
     switch (kind)
     {
     case Kind::Device:
-        checkCuda(cudaMalloc(&ptr, capacity), "cudaMalloc", capacity);
+    {
+        const cudaError_t e = cudaMalloc(&ptr, capacity);
+        if (e != cudaSuccess)
+        {
+            if (cudaErr != nullptr) { *cudaErr = static_cast<int>(e); }
+            (void)cudaGetLastError();
+            return {};
+        }
         break;
+    }
     case Kind::PinnedHost:
-        checkCuda(cudaMallocHost(&ptr, capacity), "cudaMallocHost", capacity);
+    {
+        const cudaError_t e = cudaMallocHost(&ptr, capacity);
+        if (e != cudaSuccess)
+        {
+            if (cudaErr != nullptr) { *cudaErr = static_cast<int>(e); }
+            (void)cudaGetLastError();
+            return {};
+        }
         break;
+    }
     case Kind::Host:
         ptr = ::operator new[](capacity, std::nothrow);
         if (ptr == nullptr)
         {
-            const std::string msg = "MemoryPool[host]: allocation failed for " +
-                                    std::to_string(capacity) + " bytes";
-            TRT_LOG_ERROR(msg);
-            throw std::runtime_error(msg);
+            return {};
         }
         break;
     }
@@ -163,6 +172,41 @@ MemoryPool::Block MemoryPool::allocate(Kind kind, std::size_t bytes)
     TRT_LOG_DEBUG("MemoryPool[" << kindName(kind) << "]: allocate "
                   << bytes << " bytes -> miss (cuda alloc, cap=" << capacity << ")");
     return Block{ptr, capacity};
+}
+
+MemoryPool::Block MemoryPool::allocate(Kind kind, std::size_t bytes)
+{
+    if (bytes == 0)
+    {
+        return {};
+    }
+    int cudaErr = 0;
+    const Block block = allocateImpl(kind, bytes, &cudaErr);
+    if (block.ptr != nullptr)
+    {
+        return block;
+    }
+    const std::size_t capacity = roundUp(bytes);
+    std::string msg = std::string("MemoryPool: ") + kindName(kind) +
+                      " allocation failed for " + std::to_string(capacity) + " bytes";
+    if (cudaErr != 0)
+    {
+        msg += std::string(": ") + cudaGetErrorString(static_cast<cudaError_t>(cudaErr));
+    }
+    TRT_LOG_ERROR(msg);
+    throw std::runtime_error(msg);
+}
+
+MemoryPool::Block MemoryPool::tryAllocate(Kind kind, std::size_t bytes) noexcept
+{
+    try
+    {
+        return allocateImpl(kind, bytes, nullptr);
+    }
+    catch (...)
+    {
+        return {};
+    }
 }
 
 void MemoryPool::release(Kind kind, Block block) noexcept

@@ -5,8 +5,8 @@
 //
 //  Usage (synchronous):
 //      trt_alpha::InferParams p;
-//      p.model_type  = trt_alpha::ModelType::yolov8_old;
-//      p.config_path = "configs/yolov8_old.ini";
+//      p.model_type  = trt_alpha::ModelType::yolov5;
+//      p.config_path = "configs/yolov5.ini";
 //      p.source      = "data/bus.jpg";
 //      p.conf_thresh = 0.5f;
 //
@@ -67,9 +67,6 @@ enum class ModelType
     yolov5,
     yolov6,
     yolov7,
-    yolov8_old,
-    yolov8_pose_old,
-    yolov8_seg_old,
     yolox,
     yolor,
     yolo_nas,
@@ -86,9 +83,7 @@ enum class ModelType
     yolov26_pose,
     yolov26_seg,
     yolov26_sem,
-    // YOLOV8 on the fused pipeline (the *_old entries above are the legacy
-    // implementations kept for A/B comparison). Append-only, same lock-step
-    // rule as above.
+    // YOLOV8 on the fused pipeline. Append-only, same lock-step rule as above.
     yolov8,
     yolov8_pose,
     yolov8_seg,
@@ -145,7 +140,7 @@ struct SaveOption
 //
 //  Required:
 //    * model_type  -- the model type
-//    * config_path -- the ini path (e.g. "configs/yolov8_old.ini")
+//    * config_path -- the ini path (e.g. "configs/yolov5.ini")
 //    * a source: source (image / video / URL) or camera_id (camera), one of them
 //
 //  Optional (empty / -1 / Unset = no override, use the ini):

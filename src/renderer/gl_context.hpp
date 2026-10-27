@@ -66,6 +66,11 @@ public:
     //! host-copy policy must fall back to a D2H copy + glTexSubImage2D upload.
     static bool probeInterop();
 
+    //! Result of the probe above (cached). False on software rasterizers, where
+    //! device-resident frames cannot reach a texture and the caller must hand
+    //! over host pixels instead.
+    [[nodiscard]] bool supportsDeviceFrames() const;
+
     //! Upload a tightly-packed BGR8 host frame into tile `tile`'s texture.
     void uploadFrame(int tile, const std::uint8_t* data, int w, int h, int stride);
 

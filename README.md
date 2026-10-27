@@ -26,6 +26,7 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 - **多 batch 推理**：`1 engine + N context` 并发，每个 worker 独占一条 `cudaStream`。
 - **无损复刻原始 PyTorch 推理**：对齐 ultralytics 官方实现，见 [严格精度对齐](#严格精度对齐)。
 - **多种输入源**：图片、图片目录、视频流（RTSP / RTMP / HTTP(S) / UDP）、webcam、URL —— 一个 `--source` 自动判别。
+- **高性能视频解码**：借助 [FFmpeg 硬解](docs/build_ffmpeg.md)（NVDEC）加速视频解码。
 
 </details>
 
@@ -45,7 +46,15 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 <details>
 <summary><b>更新日志</b></summary>
 
-- 2026.10.18 🚀 YOLOV11 / YOLOV8 / YOLOV9 / YOLOV10 接入，全部走 YOLO26 的 fused 前后处理：yolov11 五任务；yolov8 重写五任务（旧的动态引擎保留为 `yolov8*_old` 供 A/B 对拍）；yolov9 det + seg；yolov10 det（仅 one2many）。与 python 逐框对拍实测：框 ≤3.4e-4 px、conf ≤2e-6、mask 逐像素 0 差异
+- 2026.10.27 📚 文档重构：README 只保留 TensorRT + OpenCV 一条默认路线，FFmpeg 硬解与 FFmpeg + OpenGL 多路渲染各自独立成篇；六个编译脚本统一命名 `build_<系统>_<库组合>`
+- 2026.10.24 🎮 多路渲染收口：CUDA-GL interop 零拷贝显示、单击放大、per-source 结果队列；9 路 1080p 稳定（pinned 内存受 `RLIMIT_MEMLOCK` 限制时自动降级并只告警一次）
+- 2026.10.24 🧩 三套构建目录定型（`build` / `build-ffm` / `build-gl`）+ 两个开关（test 默认关、sample 默认开）；移除 yolov8_old / yolov8_pose_old / yolov8_seg_old
+- 2026.10.24 ⚡ seg / depth / sem 结果合成全部下沉到 CUDA，OpenCV 与 GL 两个渲染器共用同一套实现
+- 2026.10.23 🖼️ 多路视频 + OpenGL 渲染后端（GLFW + CUDA-GL interop）；OpenCV 降为可选后端（`-DTRT_ALPHA_WITH_OPENCV=OFF`）
+- 2026.10.21 🚀 release v1.3.0：FFmpeg 硬解改为编译期可选（`--decode ffmpeg` / `--hwaccel nvdec`），NVDEC 显存直通 + pinned 回拷，`[source]` 段与三态 `HostCopy`
+- 2026.10.20 🐛 修复非 640 输入（如 672）在 fused 预处理中的 `float4` 对齐越界
+- 2026.10.19 📦 samples 改为一任务一示例；清理无用参数与 `input_output_names`；补训练 / 部署文档（英 / 中）
+- 2026.10.18 🚀 YOLOV11 / YOLOV8 / YOLOV9 / YOLOV10 接入，全部走 YOLO26 的 fused 前后处理：yolov11 五任务；yolov8 重写五任务；yolov9 det + seg；yolov10 det（仅 one2many）。与 python 逐框对拍实测：框 ≤3.4e-4 px、conf ≤2e-6、mask 逐像素 0 差异
 - 2026.10.16 💖 release v1.0
 - 2026.10.15 🐧 Linux 支持：GCC 13 移植、行尾 / 编辑器策略归一、引擎序列化脚本；Windows 运行时 DLL 自动部署；参数解析与源探测硬化 + `run` 全参数矩阵测试脚本
 - 2026.10.14 🧠 YOLO26 全任务族补齐：cls / depth / obb / pose / seg / sem；首页架构图
@@ -103,37 +112,22 @@ C++ 推理仓库，基于 **TensorRT + CUDA**，**手写全部 CUDA C 算子**�
 
 ## 安装依赖
 
-<details open>
-<summary><small>Linux</small></summary>
-
-| 依赖 | 版本 | 备注 |
+| 依赖 | 版本 | 说明 |
 |---|---|---|
-| gcc | 13.3.0 | |
+| CUDA | 12.9 | 预处理 / 后处理由 CUDA C 实现，支持双 batch |
+| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | 支持 FP32 / FP16 / INT8 量化 |
+| [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 | 解码 + 窗口 + 存图 |
 | C++ | C++17 | |
-| [OpenCV](https://codeload.github.com/opencv/opencv/zip/refs/tags/4.8.1) | >= 4.5 | 未来会因性能问题剔除 |
-| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/tars/TensorRT-10.16.1.11.Linux.x86_64-gnu.cuda-12.9.tar.gz?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | |
-| CUDA | 12.9 | |
-| [FFmpeg](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-shared-9.0.tar.xz) | 9.0 | 🚀 [可选](#4使用-ffmpeg-解码视频实现更高性能)，更高性能 |
+| gcc（Linux） | 13.3 | |
+| Visual Studio（Windows） | 2017 / 2019 / 2022 | |
 
-具体参考：[Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](docs/install_with_docker.md)
+具体安装步骤：[Windows](docs/install_for_windows.md)　or　[Ubuntu 24.04](docs/install_for_ubuntu24.04.md)　or　[Docker](docs/install_with_docker.md)
 
-</details>
+视频硬解和多路 GL 渲染是另外两条可选路线，依赖、编译、执行分别写在：
 
-<details open>
-<summary><small>Windows</small></summary>
+- [FFmpeg 硬解](docs/build_ffmpeg.md)
+- [FFmpeg + OpenGL 多路渲染](docs/build_ffmpeg_opengl.md)
 
-| 依赖 | 版本 | 备注 |
-|---|---|---|
-| Visual Studio | 2017 / 2019 / 2022 | |
-| C++ | C++17 | |
-| [OpenCV](https://release-assets.githubusercontent.com/github-production-release-asset/5108051/2d11b48c-60e6-4f11-acc4-158da7fcb799?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-10-16T02%3A28%3A08Z&rscd=attachment%3B+filename%3Dopencv-4.8.1-windows.exe&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-10-16T01%3A27%3A29Z&ske=2026-10-16T02%3A28%3A08Z&sks=b&skv=2018-11-09&sig=OcWdIQ0t5iJThr4cjQEp%2BbsEw865e73NiQWS4Fsz0V8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5MjExODU1OCwibmJmIjoxNzkyMTE0OTU4LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.THYDLnoAwzXO-Ha4OP4HwG83NRh5N-X5_1xaqFRjxFA&response-content-disposition=attachment%3B%20filename%3Dopencv-4.8.1-windows.exe&response-content-type=application%2Foctet-stream) | >= 4.5 | 未来会因性能问题剔除 |
-| [TensorRT](https://developer.download.nvidia.cn/compute/machine-learning/tensorrt/10.16.1/zip/TensorRT-10.16.1.11.Windows.amd64.cuda-12.9.zip?t=eyJscyI6ImJzZW8iLCJsc2QiOiJodHRwczovL2NuLmJpbmcuY29tLyJ9) | 10.16 | |
-| CUDA | 12.9 | |
-| [FFmpeg](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-gpl-shared-9.0.zip) | 9.0 | 🚀 [可选](#4使用-ffmpeg-解码视频实现更高性能)，更高性能 |
-
-具体参考：[Windows](docs/install_for_windows.md)
-
-</details>
 
 ## 快速开始
 
@@ -155,14 +149,9 @@ cmake -S D:\VS2022_Project\TensorRT-Alpha `
       -DOpenCV_DIR=D:/ThirdParty/opencv/build/x64/vc16/lib `
       -DTensorRT_ROOT=D:/ThirdParty/TensorRT-10.16.1.11
 
-cmake --build build --config Debug   -j 24
 cmake --build build --config Release -j 24
-
-# 验证
-./build/bin/Debug/trt_alpha.exe list
-
+.\build\bin\Release\trt_alpha.exe list
 ```
-
 
 </details>
 
@@ -173,14 +162,14 @@ cmake --build build --config Release -j 24
 cmake -S ~/workspace/TensorRT-Alpha -B ~/workspace/TensorRT-Alpha/build \
       -DCMAKE_BUILD_TYPE=Release \
       -DOpenCV_DIR=/home/feiyull/thirdparty/opencv4.8.1/lib/cmake/opencv4 \
-      -DTensorRT_ROOT=/home/feiyull/thirdparty/TensorRT-10.16.1.11
+      -DTensorRT_ROOT=/home/feiyull/thirdparty/TensorRT-10.16.1.11 \
+      -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.9/bin/nvcc
 
 cmake --build build -j24
-# 验证
 ./build/bin/Release/trt_alpha list
 ```
 
-产物：`build/bin/Release/trt_alpha`。要 Debug 就换成 `-DCMAKE_BUILD_TYPE=Debug` 重配一次，产物进 `build/bin/Debug/`。
+要 Debug：多配置生成器把 `--config Release` 换成 `Debug`；单配置生成器重配一次 `-DCMAKE_BUILD_TYPE=Debug`。产物进 `bin/Debug/`。
 
 </details>
 
@@ -200,18 +189,24 @@ trtexec --onnx=yolo26n.onnx --saveEngine=engines/yolov26n.trt --noTF32
 
 更多参考：[导出与序列化](docs/export_and_serialize.md)
 
+> 上面 `yolo export` 只是**拿 ultralytics 举个例**，不代表只能用 ultralytics。换 MMDetection / Detectron2 / PaddleDetection / 自己写的 PyTorch 训练脚本，流程完全一样：先在各自框架里**手动导出 ONNX**，再交给 `trtexec` 序列化。本仓库只消费 ONNX，不负责导出。
+
 </details>
 
 <details open>
 <summary><b>3. 执行</b></summary>
 
 ```bash
-./trt_alpha run --net yolov26 --source data/bus.jpg --show
-./trt_alpha run --net yolov26 --source data/xxx.mp4 --config configs/yolov26.ini --save
-./trt_alpha run --net yolov26 --source rtsp:xxxxx --engine yolov26.trt --save output/det/
-# 加载量化模型
-./trt_alpha run --net yolov26 --source data/xxx.mp4 --engine yolov26_fp16.trt
+./build/bin/Release/trt_alpha run --net yolov26 --source data/bus.jpg --show    # 图片
+./build/bin/Release/trt_alpha run --net yolov26 --source data/people.mp4 --show   # 视频
+./build/bin/Release/trt_alpha run --net yolov26 --source data/images/ --save output/det/   # 目录
+./build/bin/Release/trt_alpha run --net yolov26 --source 0 --show              # 相机
+./build/bin/Release/trt_alpha run --net yolov26 --source data/bus.jpg --save output/det/
+# 量化模型换 --engine
+./build/bin/Release/trt_alpha run --net yolov26 --source data/bus.jpg --engine engines/yolov26n_fp16.trt --show
 ```
+
+Windows 下把 `./build/bin/Release/trt_alpha` 换成 `.\build\bin\Release\trt_alpha.exe`。
 
 更多参考：[CLI 完整用法](docs/cli.md)
 
@@ -321,8 +316,8 @@ include/trt_alpha/   公共头
   └── det|seg|kpt|cls|depth|sem|obb/  任务类型与模型
 src/                 实现
 samples/             使用示例（含 sample_infer 高层 API 示例）
-test/                单元测试（CTest）
-scripts/             平台脚本（linux/ = 引擎序列化、参数矩阵测试）
+test/                单元测试（默认不编，-DTRT_ALPHA_BUILD_TESTS=ON）
+scripts/             编译脚本（build_<系统>_<库组合>）+ 引擎序列化 / 参数矩阵
 ```
 
 </details>
@@ -334,7 +329,9 @@ scripts/             平台脚本（linux/ = 引擎序列化、参数矩阵测�
 
 #### [3.部署自己训练的模型](docs/train_and_deploy_custom.md)
 
-#### [4.使用 FFmpeg 解码视频，实现更高性能](docs/install_ffmpeg_zh.md)
+#### [4.FFmpeg 硬解（`--decode` / `--hwaccel`）](docs/build_ffmpeg.md)
+
+#### [5.FFmpeg + OpenGL 多路渲染（`--render gl`）](docs/build_ffmpeg_opengl.md)
 
 ## Citation
 ```bibtex

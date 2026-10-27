@@ -6,7 +6,7 @@
 #    * 自动探测 CUDA 架构（nvidia-smi）
 #    * 收集 src/ 下所有 .cpp / .cu，编成 trt_alpha_core 静态库
 #    * 加载依赖（OpenCV / TensorRT，见 cmake/）
-#    * 挂上 test/ 子目录
+#    * 按开关挂上 test/ 与 samples/（TRT_ALPHA_BUILD_TESTS / TRT_ALPHA_BUILD_SAMPLES）
 # =============================================================================
 cmake_minimum_required(VERSION 3.25)
 
@@ -129,7 +129,9 @@ file(GLOB_RECURSE TRT_ALPHA_SOURCES CONFIGURE_DEPENDS
 #    要在这里同步登记】，否则 OFF 构建会因为找不到第三方头而失败。
 if(NOT TRT_ALPHA_WITH_OPENCV)
   list(FILTER TRT_ALPHA_SOURCES EXCLUDE REGEX "/opencv_(source|renderer)\\.cpp$")
-  message(STATUS "Sources: excluded opencv_source.cpp / opencv_renderer.cpp")
+  # The seg family needs no OpenCV: the hot path (proto -> 640x640 bilinear) is a
+  # CUDA kernel (scale_mask_yolov26.cu) and the remaining CPU bits are plain loops.
+  message(STATUS "Sources: OpenCV=OFF -> excluded opencv_source/opencv_renderer")
 endif()
 if(NOT TRT_ALPHA_WITH_GL)
   list(FILTER TRT_ALPHA_SOURCES EXCLUDE REGEX "/gl_(renderer|context)\\.cpp$")
@@ -309,29 +311,60 @@ target_link_libraries(trt_alpha_core
 
 
 # =============================================================================
+# 可选子目录：test/ 与 samples/
+# -----------------------------------------------------------------------------
+#   test/     默认 OFF —— 单元测试 + CTest 注册，日常构建不需要编。
+#   samples/  默认 ON  —— 使用示例（依赖 OpenCV），构建耗时占大头，赶时间可关。
+#
+#   只想要产品就两个都关：
+#       cmake -S . -B build -DTRT_ALPHA_BUILD_TESTS=OFF -DTRT_ALPHA_BUILD_SAMPLES=OFF
+# =============================================================================
+option(TRT_ALPHA_BUILD_TESTS   "Build test/ and register its CTest targets" OFF)
+option(TRT_ALPHA_BUILD_SAMPLES "Build samples/ (OpenCV demos)"             ON)
+
+
+# =============================================================================
 # 测试
 # =============================================================================
-enable_testing()          # 顶层开启 CTest，注册的各 test_* 可 `ctest -C Release` 一键跑
-#add_subdirectory(test)
+if(TRT_ALPHA_BUILD_TESTS)
+    enable_testing()     # 顶层开启 CTest；各 test_* 由 test/CMakeLists.txt 统一 add_test
+    add_subdirectory(test)
+    message(STATUS "tests: ON")
+else()
+    message(STATUS "tests: OFF (default; -DTRT_ALPHA_BUILD_TESTS=ON to build them)")
+endif()
 
-# 单个测试的独立入口：整个 test/ 树默认不编（上面那行是注释状态），但解码后端
-# 的 A/B 需要随时能跑，所以给一个只挂 test_ffmpeg_source 的开关：
+# 单个测试的独立入口：整个 test/ 树默认不编，但解码后端的 A/B 需要随时能跑，
+# 所以给一个只挂 test_ffmpeg_source 的开关（TRT_ALPHA_BUILD_TESTS=ON 时不必开）：
 #     cmake -S . -B build -DTRT_ALPHA_BUILD_FFMPEG_TEST=ON
 #     cmake --build build --config Release --target test_ffmpeg_source
 #     ctest -C Release -R test_ffmpeg_source --output-on-failure
 option(TRT_ALPHA_BUILD_FFMPEG_TEST
-       "Build test/test_ffmpeg_source (opencv / ffmpeg-sw / ffmpeg-nvdec A/B)" OFF)
-if(TRT_ALPHA_BUILD_FFMPEG_TEST AND NOT TARGET test_ffmpeg_source)
+       "Build test/test_ffmpeg_source only (ignored when TRT_ALPHA_BUILD_TESTS=ON)" OFF)
+if(TRT_ALPHA_BUILD_FFMPEG_TEST AND NOT TRT_ALPHA_BUILD_TESTS)
+    enable_testing()
     add_subdirectory(test/test_ffmpeg_source)
     add_test(NAME test_ffmpeg_source COMMAND test_ffmpeg_source)
     set_tests_properties(test_ffmpeg_source PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 add_subdirectory(app)
-add_subdirectory(samples)
 
-# demos/ is a local-only playground (ignored by .gitignore). Guard the mount so a
-# fresh clone that does not carry the directory still configures cleanly.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/demos/CMakeLists.txt")
-    add_subdirectory(demos)
+# samples/ and demos/ are both example code written against OpenCVSource /
+# OpenCVRenderer: they cannot compile with TRT_ALPHA_WITH_OPENCV=OFF, and both are
+# skipped when TRT_ALPHA_BUILD_SAMPLES=OFF. The trt_alpha CLI in app/ is the product
+# and stays available either way.
+if(NOT TRT_ALPHA_BUILD_SAMPLES)
+    message(STATUS "samples: skipped (TRT_ALPHA_BUILD_SAMPLES=OFF); demos: skipped too")
+elseif(TRT_ALPHA_WITH_OPENCV)
+    add_subdirectory(samples)
+    message(STATUS "samples: ON")
+
+    # demos/ is a local-only playground (ignored by .gitignore); guard the mount so
+    # a fresh clone that does not carry the directory still configures cleanly.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/demos/CMakeLists.txt")
+        add_subdirectory(demos)
+    endif()
+else()
+    message(STATUS "samples: skipped (OpenCV=OFF); demos: skipped too")
 endif()

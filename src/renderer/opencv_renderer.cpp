@@ -3,6 +3,7 @@
 // =============================================================================
 #include "trt_alpha/renderer/opencv_renderer.hpp"
 
+#include "overlay_stage.hpp"
 #include "trt_alpha/core/logger.hpp"
 
 #include <opencv2/core.hpp>
@@ -14,6 +15,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -325,7 +327,11 @@ void drawDetections(cv::Mat& image, const std::vector<det::Detection>& detection
 //! 画分割列表 —— 复刻 ultralytics Annotator.masks 的整帧合成：
 //!   mcs = amax_i(mask_i * color_i)，inv = prod_i(1 - mask_i * alpha)，
 //!   out = (im/255 * inv + mcs) * 255（最后截断，即 torch 的 .byte()）。
-void drawSegmentations(cv::Mat& image, const std::vector<seg::Segmentation>& segs,
+//!
+//! ⚠️ 保留但不调用：绘制已统一由 `kernels/ops/overlay.cu` 在 device 上完成
+//! （两个后端共用一套实现，见 renderer/overlay_stage.hpp）。这段 host 实现
+//! 仅作参考/回归对照，去掉 [[maybe_unused]] 前先确认没有再被引用。
+[[maybe_unused]] void drawSegmentations(cv::Mat& image, const std::vector<seg::Segmentation>& segs,
                        const std::vector<core::ClassInfo>& classNames,
                        float alpha)
 {
@@ -697,7 +703,8 @@ cv::Mat colorizeDepth(const depth::DepthMap& dm, DepthCmap cmap, DepthMode mode)
 }
 
 //! 深度伪彩叠加（上游 Annotator.depth_map 的默认档：jet / disparity / alpha 0.6）。
-void drawDepths(cv::Mat& image, const depth::DepthMap& dm)
+//! 深度伪彩叠加。⚠️ 保留但不调用 —— 见 drawSegmentations 上方说明。
+[[maybe_unused]] void drawDepths(cv::Mat& image, const depth::DepthMap& dm)
 {
     if (dm.empty() || image.empty())
     {
@@ -712,7 +719,8 @@ void drawDepths(cv::Mat& image, const depth::DepthMap& dm)
 }
 
 //! 语义分割上色（上游 Annotator.semantic_mask：alpha 0.5，ignore_index 255 涂黑）。
-void drawSemantics(cv::Mat& image, const sem::SemanticMask& mask)
+//! ⚠️ 保留但不调用 —— 见 drawSegmentations 上方说明。
+[[maybe_unused]] void drawSemantics(cv::Mat& image, const sem::SemanticMask& mask)
 {
     if (mask.empty() || image.empty())
     {
@@ -909,6 +917,15 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
     const std::size_t n =
         std::min<std::size_t>(result.views.size(),
                               static_cast<std::size_t>(std::max(0, result.validCount)));
+
+    // Overlays (instance masks / semantic colours / depth heat) are baked by the
+    // SAME CUDA compositor the GL backend uses -- one implementation for both.
+    // thread_local: each render thread keeps its own staging + CUDA stream, so
+    // no lock is needed (the GL backend is single-threaded by contract).
+    static thread_local OverlayStage overlay;
+    const bool hasOverlay = !result.segmentations.empty() || !result.depths.empty() ||
+                            !result.semantics.empty();
+
     for (std::size_t i = 0; i < n; ++i)
     {
         cv::Mat image = matFromView(result.views[i]);
@@ -917,13 +934,37 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
             continue;
         }
 
+        if (hasOverlay)
+        {
+            const std::size_t stride = static_cast<std::size_t>(image.step);
+            const std::uint8_t* baked = overlay.composeDevice(
+                result, image.data, image.cols, image.rows, stride,
+                options.maskAlpha, static_cast<int>(i));
+            if (baked != nullptr)
+            {
+                const std::uint8_t* back = overlay.copyBack(image.cols, image.rows, stride);
+                if (back != nullptr)
+                {
+                    std::memcpy(image.data, back, stride * static_cast<std::size_t>(image.rows));
+                }
+            }
+        }
+
         if (i < result.detections.size())
         {
             drawDetections(image, result.detections[i], classNames);
         }
         if (i < result.segmentations.size())
         {
-            drawSegmentations(image, result.segmentations[i], classNames, options.maskAlpha);
+            // Masks are already baked in above; only the boxes are left to draw
+            // (the host path used to paint both in one go).
+            for (const auto& s : result.segmentations[i])
+            {
+                if (s.box.label >= 0)
+                {
+                    drawBoxColored(image, s.box, classNames, ultraBgr(s.box.label));
+                }
+            }
         }
         if (i < result.obbs.size())
         {
@@ -932,14 +973,6 @@ void OpenCVRenderer::drawResult(core::BatchResult& result,
         if (i < result.classifications.size())
         {
             drawClassifications(image, result.classifications[i], classNames);
-        }
-        if (i < result.semantics.size())
-        {
-            drawSemantics(image, result.semantics[i]);
-        }
-        if (i < result.depths.size())
-        {
-            drawDepths(image, result.depths[i]);
         }
         if (i < result.keypoints.size())
         {

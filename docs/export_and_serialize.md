@@ -297,56 +297,6 @@ yolo export model=yolov8n-seg.pt format=onnx imgsz=640 batch=2 opset=17
 trtexec --onnx=yolov8n-seg.onnx --saveEngine=engines/yolov8n_seg.trt --noTF32
 ```
 
-## yolov8_old
-
-The legacy detection implementation, kept for A/B comparison. It consumes the
-**dynamic** engine, not the static one above — and it exports to the same
-`yolov8n.onnx` stem, so build one, move it aside, then build the other.
-
-```bash
-# export (dynamic batch)
-yolo export model=yolov8n.pt format=onnx imgsz=640 batch=1 dynamic=True opset=17
-
-# serialize
-trtexec --onnx=yolov8n.onnx \
-        --saveEngine=engines/yolov8n_old.trt \
-        --minShapes=images:1x3x640x640 \
-        --optShapes=images:2x3x640x640 \
-        --maxShapes=images:4x3x640x640
-```
-
-## yolov8_pose_old
-
-Legacy pose implementation, dynamic engine (same ONNX stem as the static build).
-
-```bash
-# export (dynamic batch)
-yolo export model=yolov8n-pose.pt format=onnx imgsz=640 batch=1 dynamic=True opset=17
-
-# serialize
-trtexec --onnx=yolov8n-pose.onnx \
-        --saveEngine=engines/yolov8n_pose_old.trt \
-        --minShapes=images:1x3x640x640 \
-        --optShapes=images:2x3x640x640 \
-        --maxShapes=images:4x3x640x640
-```
-
-## yolov8_seg_old
-
-Legacy segmentation implementation, dynamic engine (same ONNX stem as the static build).
-
-```bash
-# export (dynamic batch)
-yolo export model=yolov8n-seg.pt format=onnx imgsz=640 batch=1 dynamic=True opset=17
-
-# serialize
-trtexec --onnx=yolov8n-seg.onnx \
-        --saveEngine=engines/yolov8n_seg_old.trt \
-        --minShapes=images:1x3x640x640 \
-        --optShapes=images:2x3x640x640 \
-        --maxShapes=images:4x3x640x640
-```
-
 ## yolov9
 
 det · 640 · static batch = 2 · `yolov9t` is the smallest detection checkpoint ultralytics ships
@@ -557,7 +507,7 @@ trtexec --onnx=u2net.onnx \
 
 ## Dynamic batch
 
-The `*_old` and legacy sections above pass explicit profiles. The same form
+The legacy sections above pass explicit profiles. The same form
 works for any model whose ONNX has a dynamic batch axis:
 
 ```bash

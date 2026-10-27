@@ -8,9 +8,11 @@
 #include "trt_alpha/renderer/gl_renderer.hpp"
 
 #include "gl_context.hpp"
+#include "overlay_stage.hpp"
 #include "trt_alpha/core/logger.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
@@ -283,6 +285,39 @@ struct GLRenderer::Impl
     std::vector<std::vector<Prim>> scene;   //!< per tile, frame-pixel coords
     bool ready = false;
     bool warnedUnsupported = false;
+
+    //! Instance masks are baked into the frame by the CUDA compositor before the
+    //! texture upload (see overlay_stage.hpp). `maskAlpha` is captured from the
+    //! RenderOptions on the drawResult call, because show() does not receive them.
+    OverlayStage overlay;
+    float maskAlpha = 0.5f;
+    bool warnedOverlay = false;
+
+    // show() is called once per arrived result, i.e. once per source per frame.
+    // Nine sources at 30 fps call it 270 times a second, and every call used to
+    // repaint the whole window (glClear + every tile quad + swapBuffers) even
+    // though a display can only present ~60 times a second. Throttle the repaint
+    // to one per kPresentInterval. This gates the redraw only: the texture
+    // upload happens before the gate, so the frame painted at the deadline
+    // always shows the newest pixels, and the per-tile primitives live in
+    // scene[] (persistent), so skipping a repaint cannot drop an overlay.
+    static constexpr std::chrono::milliseconds kPresentInterval{16};
+
+    std::chrono::steady_clock::time_point lastPresent{};
+    bool hasPresented = false;
+
+    //! True when the current call is allowed to repaint and present.
+    bool presentDue()
+    {
+        const auto now = std::chrono::steady_clock::now();
+        if (hasPresented && now - lastPresent < kPresentInterval)
+        {
+            return false;
+        }
+        lastPresent = now;
+        hasPresented = true;
+        return true;
+    }
 };
 
 GLRenderer::GLRenderer(int numTiles)
@@ -344,13 +379,7 @@ void GLRenderer::drawResult(core::BatchResult& result,
         drawClassifications(out, result.classifications[0], fh, classNames);
     }
 
-    if ((!result.segmentations.empty() || !result.depths.empty() ||
-         !result.semantics.empty()) && !m_impl->warnedUnsupported)
-    {
-        m_impl->warnedUnsupported = true;
-        TRT_LOG_WARN("GLRenderer: segmentation / depth / semantic overlays are not "
-                     "drawn yet (v1 draws det / obb / pose / cls only)");
-    }
+    m_impl->maskAlpha = options.maskAlpha;
 }
 
 void GLRenderer::save(const core::BatchResult& /*result*/,
@@ -406,9 +435,57 @@ void GLRenderer::show(const core::BatchResult& result,
     }
     else
     {
-        m_impl->ctx.uploadFrame(tile, v.data, v.width, v.height, v.stride);
+        // Host frame: bake the instance masks in on the GPU first.
+        //   * CUDA-GL interop available -> the composited frame goes straight to
+        //     the PBO; the PCIe traffic is the same as a plain glTexSubImage2D.
+        //   * no interop (software rasterizer) -> one D2H copy back, then upload
+        //     from CPU memory exactly as before.
+        bool uploaded = false;
+        if (!result.segmentations.empty() || !result.depths.empty() ||
+            !result.semantics.empty())
+        {
+            const std::uint8_t* baked = m_impl->overlay.composeDevice(
+                result, v.data, v.width, v.height,
+                static_cast<std::size_t>(v.stride), m_impl->maskAlpha);
+            if (baked != nullptr)
+            {
+                if (m_impl->ctx.supportsDeviceFrames())
+                {
+                    m_impl->ctx.uploadFrameDevice(tile, baked, v.width, v.height, v.stride);
+                    uploaded = true;
+                }
+                else
+                {
+                    const std::uint8_t* back = m_impl->overlay.copyBack(
+                        v.width, v.height, static_cast<std::size_t>(v.stride));
+                    if (back != nullptr)
+                    {
+                        m_impl->ctx.uploadFrame(tile, back, v.width, v.height, v.stride);
+                        uploaded = true;
+                    }
+                }
+            }
+            if (const char* err = m_impl->overlay.lastError();
+                err != nullptr && !uploaded && !m_impl->warnedOverlay)
+            {
+                m_impl->warnedOverlay = true;
+                TRT_LOG_WARN("GLRenderer: mask overlay failed (" << err
+                             << "), uploading the frame without masks");
+            }
+        }
+        if (!uploaded)
+        {
+            m_impl->ctx.uploadFrame(tile, v.data, v.width, v.height, v.stride);
+        }
     }
     m_impl->ctx.beginFrame();
+
+    // beginFrame() already polled the window events, so returning here cannot
+    // freeze the window; it only skips this repaint. See Impl::kPresentInterval.
+    if (!m_impl->presentDue())
+    {
+        return;
+    }
 
     // beginFrame() just cleared the shared primitive batch, so EVERY visible
     // tile must re-emit its boxes/labels this frame. show() receives only one
@@ -477,6 +554,10 @@ void GLRenderer::pump() const
         return;
     }
     m_impl->ctx.beginFrame();
+    if (!m_impl->presentDue())
+    {
+        return;
+    }
     m_impl->ctx.present();
 }
 

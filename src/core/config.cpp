@@ -207,8 +207,8 @@ void requireScaleOnlyNorm(const ModelConfig& cfg, const std::string& who)
             who + ": normalize.mean/std are not supported by this model "
                   "(its fused preprocess applies 'scale' only), got mean='" + meanStr +
                   "', std='" + stdStr + "'; remove them, or use a model whose "
-                  "preprocess honours mean/std (yolov3-8 / yolox / yolor / yolo_nas / "
-                  "yolov8_pose_old / yolov8_seg_old / u2net)");
+                  "preprocess honours mean/std (yolov3-7 / yolox / yolor / yolo_nas / "
+                  "u2net)");
     }
 }
 

@@ -88,8 +88,9 @@ private:
     core::DeviceBuffer m_outputSrc;     // [B, 1, dstH, dstW] float
     core::DeviceBuffer m_outputResize;  // [B, 1, srcH, srcW] float
 
-    // Host（D2H 后转 uint8）
-    core::PinnedBuffer m_outputResizeHost;  // [B, 1, srcH, srcW] float
+    // 后处理末段：float -> uint8 在 device 上完成，只回传 1 字节/像素
+    core::DeviceBuffer m_maskU8;        // [B, 1, srcH, srcW] uint8
+    core::PinnedBuffer m_maskU8Host;    // [B, 1, srcH, srcW] uint8
 
     trt_alpha::kernels::AffineMat m_dst2src{};
     trt_alpha::kernels::AffineMat m_src2dst{};

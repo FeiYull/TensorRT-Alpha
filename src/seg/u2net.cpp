@@ -7,6 +7,7 @@
 #include "trt_alpha/core/model_registry.hpp"
 
 #include "trt_alpha/kernels/legacy/u2net_reduce.hpp"
+#include "trt_alpha/kernels/ops/seg_mask_post.hpp"
 #include <cuda_runtime.h>
 
 #include <algorithm>
@@ -117,7 +118,8 @@ void U2Net::allocateBuffers()
 
     // output_resize 依赖 srcH/srcW，setBatch 里再分配
     m_outputResize.allocate(std::size_t(B) * 1 * DH * DW * sizeof(float));
-    m_outputResizeHost.allocate(std::size_t(B) * 1 * DH * DW * sizeof(float));
+    m_maskU8.allocate(std::size_t(B) * 1 * DH * DW);
+    m_maskU8Host.allocate(std::size_t(B) * 1 * DH * DW);
 
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
@@ -165,9 +167,13 @@ void U2Net::setBatch(const core::Batch& batch)
     {
         m_outputResize.allocate(std::size_t(m_batch) * oneSrcGray * sizeof(float));
     }
-    if (m_outputResizeHost.bytes() < std::size_t(m_batch) * oneSrcGray * sizeof(float))
+    if (m_maskU8.bytes() < std::size_t(m_batch) * oneSrcGray)
     {
-        m_outputResizeHost.allocate(std::size_t(m_batch) * oneSrcGray * sizeof(float));
+        m_maskU8.allocate(std::size_t(m_batch) * oneSrcGray);
+    }
+    if (m_maskU8Host.bytes() < std::size_t(m_batch) * oneSrcGray)
+    {
+        m_maskU8Host.allocate(std::size_t(m_batch) * oneSrcGray);
     }
 
     // batch.buffer 是 uint8：H2D uint8 -> GPU kernel -> float
@@ -237,6 +243,7 @@ void U2Net::postprocess()
 
     const int DH = m_cfg.dstH;
     const int DW = m_cfg.dstW;
+    const std::size_t oneSrcGray = std::size_t(m_srcH) * std::size_t(m_srcW);
 
     // 1. 算每张图输出的 min/max
     kernels::reduceMinMax(m_stream.get(),
@@ -260,24 +267,30 @@ void U2Net::postprocess()
                              /*isGray=*/true,
                              m_src2dst);
 
-    // 4. D2H
-    cudaMemcpyAsync(m_outputResizeHost.data(), m_outputResize.data(),
-                    std::size_t(m_batch) * std::size_t(m_srcH) * m_srcW * sizeof(float),
+    // 4. device 上转 uint8（clamp + 截断，与原来 host 的 std::clamp 逐位一致），
+    //    再一次性回传。旧实现每次都把 srcH*srcW 的 float 平面搬回 CPU（1080p
+    //    8.3 MB/图），回传后还要在 host 上逐像素 clamp —— 现在只剩 1 字节/像素。
+    const std::size_t maskElems = std::size_t(m_batch) * oneSrcGray;
+    const cudaError_t cErr = kernels::ops::clampToU8(
+        m_stream.get(), m_outputResize.asFloat(),
+        static_cast<std::uint8_t*>(m_maskU8.data()), maskElems);
+    if (cErr != cudaSuccess)
+    {
+        throw std::runtime_error(std::string("u2net: mask clamp kernel failed: ") +
+                                 cudaGetErrorString(cErr));
+    }
+
+    cudaMemcpyAsync(m_maskU8Host.data(), m_maskU8.data(), maskElems,
                     cudaMemcpyDeviceToHost, m_stream.get());
     m_stream.synchronize();
 
-    // 5. 转 uint8，构造 Segmentation
-    const float* host = static_cast<const float*>(m_outputResizeHost.data());
+    // 5. 组装 Segmentation
+    const std::uint8_t* host = static_cast<const std::uint8_t*>(m_maskU8Host.data());
     for (int b = 0; b < m_batch; ++b)
     {
         auto maskBuf = core::Buffer::createHost(m_srcW, m_srcH, 1, core::DataType::UInt8);
-        std::uint8_t* maskData = maskBuf->mutableData();
-        const float* maskSrc = host + std::size_t(b) * m_srcH * m_srcW;
-        for (std::size_t i = 0; i < std::size_t(m_srcH) * m_srcW; ++i)
-        {
-            const float v = maskSrc[i];
-            maskData[i] = static_cast<std::uint8_t>(std::clamp(v, 0.f, 255.f));
-        }
+        std::memcpy(maskBuf->mutableData(),
+                    host + std::size_t(b) * oneSrcGray, oneSrcGray);
 
         seg::Segmentation s;
         // 无框（box.label 默认 -1），只填 mask

@@ -112,6 +112,7 @@ void sample_yolov26_cls(const std::string& source)
     trt_alpha::InferParams p;
     p.model_type  = trt_alpha::ModelType::yolov26_cls;
     p.config_path = "configs/yolov26_cls.ini";
+    p.engine = "D:/VS2022_Project/TensorRT-Alpha/engines/yolov26n_cls.trt";
     p.source      = source;
     p.draw        = true;
 
@@ -139,6 +140,7 @@ void sample_yolov26_seg(const std::string& source)
     p.config_path = "configs/yolov26_seg.ini";
     p.source      = source;
     p.draw        = true;
+    p.engine = "D:/VS2022_Project/TensorRT-Alpha/engines/yolov26n_seg.trt";
 
     trt_alpha::Infer  model(p);
     trt_alpha::Stream stream = model.async();
@@ -169,6 +171,7 @@ void sample_yolov26_pose(const std::string& source)
     p.model_type  = trt_alpha::ModelType::yolov26_pose;
     p.config_path = "configs/yolov26_pose.ini";
     p.source      = source;
+    p.engine = "D:/VS2022_Project/TensorRT-Alpha/engines/yolov26n_pose.trt";
     p.draw        = true;
 
     trt_alpha::Infer  model(p);
@@ -248,6 +251,11 @@ void sample_yolov26_depth(const std::string& source)
                     d.data[static_cast<std::size_t>(d.height / 2) * d.width + d.width / 2];
                 std::cout << "  depth " << d.width << "x" << d.height
                           << " data=vector<float> center=" << center << " m\n";
+            cv::Mat depth(d.height, d.width, CV_32FC1, const_cast<float*>(d.data.data()));
+            cv::Mat u8, vis;
+            cv::normalize(depth, u8, 0, 255, cv::NORM_MINMAX, CV_8U);   // 逐帧 min/max，画面会闪
+            cv::applyColorMap(u8, vis, cv::COLORMAP_JET);
+
             }
             if (!showFrame("yolov26 depth", f)) { stream.stop(); return; }
         }
@@ -295,10 +303,13 @@ int main(int argc, char** argv)
     {
         //sample_yolov26_det("F:/VideoAlpha/huaxue1.mp4");
         //sample_yolov26_cls("F:/VideoAlpha/huaxue1.mp4");
-        sample_yolov26_seg("D:/Data/bus.jpg");
+        //sample_yolov26_seg("D:/Data/bus.jpg");
+        //sample_yolov26_cls("D:/Data/bus.jpg");
         //sample_yolov26_pose("F:/VideoAlpha/huaxue1.mp4");
+        //sample_yolov26_pose("D:/Data/bus.jpg");
         //sample_yolov26_obb("D:/Data/boats.mp4");
         //sample_yolov26_depth("F:/VideoAlpha/korea-night.mp4");
+        sample_yolov26_depth("D:/Data/bus.jpg");
     }
     catch (const std::exception& e)
     {

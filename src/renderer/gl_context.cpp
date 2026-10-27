@@ -25,6 +25,11 @@
 namespace trt_alpha::renderer {
 namespace {
 
+//! Cached answer of GLContext::probeInterop(). The probe creates and destroys a
+//! hidden GLFW window, and both the host-copy policy and the renderer need the
+//! answer, so it is recorded once here.
+bool g_interopOk = false;
+
 // ---- shaders ----------------------------------------------------------------
 
 const char* kVideoVs = R"(#version 330 core
@@ -728,11 +733,17 @@ bool GLContext::probeInterop()
                      glDevCount > 0);
     TRT_LOG_INFO("GLContext: CUDA-GL interop "
                  << (ok ? "available" : "UNAVAILABLE (host copy)"));
+    g_interopOk = ok;
 
     glfwMakeContextCurrent(nullptr);
     glfwDestroyWindow(probe);
     glfwTerminate();
     return ok;
+}
+
+bool GLContext::supportsDeviceFrames() const
+{
+    return g_interopOk;
 }
 
 void GLContext::uploadFrame(int tile, const std::uint8_t* data, int w, int h, int stride)

@@ -20,7 +20,6 @@ add_subdirectory(test_yolov4)
 add_subdirectory(test_yolov5)
 add_subdirectory(test_yolov6)
 add_subdirectory(test_yolov7)
-add_subdirectory(test_yolov8_old)
 add_subdirectory(test_yolov26)
 add_subdirectory(test_yolov11)
 add_subdirectory(test_yolov9)
@@ -30,16 +29,17 @@ add_subdirectory(test_yolor)
 add_subdirectory(test_yolonas)
 add_subdirectory(test_efficientdet)
 add_subdirectory(test_yunet)
-add_subdirectory(test_yolov8_seg_old)
 add_subdirectory(test_u2net)
-add_subdirectory(test_yolov8_pose_old)
 add_subdirectory(test_infer)
 add_subdirectory(test_yolov26_tasks)
 add_subdirectory(test_ffmpeg_source)
 
 # -----------------------------------------------------------------------------
-# 注册到 CTest：在 build 目录执行
-#     ctest -C Release --output-on-failure
+# 注册到 CTest（本目录只在 -DTRT_ALPHA_BUILD_TESTS=ON 时才被挂上，默认 OFF）。
+# 打开后：
+#     cmake -S . -B build -DTRT_ALPHA_BUILD_TESTS=ON
+#     cmake --build build --config Release
+#     cd build && ctest -C Release --output-on-failure
 # 即可一键跑全部测试。需要真实引擎/图片的测试在资源缺失时会返回 77，
 # CTest 记为 SKIP（而非 FAIL），见各测试的 SKIP_RETURN_CODE。
 # -----------------------------------------------------------------------------
@@ -49,8 +49,8 @@ set(TRT_ALPHA_TEST_TARGETS
     test_batch_result test_model_registry test_memory_pool test_kernels
     test_renderer test_datasource test_bounded_queue test_pipeline
     test_yolov3 test_yolov4 test_yolov5 test_yolov6 test_yolov7
-    test_yolov8_old test_yolov26 test_yolox test_yolor test_yolonas test_efficientdet
-    test_yunet test_yolov8_seg_old test_u2net test_yolov8_pose_old test_infer
+    test_yolov26 test_yolox test_yolor test_yolonas test_efficientdet
+    test_yunet test_u2net test_infer
     test_yolov26_tasks test_yolov11 test_yolov9 test_yolov10
     test_ffmpeg_source
 )

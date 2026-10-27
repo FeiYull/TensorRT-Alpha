@@ -106,4 +106,12 @@ build/
 *TODO.txt
 
 *perf_decode_backends.md
-*build-gl
+
+# GL multi-stream rendering is parked; keep the doc local until it is stable.
+*build_ffmpeg_opengl.md
+
+# Build trees only. `*build*` used to be here and it silently swallowed every
+# file whose name contained "build" (scripts/build_*.ps1, docs/build_*.md).
+build/
+build-*/
+cmake-build-*/

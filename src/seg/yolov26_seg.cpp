@@ -10,13 +10,18 @@
 //                   图里，算子只做 conf 过滤 + NMS；随后**按 chunk 批量**做
 //                       CvMaskCoeffDotPlan（系数 x proto -> 160x160 logits）
 //                    -> CvScaleMaskPlan<float>（ATen bilinear 上采样到 640x640）
-//                    -> 一次 D2H + 一次 sync（整个 chunk 共用）
-//                    -> CPU 侧 >0 二值化 + 按框裁剪（**右/下严格小于**）
-//                    -> 全零则丢弃（官方 keep = masks.amax() > 0）
+//                    -> binarizeCropMasks（>0 二值化 + 按框裁剪，**右/下严格
+//                       小于**；同一趟把 up 槽位就地改写成 0/1 float）
+//                    -> 一次 D2H（uint8）+ 一次 sync（整个 chunk 共用）
+//                    -> 全零则丢弃（官方 keep = masks.amax() > 0，计数由核给出）
 //  输出：mask      = 640x640 网络空间（对齐 py 口径 / 对拍，保留原样）
 //        maskOrig  = 原图尺寸（= scale_masks 那一步），**仅 [model] mask_orig = true
-//                    时生成**；默认不生成，因为内置 renderer 不用它，而它是每个
-//                    实例一次全分辨率双线性 resize（1912x1080 上 ~616 us/实例）。
+//                    时生成**；默认不生成，因为内置 renderer 不用它。走的是
+//                    CvScaleMaskPlan<float> + thresholdMaskToU8，即 py 的
+//                    F.interpolate(bilinear) + "> 0.5"，全在 device 上。
+//
+//  **整条后处理没有一个 host 侧数学循环**：device 只回传成品 uint8 mask
+//  （409 KB/实例），不再回传 640x640 的 float 平面（1.6 MB/实例）。
 //
 //  为什么逐个实例算、却按 chunk 拷贝：
 //      官方顺序要求先把 logits 上采样到 640x640 再二值化，所以每个实例都要一份
@@ -33,10 +38,8 @@
 #include "trt_alpha/core/logger.hpp"
 #include "trt_alpha/core/model_registry.hpp"   // TRT_ALPHA_REGISTER_MODEL
 
-#include <opencv2/imgproc.hpp>
-
 #include <algorithm>
-#include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -236,6 +239,9 @@ void YoloV26Seg::buildPlans()
             std::to_string(si.cropTop) + ") -- output1 must be a clean 1/N of the"
             " network input, otherwise the upscale would drop mask content");
     }
+
+    // mask_orig needs the SOURCE image size, which is only known once the first
+    // batch arrives -- its plan and scratch are built in setBatch() instead.
 }
 
 void YoloV26Seg::allocateBuffers()
@@ -308,9 +314,24 @@ void YoloV26Seg::allocateBuffers()
     logBox(m_tag + ".mask_up", kMaskChunk, 1, H, W, core::DataType::Float32,
            m_maskUp.bytes(), core::MemorySpace::Device);
 
-    m_maskUpHost.allocate(maskBytes * kMaskChunk);
-    logBox(m_tag + ".mask_up_host", kMaskChunk, 1, H, W, core::DataType::Float32,
-           m_maskUpHost.bytes(), core::MemorySpace::Host);
+    // Stage 3 output lives on the device; only the finished uint8 mask is copied
+    // back (4x less traffic than the float plane it used to ship home).
+    const std::size_t maskU8Bytes = static_cast<std::size_t>(W) * H;
+    m_maskU8.allocate(maskU8Bytes * kMaskChunk);
+    logBox(m_tag + ".mask_u8", kMaskChunk, 1, H, W, core::DataType::UInt8,
+           m_maskU8.bytes(), core::MemorySpace::Device);
+
+    m_maskU8Host.allocate(maskU8Bytes * kMaskChunk);
+    logBox(m_tag + ".mask_u8_host", kMaskChunk, 1, H, W, core::DataType::UInt8,
+           m_maskU8Host.bytes(), core::MemorySpace::Host);
+
+    m_maskCounts.allocate(sizeof(int) * kMaskChunk);
+    logBox(m_tag + ".mask_counts", kMaskChunk, 1, 1, 1, core::DataType::Int32,
+           m_maskCounts.bytes(), core::MemorySpace::Device);
+
+    m_maskCountsHost.allocate(sizeof(int) * kMaskChunk);
+    logBox(m_tag + ".mask_counts_host", kMaskChunk, 1, 1, 1, core::DataType::Int32,
+           m_maskCountsHost.bytes(), core::MemorySpace::Host);
 
     nvinfer1::IExecutionContext* ctx = m_engine->context();
     if (!ctx->setTensorAddress(m_inputName.c_str(), m_inputNchw.data()) ||
@@ -364,6 +385,53 @@ void YoloV26Seg::ensurePreprocessPlan()
                  << " ratio=" << m_lb.ratio);
 }
 
+void YoloV26Seg::ensureMaskOrigPlans()
+{
+    if (!m_emitMaskOrig)
+    {
+        return;
+    }
+
+    if (!m_origScale || !m_origScale->matches(m_srcW, m_srcH, m_cfg.dstW, m_cfg.dstH))
+    {
+        // scale_masks(padding=True): drop the letterbox bars and bilinear-resample
+        // onto the source image. Same ATen port stage 2 uses, run backwards.
+        m_origScale = std::make_unique<kernels::ops::CvScaleMaskPlan<float>>(
+            m_srcW, m_srcH, m_cfg.dstW, m_cfg.dstH,
+            kernels::ops::MaskInterp::Bilinear, /*padding=*/true);
+        if (!m_origScale->ok())
+        {
+            throw std::runtime_error(m_tag + ": mask_orig scale plan construction failed");
+        }
+
+        // The crop window must be the very letterbox the preprocess applied,
+        // otherwise the mask is resampled off a different rectangle than the
+        // image was padded with -- a silent misalignment nothing else catches.
+        const kernels::ops::ScaleMaskInfo& oi = m_origScale->info();
+        if (oi.newW != m_lb.newW || oi.newH != m_lb.newH ||
+            oi.cropLeft != m_lb.padLeft || oi.cropTop != m_lb.padTop)
+        {
+            throw std::runtime_error(
+                m_tag + ": mask_orig crop window " + std::to_string(oi.newW) + "x" +
+                std::to_string(oi.newH) + " at " + std::to_string(oi.cropLeft) + "," +
+                std::to_string(oi.cropTop) + " does not match the preprocess letterbox " +
+                std::to_string(m_lb.newW) + "x" + std::to_string(m_lb.newH) + " at " +
+                std::to_string(m_lb.padLeft) + "," + std::to_string(m_lb.padTop));
+        }
+    }
+
+    const std::size_t origElems = static_cast<std::size_t>(m_srcW) * m_srcH;
+    if (m_origF.bytes() < origElems * sizeof(float))
+    {
+        m_origF.allocate(origElems * sizeof(float));
+        m_origU8.allocate(origElems);
+        m_origU8Host.allocate(origElems);
+
+        TRT_LOG_DEBUG(m_tag << ": mask_orig scratch " << m_srcW << "x" << m_srcH
+                     << " (" << ((origElems * sizeof(float)) >> 20) << " MB f32)");
+    }
+}
+
 void YoloV26Seg::setBatch(const core::Batch& batch)
 {
     if (batch.views.empty())
@@ -381,6 +449,7 @@ void YoloV26Seg::setBatch(const core::Batch& batch)
     }
 
     ensurePreprocessPlan();
+    ensureMaskOrigPlans();
 
     if (batch.buffer == nullptr || batch.buffer->data() == nullptr)
     {
@@ -460,18 +529,14 @@ void YoloV26Seg::postprocess()
     const std::size_t logitElems = static_cast<std::size_t>(m_protoH) * m_protoW;
     const std::size_t protoElems =
         static_cast<std::size_t>(m_numCoeffs) * m_protoH * m_protoW;
-    const std::size_t upElems   = static_cast<std::size_t>(W) * H;
-    const std::size_t maskBytes = upElems * sizeof(float);
+    const std::size_t upElems = static_cast<std::size_t>(W) * H;
 
-    float* logitsDev  = m_logits.asFloat();
-    float* maskUpDev  = m_maskUp.asFloat();
-    float* maskUpHome = m_maskUpHost.asFloat();
-
-    // x >= x1 with integer x is x >= ceil(x1); x < x2 is x <= ceil(x2) - 1.
-    const auto ceilInt = [](float v)
-    {
-        return static_cast<int>(std::ceil(static_cast<double>(v)));
-    };
+    float* logitsDev = m_logits.asFloat();
+    float* maskUpDev = m_maskUp.asFloat();
+    std::uint8_t* maskU8Dev  = static_cast<std::uint8_t*>(m_maskU8.data());
+    std::uint8_t* maskU8Home = static_cast<std::uint8_t*>(m_maskU8Host.data());
+    int*          maskCntDev = static_cast<int*>(m_maskCounts.data());
+    const int*    maskCntHome = static_cast<const int*>(m_maskCountsHost.data());
 
     int produced = 0;
     int allZero  = 0;
@@ -519,61 +584,62 @@ void YoloV26Seg::postprocess()
                 }
             }
 
-            // Slots are contiguous on both sides, so this is one single copy.
-            const cudaError_t copyErr =
-                cudaMemcpyAsync(maskUpHome, maskUpDev,
-                                maskBytes * static_cast<std::size_t>(m),
-                                cudaMemcpyDeviceToHost, m_stream.get());
-            if (copyErr != cudaSuccess)
+            // ---- stage 3 on the DEVICE: binarize (> 0) + crop to the box -----
+            // Pixel indices inside the half-open window
+            //     [ceil(x1), ceil(x2)) x [ceil(y1), ceil(y2))
+            // are the ones satisfying `x >= x1 && x < x2 && y >= y1 && y < y2`
+            // (ultralytics crop_mask: right and bottom strict). Everything else
+            // is 0. The same pass rewrites the up-slots to the 0/1 float form
+            // that mask_orig interpolates, so no second plane pass is needed.
+            cudaMemsetAsync(maskCntDev, 0,
+                            sizeof(int) * static_cast<std::size_t>(m), m_stream.get());
+
+            const cudaError_t bErr = kernels::ops::binarizeCropMasks(
+                m_stream.get(), m,
+                maskUpDev, upElems,
+                detsBase + static_cast<std::size_t>(base) * stride,
+                stride, W, H, maskU8Dev, maskCntDev, /*thr=*/0.0f);
+            if (bErr != cudaSuccess)
             {
-                throw std::runtime_error(m_tag + ": mask copy back failed: " +
-                                         cudaGetErrorString(copyErr));
+                throw std::runtime_error(m_tag + ": mask binarize/crop kernel failed: " +
+                                         cudaGetErrorString(bErr));
+            }
+
+            // Slots are contiguous on both sides, so this is one single copy --
+            // uint8 now, i.e. a quarter of the float plane this used to ship home.
+            const cudaError_t copyErr =
+                cudaMemcpyAsync(maskU8Home, maskU8Dev,
+                                upElems * static_cast<std::size_t>(m),
+                                cudaMemcpyDeviceToHost, m_stream.get());
+            const cudaError_t cntErr =
+                cudaMemcpyAsync(m_maskCountsHost.data(), maskCntDev,
+                                sizeof(int) * static_cast<std::size_t>(m),
+                                cudaMemcpyDeviceToHost, m_stream.get());
+            if (copyErr != cudaSuccess || cntErr != cudaSuccess)
+            {
+                throw std::runtime_error(
+                    m_tag + ": mask copy back failed: " +
+                    cudaGetErrorString(copyErr != cudaSuccess ? copyErr : cntErr));
             }
             m_stream.synchronize();
 
             for (int j = 0; j < m; ++j)
             {
-                const float* d  = detRow + static_cast<std::size_t>(base + j) * stride;
-                float*       up = maskUpHome + static_cast<std::size_t>(j) * upElems;
+                const float* d = detRow + static_cast<std::size_t>(base + j) * stride;
 
-                // ---- stage 3: binarize (>0), then crop to the box ------------
-                // crop_mask:  x >= x1 && x < x2 && y >= y1 && y < y2   (right and
-                // bottom strict). The box is still in network pixels -- scale_boxes
-                // comes after, exactly as in the official construct_result.
-                //
-                // Over integer pixel indices that condition is the half-open
-                // window [ceil(x1), ceil(x2)) x [ceil(y1), ceil(y2)), so the whole
-                // stage is "zero outside + one SIMD compare inside" instead of a
-                // scalar 640x640 loop.
-                const float x1 = d[0], y1 = d[1], x2 = d[2], y2 = d[3];
-                const int xa = std::clamp(ceilInt(x1), 0, W);
-                const int xb = std::clamp(ceilInt(x2), 0, W);
-                const int ya = std::clamp(ceilInt(y1), 0, H);
-                const int yb = std::clamp(ceilInt(y2), 0, H);
-
-                if (xb <= xa || yb <= ya)
+                // Official `keep = masks.amax((-2,-1)) > 0`: an instance whose mask
+                // is empty after cropping is dropped from the result list entirely.
+                // The count came from the kernel -- nothing is scanned on the host.
+                if (maskCntHome[j] == 0)
                 {
                     ++allZero;
                     continue;
                 }
 
                 auto maskBuf = core::Buffer::createHost(W, H, 1, core::DataType::UInt8);
-                std::uint8_t* md = maskBuf->mutableData();
-
-                cv::Mat netMask(H, W, CV_8UC1, md);
-                netMask.setTo(0);                    // everything outside stays 0
-                const cv::Rect roi(xa, ya, xb - xa, yb - ya);
-                const cv::Mat  upMat(H, W, CV_32FC1, up);
-                cv::compare(upMat(roi), cv::Scalar(0.0), netMask(roi), cv::CMP_GT);
-
-                // Official `keep = masks.amax((-2,-1)) > 0`: an instance whose mask
-                // is empty after cropping is dropped from the result list entirely.
-                const int on = cv::countNonZero(netMask(roi));
-                if (on == 0)
-                {
-                    ++allZero;
-                    continue;
-                }
+                std::memcpy(maskBuf->mutableData(),
+                            maskU8Home + static_cast<std::size_t>(j) * upElems,
+                            upElems);
 
                 Segmentation s;
                 s.box.left       = clipX(m_lb.toOrigX(d[0]));
@@ -586,31 +652,50 @@ void YoloV26Seg::postprocess()
                 s.maskOwner = maskBuf;
 
                 // ---- stage 4: un-letterbox the mask to the SOURCE-IMAGE size --
-                // Drop the letterbox bars, bilinear-resize to srcW x srcH, re-binarize.
-                // Mirrors ultralytics `ops.scale_masks(mask, im0.shape[:2], mode="bilinear")`
-                // followed by `> 0.5`. Off unless [model] mask_orig = true: this is a
-                // full-resolution resize per instance and the built-in renderer never
-                // reads the result (it rescales `mask` itself).
+                // Drop the letterbox bars and bilinear-resample onto srcW x srcH,
+                // then `> 0.5` -- i.e. ops.scale_masks(mode="bilinear") plus the
+                // comparison that follows it in the python reference. The source
+                // is the 0/1 float mask the binarize kernel left in the up-slot,
+                // which is exactly the python bool mask cast to float, and the
+                // resampler is the same ATen bilinear port stage 2 uses.
+                //
+                // Off unless [model] mask_orig = true: it costs a full-resolution
+                // resize per instance and the built-in renderer never reads the
+                // result (it rescales `mask` itself). One instance at a time, so
+                // the float scratch stays at a single srcW*srcH plane.
                 if (m_emitMaskOrig)
                 {
-                    const int lw = m_lb.newW,  lh = m_lb.newH;
-                    const int lx = m_lb.padLeft, ly = m_lb.padTop;
-                    if (lw > 0 && lh > 0 && lx >= 0 && ly >= 0 &&
-                        lx + lw <= W && ly + lh <= H)
-                    {
-                        const cv::Mat crop = netMask(cv::Rect(lx, ly, lw, lh));
-                        cv::Mat srcMask;
-                        cv::resize(crop, srcMask, cv::Size(m_srcW, m_srcH), 0.0, 0.0,
-                                   cv::INTER_LINEAR);
-                        cv::threshold(srcMask, srcMask, 127, 255, cv::THRESH_BINARY);
+                    const std::size_t origElems =
+                        static_cast<std::size_t>(m_srcW) * m_srcH;
 
-                        auto fullBuf = core::Buffer::createHost(
-                            m_srcW, m_srcH, 1, core::DataType::UInt8);
-                        std::memcpy(fullBuf->mutableData(), srcMask.data,
-                                    static_cast<std::size_t>(m_srcW) * m_srcH);
-                        s.maskOrig      = fullBuf->view();
-                        s.maskOrigOwner = fullBuf;
+                    m_origScale->launch(m_stream.get(), /*batch=*/1,
+                                        maskUpDev + static_cast<std::size_t>(j) * upElems,
+                                        m_origF.asFloat(), /*channels=*/1);
+                    if (!m_origScale->ok())
+                    {
+                        throw std::runtime_error(m_tag + ": mask_orig scale kernel failed");
                     }
+
+                    const cudaError_t tErr = kernels::ops::thresholdMaskToU8(
+                        m_stream.get(), m_origF.asFloat(),
+                        static_cast<std::uint8_t*>(m_origU8.data()),
+                        origElems, /*thr=*/0.5f);
+                    if (tErr != cudaSuccess)
+                    {
+                        throw std::runtime_error(
+                            m_tag + ": mask_orig threshold kernel failed: " +
+                            cudaGetErrorString(tErr));
+                    }
+
+                    cudaMemcpyAsync(m_origU8Host.data(), m_origU8.data(), origElems,
+                                    cudaMemcpyDeviceToHost, m_stream.get());
+                    m_stream.synchronize();
+
+                    auto fullBuf = core::Buffer::createHost(
+                        m_srcW, m_srcH, 1, core::DataType::UInt8);
+                    std::memcpy(fullBuf->mutableData(), m_origU8Host.data(), origElems);
+                    s.maskOrig      = fullBuf->view();
+                    s.maskOrigOwner = fullBuf;
                 }
 
                 out.push_back(std::move(s));

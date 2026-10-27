@@ -109,6 +109,12 @@ public:
     //! bytes == 0 returns an empty block (no CUDA call).
     [[nodiscard]] Block allocate(Kind kind, std::size_t bytes);
 
+    //! Like allocate(), but returns an empty block instead of throwing when the
+    //! allocation fails, and logs no ERROR. Used where a failure has a graceful
+    //! fallback (pinned -> pageable host) and an ERROR per batch would just be
+    //! noise. The failed CUDA last-error is cleared before returning.
+    [[nodiscard]] Block tryAllocate(Kind kind, std::size_t bytes) noexcept;
+
     //! Return a block. noexcept -- called from RAII destructors.
     //! A double free or a foreign pointer is always rejected with an ERROR log
     //! (in every build).
@@ -134,6 +140,11 @@ private:
     };
 
     static std::size_t roundUp(std::size_t bytes) noexcept;
+
+    //! Shared implementation of allocate() / tryAllocate(). Returns an empty
+    //! Block on failure; when `cudaErr` is non-null it receives the CUDA error
+    //! code (0 = success) so allocate() can build its message.
+    Block allocateImpl(Kind kind, std::size_t bytes, int* cudaErr);
 
     KindState& state(Kind kind) noexcept
     {

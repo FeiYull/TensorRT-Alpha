@@ -8,6 +8,7 @@
 
 #include <cuda_runtime.h>
 
+#include <atomic>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -119,7 +120,29 @@ std::shared_ptr<Buffer> Buffer::createPinned(int width, int height, int channels
     // also a scarce resource (it cannot be paged out), which is why the pool owns
     // it and hands the same blocks back instead of calling cudaHostAlloc per batch.
     const std::shared_ptr<MemoryPool>& pool = MemoryPool::instance();
-    const MemoryPool::Block block = pool->allocate(MemoryPool::Kind::PinnedHost, bytes);
+
+    // Pinned memory is capped by RLIMIT_MEMLOCK, which WSL2 and stock Linux both
+    // default to 64 MB -- and a non-root process cannot raise the hard limit.
+    // Several concurrent 1080p streams exhaust that quickly. Losing page-locking
+    // is a performance regression (cudaMemcpyAsync becomes a synchronous staging
+    // copy, ~0.8 ms per 1080p frame), not a correctness one, so fall back to a
+    // pageable block instead of aborting the whole run. tryAllocate also clears
+    // the failed allocation's CUDA last-error, which would otherwise be reported
+    // by the next cudaGetLastError() on this thread (e.g. nv12ToBgr).
+    MemoryPool::Block block = pool->tryAllocate(MemoryPool::Kind::PinnedHost, bytes);
+    if (block.ptr == nullptr)
+    {
+        static std::atomic<bool> warnedOnce{false};
+        if (!warnedOnce.exchange(true, std::memory_order_relaxed))
+        {
+            TRT_LOG_WARN("Buffer: pinned host allocation failed (pinned memory is "
+                         "capped by RLIMIT_MEMLOCK, 64 MB by default on WSL/stock "
+                         "Linux); falling back to pageable host memory, which makes "
+                         "cudaMemcpyAsync synchronous (~0.8 ms per 1080p frame). "
+                         "Further fallbacks are silent.");
+        }
+        return createHost(width, height, channels, dtype);
+    }
 
     TRT_LOG_DEBUG("Buffer: createPinned " << width << "x" << height
                   << "x" << channels << " " << nameOf(dtype)
